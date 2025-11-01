@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, Home, Search } from "lucide-react";
+import { Building2, Home, Search, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Companies", href: "/companies", icon: Building2 },
+  { name: "Cadences", href: "/cadences", icon: Workflow },
 ];
 
 export function Sidebar() {

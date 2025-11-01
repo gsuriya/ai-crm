@@ -20,6 +20,7 @@ interface Company {
   arr?: number;
   funding_amount?: number;
   industry?: string;
+  website?: string;
 }
 
 interface CompanyWithMatches extends Company {
