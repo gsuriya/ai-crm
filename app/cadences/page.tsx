@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Edit, Trash2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { CadenceFlowBuilder, FlowBlock } from "@/components/cadence-flow-builder";
 import { supabase } from "@/lib/supabase";
 import { X } from "lucide-react";
@@ -74,7 +73,7 @@ export default function CadencesPage() {
           .from('cadences')
           .update({
             name: name || editingCadence.name,
-            description: description || editingCadence.description,
+            description: description?.trim() || null,
             nodes: blocks,
             updated_at: new Date().toISOString(),
           })
@@ -88,7 +87,7 @@ export default function CadencesPage() {
             ? { 
                 ...c, 
                 name: name || c.name,
-                description: description || c.description,
+                description: description?.trim() || null,
                 blocks, 
                 nodes: blocks, 
                 updated_at: new Date().toISOString() 
@@ -106,7 +105,7 @@ export default function CadencesPage() {
           .from('cadences')
           .insert({
             name: name.trim(),
-            description: description || null,
+            description: description?.trim() || null,
             nodes: blocks,
             connections: [],
             is_active: true,
@@ -152,10 +151,44 @@ export default function CadencesPage() {
     }
   };
 
-  const handleCloseFlowBuilder = () => {
+  const handleCloseFlowBuilder = useCallback(() => {
     setShowFlowBuilder(false);
     setEditingCadence(null);
-  };
+  }, []);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showFlowBuilder) {
+        handleCloseFlowBuilder();
+      }
+    };
+
+    if (showFlowBuilder) {
+      window.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [showFlowBuilder, handleCloseFlowBuilder]);
+
+  // Hide sidebar when modal is open
+  useEffect(() => {
+    if (showFlowBuilder) {
+      // Add class immediately to hide sidebar
+      document.body.classList.add('modal-open');
+    } else {
+      // Delay removing class slightly to coordinate with modal exit animation
+      const timer = setTimeout(() => {
+        document.body.classList.remove('modal-open');
+      }, 100); // Small delay to let modal start fading out first
+      return () => clearTimeout(timer);
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showFlowBuilder]);
 
   if (loading) {
     return (
@@ -185,63 +218,87 @@ export default function CadencesPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto">
         {cadences.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
+          <div className="flex flex-col items-center justify-center py-12 px-8">
             <div className="text-muted-foreground mb-4">
               No cadences yet. Create your first cadence to get started.
             </div>
           </div>
         ) : (
-          <div className="mx-auto max-w-6xl space-y-4">
-            {cadences.map((cadence) => (
-              <motion.div
-                key={cadence.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-xl">{cadence.name}</CardTitle>
-                        {cadence.description && (
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {cadence.description}
-                          </p>
-                        )}
-                        <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            Updated {new Date(cadence.updated_at).toLocaleDateString()}
-                          </div>
-                          {cadence.blocks && (
-                            <div>{cadence.blocks.length} blocks</div>
-                          )}
-                        </div>
+          <div className="w-full">
+            <table className="w-full">
+              <thead className="bg-muted/50 border-b border-border">
+                <tr>
+                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Updated
+                  </th>
+                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Blocks
+                  </th>
+                  <th className="px-8 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {cadences.map((cadence) => (
+                  <motion.tr
+                    key={cadence.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="px-8 py-4 whitespace-nowrap">
+                      <div className="font-medium text-foreground">{cadence.name}</div>
+                    </td>
+                    <td className="px-8 py-4">
+                      <div className="text-sm text-muted-foreground max-w-md truncate">
+                        {cadence.description || '-'}
                       </div>
-                      <div className="flex gap-2">
+                    </td>
+                    <td className="px-8 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {new Date(cadence.updated_at).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-8 py-4 whitespace-nowrap">
+                      <div className="text-sm text-foreground">
+                        {cadence.blocks?.length || 0}
+                      </div>
+                    </td>
+                    <td className="px-8 py-4 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditCadence(cadence)}
+                          className="h-8"
                         >
-                          <Edit className="h-4 w-4 mr-2" />
+                          <Edit className="h-3.5 w-3.5 mr-1.5" />
                           Edit
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleDeleteCadence(cadence.id)}
+                          className="h-8"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              </motion.div>
-            ))}
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, X, Mail, Phone, Calendar, GitBranch, Clock, Play, Square, Settings, ArrowDown, ArrowUp } from "lucide-react";
+import { Plus, Check, X, Mail, Phone, Calendar, GitBranch, Clock, Play, Square, Settings, ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
@@ -150,14 +150,16 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isChatFocused, setIsChatFocused] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatMessagesRef = useRef<HTMLDivElement>(null);
   const [isChatScrolled, setIsChatScrolled] = useState(false);
   const [isChatAtBottom, setIsChatAtBottom] = useState(true);
+  const [hasScrollableContent, setHasScrollableContent] = useState(false);
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     setSaved(true);
     
     // Normalize blocks before saving (ensure exactly one trigger block)
@@ -192,7 +194,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
       onSave(normalizedBlocks, name, description);
     }
     setTimeout(() => setSaved(false), 2000);
-  };
+  }, [blocks, autoSave, cadenceId, name, description, onSave]);
 
   const handleBlockClick = (blockId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -429,7 +431,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [dragging, dragOffset, draggingConnection, connectingFrom, connectionPoint, connectionStartPos, autoSave, pan, zoom]);
+  }, [dragging, dragOffset, draggingConnection, connectingFrom, connectionPoint, connectionStartPos, autoSave, pan, zoom, handleSave]);
 
   const handleZoom = (delta: number) => {
     setZoom(prev => Math.max(0.25, Math.min(2, prev + delta)));
@@ -444,14 +446,14 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
-  const handlePanMove = (e: MouseEvent) => {
+  const handlePanMove = useCallback((e: MouseEvent) => {
     if (isPanning) {
       setPan({
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
     }
-  };
+  }, [isPanning, panStart]);
 
   const handlePanEnd = () => {
     setIsPanning(false);
@@ -466,37 +468,53 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         window.removeEventListener('mouseup', handlePanEnd);
       };
     }
-  }, [isPanning, panStart]);
+  }, [isPanning, panStart, handlePanMove]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    // Reset bottom state when new messages arrive
+    // Reset scroll state when new messages arrive
     setTimeout(() => {
       setIsChatAtBottom(true);
       setIsChatScrolled(false);
-    }, 100);
+      // Re-check scrollable content
+      const container = chatMessagesRef.current;
+      if (container) {
+        setHasScrollableContent(container.scrollHeight > container.clientHeight);
+      }
+    }, 150);
   }, [chatMessages, isChatLoading]);
 
   // Track scroll position for gradient visibility
   useEffect(() => {
+    if (!isRightSidebarOpen) return;
+    
     const messagesContainer = chatMessagesRef.current;
     if (!messagesContainer) return;
 
     const handleScroll = () => {
       const container = messagesContainer;
-      setIsChatScrolled(container.scrollTop > 10);
+      const hasScroll = container.scrollHeight > container.clientHeight;
+      setHasScrollableContent(hasScroll);
+      setIsChatScrolled(container.scrollTop > 5);
       // Check if near bottom (within 20px)
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 20;
       setIsChatAtBottom(isNearBottom);
     };
 
     messagesContainer.addEventListener('scroll', handleScroll);
+    // Use ResizeObserver to detect when content changes
+    const resizeObserver = new ResizeObserver(() => {
+      handleScroll();
+    });
+    resizeObserver.observe(messagesContainer);
+    
     handleScroll(); // Check initial state
 
     return () => {
       messagesContainer.removeEventListener('scroll', handleScroll);
+      resizeObserver.disconnect();
     };
-  }, [isChatFocused, isChatOpen, chatMessages.length]);
+  }, [isRightSidebarOpen, chatMessages.length]);
 
   useEffect(() => {
     const canvas = containerRef.current;
@@ -994,32 +1012,59 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Block palette */}
-        <div className="w-64 border-r bg-gray-50 p-4 overflow-y-auto">
-          <h3 className="font-semibold mb-3">Add Block</h3>
-          <div className="space-y-2">
-            {Object.entries(blockTypeConfig)
-              .filter(([type]) => type !== 'trigger') // Exclude trigger/start block from palette
-              .map(([type, config]) => {
-                const Icon = config.icon;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => handleAddBlock(type as BlockType)}
-                    className="w-full flex items-center gap-3 p-3 bg-white border rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left"
-                  >
-                    <div className={`${config.color} p-2 rounded`}>
-                      <Icon className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <div className="font-medium text-sm">{config.label}</div>
-                    </div>
-                  </button>
-                );
-              })}
-          </div>
-        </div>
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Left Sidebar Toggle Button */}
+        <button
+          onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
+          className="absolute left-0 top-1/2 transform -translate-y-1/2 z-50 bg-background border border-border rounded-r-md p-1.5 hover:bg-accent transition-colors"
+          style={{ display: isLeftSidebarOpen ? 'none' : 'block' }}
+        >
+          {isLeftSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+
+        {/* Block palette - Left Sidebar */}
+        <AnimatePresence>
+          {isLeftSidebarOpen && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 256, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="w-64 border-r bg-background overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
+                <h3 className="text-sm font-semibold text-foreground">Add Block</h3>
+                <button
+                  onClick={() => setIsLeftSidebarOpen(false)}
+                  className="p-1 hover:bg-muted rounded transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {Object.entries(blockTypeConfig)
+                  .filter(([type]) => type !== 'trigger') // Exclude trigger/start block from palette
+                  .map(([type, config]) => {
+                    const Icon = config.icon;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => handleAddBlock(type as BlockType)}
+                        className="w-full flex items-center gap-3 p-3 bg-white border rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left"
+                      >
+                        <div className={`${config.color} p-2 rounded`}>
+                          <Icon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">{config.label}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Canvas */}
         <div
@@ -1035,219 +1080,12 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               setConnectionPoint(null);
             }
             setSelectedBlock(null);
-            // Close chat if clicking outside (but keep messages visible if they exist)
-            if (isChatFocused && !(e.target as HTMLElement).closest('[data-chat-container]')) {
-              setIsChatFocused(false);
-              // Only close completely if no messages
-              if (chatMessages.length === 0) {
-                setIsChatOpen(false);
-              }
-            }
           }}
           onMouseDown={(e) => {
             e.stopPropagation(); // Prevent modal from closing when clicking canvas
             handlePanStart(e);
           }}
         >
-          {/* Floating Chat Overlay - Compact & Clean */}
-          <div 
-            data-chat-container
-            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center"
-          >
-            {/* Chat Messages - Compact, centered with fade gradients */}
-            <AnimatePresence>
-              {isChatFocused && isChatOpen && chatMessages.length > 0 && (
-                <motion.div
-                  ref={chatMessagesRef}
-                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                  transition={{ duration: 0.15 }}
-                  className="mb-2 max-h-48 overflow-y-auto space-y-1.5 w-full flex flex-col items-center pointer-events-auto px-2 relative scroll-smooth"
-                >
-                  {/* Fade gradient at top - only show when scrolled */}
-                  {isChatScrolled && (
-                    <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-background/80 via-background/40 to-transparent pointer-events-none z-10" />
-                  )}
-                  
-                  {chatMessages.map((msg, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, y: 3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.02, duration: 0.2, ease: "easeOut" }}
-                      className="w-full flex justify-center"
-                    >
-                      <div
-                        className={`max-w-md rounded-lg px-3 py-1.5 text-xs shadow-md backdrop-blur-md ${
-                          msg.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-white/95 text-foreground border border-border/20'
-                        }`}
-                      >
-                        {msg.content}
-                      </div>
-                    </motion.div>
-                  ))}
-                  {isChatLoading && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex justify-center"
-                    >
-                      <div className="bg-white/95 backdrop-blur-md rounded-lg px-3 py-1.5 shadow-md border border-border/20">
-                        <div className="flex gap-1">
-                          <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                          <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '120ms' }}></span>
-                          <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '240ms' }}></span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                  
-                  {/* Fade gradient at bottom - only show when not at bottom */}
-                  {!isChatAtBottom && (
-                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background/80 via-background/40 to-transparent pointer-events-none z-10" />
-                  )}
-                  
-                  <div ref={chatEndRef} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Input Bar - Refined with better animations */}
-            <motion.div
-              initial={{ width: '160px', opacity: 0.8 }}
-              animate={{ 
-                width: isChatFocused ? '480px' : '160px',
-                opacity: 1
-              }}
-              transition={{ 
-                duration: 0.25, 
-                ease: [0.4, 0, 0.2, 1],
-                opacity: { duration: 0.15 }
-              }}
-              className="relative flex items-center bg-background/95 backdrop-blur-md border border-border rounded-full px-3 py-2 shadow-lg focus-within:ring-1 focus-within:ring-ring focus-within:border-ring focus-within:shadow-xl transition-all pointer-events-auto"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsChatFocused(true);
-                chatInputRef.current?.focus();
-              }}
-            >
-              <input
-                ref={chatInputRef}
-                type="text"
-                value={chatInput}
-                onChange={(e) => {
-                  setChatInput(e.target.value);
-                  if (!isChatOpen) setIsChatOpen(true);
-                }}
-                onFocus={() => {
-                  setIsChatFocused(true);
-                  setIsChatOpen(true);
-                }}
-                onBlur={(e) => {
-                  if (!(e.relatedTarget as HTMLElement)?.closest('[data-chat-container]')) {
-                    setTimeout(() => {
-                      if (!chatInput.trim() && chatMessages.length === 0) {
-                        setIsChatFocused(false);
-                      }
-                    }, 100);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!chatInput.trim() || isChatLoading) return;
-
-                    const userMessage = chatInput.trim();
-                    setChatInput('');
-                    setIsChatOpen(true);
-                    setIsChatFocused(true);
-                    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-                    setIsChatLoading(true);
-
-                    fetch('/api/cadence-chat', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        message: userMessage,
-                        blocks,
-                        name,
-                        description,
-                      }),
-                    })
-                      .then(response => {
-                        if (!response.ok) throw new Error('Failed to get response');
-                        return response.json();
-                      })
-                      .then(data => {
-                        setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
-                      })
-                      .catch(error => {
-                        console.error('Error sending chat message:', error);
-                        setChatMessages(prev => [
-                          ...prev,
-                          { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
-                        ]);
-                      })
-                      .finally(() => {
-                        setIsChatLoading(false);
-                      });
-                  }
-                }}
-                placeholder={isChatFocused ? "Ask about your workflow..." : "Ask..."}
-                className="flex-1 bg-transparent border-0 outline-none text-xs text-foreground placeholder:text-muted-foreground pr-2 min-w-0"
-                disabled={isChatLoading}
-              />
-              <button
-                onClick={async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (!chatInput.trim() || isChatLoading) return;
-
-                  const userMessage = chatInput.trim();
-                  setChatInput('');
-                  setIsChatOpen(true);
-                  setIsChatFocused(true);
-                  setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-                  setIsChatLoading(true);
-
-                  try {
-                    const response = await fetch('/api/cadence-chat', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        message: userMessage,
-                        blocks,
-                        name,
-                        description,
-                      }),
-                    });
-
-                    if (!response.ok) {
-                      throw new Error('Failed to get response');
-                    }
-
-                    const data = await response.json();
-                    setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
-                  } catch (error) {
-                    console.error('Error sending chat message:', error);
-                    setChatMessages(prev => [
-                      ...prev,
-                      { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
-                    ]);
-                  } finally {
-                    setIsChatLoading(false);
-                  }
-                }}
-                disabled={!chatInput.trim() || isChatLoading}
-                className="ml-1.5 flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all disabled:hover:bg-primary flex-shrink-0"
-              >
-                <ArrowUp className="h-3 w-3" />
-              </button>
-            </motion.div>
-          </div>
 
           <svg
             className="absolute inset-0 pointer-events-none"
@@ -1370,6 +1208,221 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             {blocks.map(block => renderBlock(block))}
           </div>
         </div>
+
+        {/* Right Sidebar Toggle Button */}
+        <button
+          onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-50 bg-background border border-border rounded-l-md p-1.5 hover:bg-accent transition-colors"
+          style={{ display: isRightSidebarOpen ? 'none' : 'block' }}
+        >
+          {isRightSidebarOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+
+        {/* Chat Sidebar - Right Panel */}
+        <AnimatePresence>
+          {isRightSidebarOpen && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 256, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              data-chat-container
+              className="w-64 border-l bg-background overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
+                <h3 className="text-sm font-semibold text-foreground">Agentic Builder</h3>
+                <button
+                  onClick={() => setIsRightSidebarOpen(false)}
+                  className="p-1 hover:bg-muted rounded transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              {/* Chat Messages */}
+              <div
+                ref={chatMessagesRef}
+                className="flex-1 overflow-y-auto p-4 space-y-2 relative scroll-smooth"
+              >
+                {/* Fade gradient at top */}
+                {hasScrollableContent && (
+                  <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-background via-background/80 to-transparent pointer-events-none z-10" />
+                )}
+
+                {chatMessages.length === 0 && (
+                  <div className="text-xs text-muted-foreground text-center py-8">
+                    Ask me anything about your workflow
+                  </div>
+                )}
+
+                {chatMessages.map((msg, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.02, duration: 0.2, ease: "easeOut" }}
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs shadow-sm ${
+                        msg.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-white text-foreground border border-border/20'
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </motion.div>
+                ))}
+
+                {isChatLoading && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex justify-start"
+                  >
+                    <div className="bg-white rounded-lg px-2.5 py-1.5 shadow-sm border border-border/20">
+                      <motion.div
+                        className="flex gap-1"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.2 }}
+                      >
+                        {[0, 1, 2].map((i) => (
+                          <motion.span
+                            key={i}
+                            className="w-1.5 h-1.5 rounded-full bg-primary"
+                            animate={{
+                              scale: [1, 1.5, 1],
+                              opacity: [0.5, 1, 0.5],
+                            }}
+                            transition={{
+                              duration: 1,
+                              repeat: Infinity,
+                              delay: i * 0.2,
+                            }}
+                          />
+                        ))}
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Fade gradient at bottom */}
+                {!isChatAtBottom && (
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background via-background/80 to-transparent pointer-events-none z-10" />
+                )}
+
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat Input */}
+              <div className="p-4 border-t">
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!chatInput.trim() || isChatLoading) return;
+
+                    const userMessage = chatInput.trim();
+                    setChatInput('');
+                    setIsChatOpen(true);
+                    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+                    setIsChatLoading(true);
+
+                    try {
+                      const response = await fetch('/api/cadence-chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          message: userMessage,
+                          blocks,
+                          name,
+                          description,
+                        }),
+                      });
+
+                      if (!response.ok) {
+                        throw new Error('Failed to get response');
+                      }
+
+                      const data = await response.json();
+                      setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+                    } catch (error) {
+                      console.error('Error sending chat message:', error);
+                      setChatMessages(prev => [
+                        ...prev,
+                        { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
+                      ]);
+                    } finally {
+                      setIsChatLoading(false);
+                    }
+                  }}
+                  className="relative flex items-center bg-background border border-border rounded-full px-3 py-2 shadow-sm focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all"
+                >
+                  <input
+                    ref={chatInputRef}
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => {
+                      setChatInput(e.target.value);
+                      setIsChatOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!chatInput.trim() || isChatLoading) return;
+
+                        const userMessage = chatInput.trim();
+                        setChatInput('');
+                        setIsChatOpen(true);
+                        setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+                        setIsChatLoading(true);
+
+                        fetch('/api/cadence-chat', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            message: userMessage,
+                            blocks,
+                            name,
+                            description,
+                          }),
+                        })
+                          .then(response => {
+                            if (!response.ok) throw new Error('Failed to get response');
+                            return response.json();
+                          })
+                          .then(data => {
+                            setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+                          })
+                          .catch(error => {
+                            console.error('Error sending chat message:', error);
+                            setChatMessages(prev => [
+                              ...prev,
+                              { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
+                            ]);
+                          })
+                          .finally(() => {
+                            setIsChatLoading(false);
+                          });
+                      }
+                    }}
+                    placeholder="Ask about your workflow..."
+                    className="flex-1 bg-transparent border-0 outline-none text-xs text-foreground placeholder:text-muted-foreground pr-2 min-w-0"
+                    disabled={isChatLoading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatInput.trim() || isChatLoading}
+                    className="ml-1.5 flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0"
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

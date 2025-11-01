@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Convert blocks to a readable format for the LLM
     const blocksDescription = blocks?.map((block: any) => {
-      const typeLabel = {
+      const typeLabelMap: Record<string, string> = {
         trigger: 'Start',
         email: 'Send Email',
         voicemail: 'Leave Voicemail',
@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
         conditional: 'If / Else',
         delay: 'Wait',
         end: 'End',
-      }[block.type] || block.type;
+      };
+      const typeLabel = typeLabelMap[block.type] || block.type;
 
       let desc = `- ${typeLabel}: "${block.title}"`;
       
@@ -82,8 +83,9 @@ ${blocksDescription}
 Your role:
 - Answer questions about the current workflow clearly and concisely
 - Suggest improvements or explain what blocks do
-- Keep responses brief and actionable (2-3 sentences max, unless more detail is needed)
+- Keep responses VERY brief (1-2 sentences max)
 - Be conversational and helpful
+- Never write long explanations unless specifically asked
 
 The user can eventually ask you to create workflows, but for now just answer questions about the current workflow.`;
 
@@ -94,7 +96,7 @@ The user can eventually ask you to create workflows, but for now just answer que
         { role: 'user', content: message },
       ],
       temperature: 0.7,
-      max_tokens: 300,
+      max_tokens: 120,
     });
 
     const reply = response.choices[0]?.message?.content?.trim() || 'Sorry, I could not generate a response.';

@@ -366,7 +366,7 @@ export default function CompaniesPage() {
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs text-foreground bg-accent/30 rounded px-2 py-1 border border-border truncate">
-                                  "{highlightMatchText(topMatch.content_snippet.slice(0, 120), searchQuery)}{topMatch.content_snippet.length > 120 ? '...' : ''}"
+                                  &quot;{highlightMatchText(topMatch.content_snippet.slice(0, 120), searchQuery)}{topMatch.content_snippet.length > 120 ? '...' : ''}&quot;
                                 </div>
                               </div>
                               {matches.length > 1 && (

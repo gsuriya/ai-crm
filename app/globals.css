@@ -10,5 +10,19 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  
+  /* Sidebar base styles with smooth transition */
+  [data-sidebar] {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s ease-in 0.1s, visibility 0.3s ease-in 0.1s;
+  }
+  
+  /* Hide sidebar when modal is open with smooth transition */
+  body.modal-open [data-sidebar] {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+  }
 }
 
