@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { signInWithGoogle, getSession } from "@/lib/auth";
+import { signInWithGoogle, signInWithGoogleDirect, getSession } from "@/lib/auth";
 import { Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -14,25 +14,79 @@ export default function SignInPage() {
 
   useEffect(() => {
     // Check if user is already signed in
-    getSession().then((session) => {
-      if (session) {
-        router.push("/companies");
-      } else {
+    const checkSession = async () => {
+      try {
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 3000)
+        );
+        
+        const sessionPromise = getSession();
+        const session = await Promise.race([sessionPromise, timeoutPromise]).catch(() => null) as any;
+        
+        if (session) {
+          router.push("/companies");
+        } else {
+          setChecking(false);
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
+        // On error, just show the sign-in page
         setChecking(false);
       }
-    });
+    };
+    
+    // Small delay to ensure page is mounted
+    const timer = setTimeout(() => {
+      checkSession();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [router]);
 
   const handleSignIn = async () => {
     try {
       setLoading(true);
-      await signInWithGoogle();
+      // Use direct Google OAuth to bypass Supabase's scope limitations
+      await signInWithGoogleDirect();
       // The redirect will happen automatically via OAuth flow
     } catch (error) {
       console.error("Sign in error:", error);
       setLoading(false);
     }
   };
+
+  // Check for OAuth errors in URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const message = params.get('message');
+    
+    if (error === 'scopes_not_granted') {
+      const missing = params.get('missing')?.split(',') || [];
+      const actual = params.get('actual')?.split(',') || [];
+      const customMessage = params.get('message');
+      
+      const errorMsg = customMessage || (
+        `❌ Google did not grant required permissions!\n\n` +
+        `Missing scopes: ${missing.join(', ')}\n` +
+        `Actual scopes granted: ${actual.join(', ') || 'NONE'}\n\n` +
+        `Please:\n` +
+        `1. Make sure you grant ALL permissions on the Google consent screen\n` +
+        `2. Look for "Send email on your behalf" and "View/edit calendars" permissions\n` +
+        `3. If you don't see these, you may need to revoke app access in Google Account settings first`
+      );
+      
+      alert(errorMsg);
+      
+      // Clear the error params to prevent re-triggering
+      window.history.replaceState({}, '', '/auth/signin');
+    } else if (error === 'scope_required' && message) {
+      alert(decodeURIComponent(message));
+      // Clear the error params to prevent re-triggering
+      window.history.replaceState({}, '', '/auth/signin');
+    }
+  }, []);
 
   if (checking) {
     return (

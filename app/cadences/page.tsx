@@ -26,10 +26,22 @@ export default function CadencesPage() {
   const [loading, setLoading] = useState(true);
   const [showFlowBuilder, setShowFlowBuilder] = useState(false);
   const [editingCadence, setEditingCadence] = useState<Cadence | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const fetchCadences = useCallback(async () => {
     try {
       setLoading(true);
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('No user found');
+        setCadences([]);
+        return;
+      }
+
+      // All cadences are shared company-wide - no user filter
       const { data, error } = await supabase
         .from('cadences')
         .select('*')
@@ -57,18 +69,30 @@ export default function CadencesPage() {
 
   const handleCreateCadence = () => {
     setEditingCadence(null);
+    setHasUnsavedChanges(false);
+    setSaveSuccess(false);
     setShowFlowBuilder(true);
   };
 
   const handleEditCadence = (cadence: Cadence) => {
     setEditingCadence(cadence);
+    setHasUnsavedChanges(false);
+    setSaveSuccess(false);
     setShowFlowBuilder(true);
   };
 
   const handleSaveFlow = async (blocks: FlowBlock[], name?: string, description?: string) => {
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert('You must be signed in to save cadences');
+        return;
+      }
+
       if (editingCadence) {
-        // Update existing cadence in Supabase
+        // Update existing cadence in Supabase (all cadences are shared)
         const { error } = await supabase
           .from('cadences')
           .update({
@@ -104,6 +128,7 @@ export default function CadencesPage() {
         const { data, error } = await supabase
           .from('cadences')
           .insert({
+            user_id: user.id,
             name: name.trim(),
             description: description?.trim() || null,
             nodes: blocks,
@@ -122,8 +147,12 @@ export default function CadencesPage() {
         }]);
       }
       
-      setShowFlowBuilder(false);
-      setEditingCadence(null);
+      // Mark as saved and clear unsaved changes
+      setHasUnsavedChanges(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      
+      // Don't refetch - we already updated local state above
     } catch (error) {
       console.error('Error saving cadence:', error);
       alert('Failed to save cadence. Please try again.');
@@ -136,6 +165,15 @@ export default function CadencesPage() {
     }
 
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert('You must be signed in to delete cadences');
+        return;
+      }
+
+      // All cadences are shared company-wide - anyone can delete
       const { error } = await supabase
         .from('cadences')
         .delete()
@@ -151,10 +189,18 @@ export default function CadencesPage() {
     }
   };
 
-  const handleCloseFlowBuilder = useCallback(() => {
+  const handleCloseFlowBuilder = useCallback((force = false) => {
+    if (!force && hasUnsavedChanges) {
+      const confirmed = confirm('You have unsaved changes. Are you sure you want to exit without saving?');
+      if (!confirmed) {
+        return;
+      }
+    }
     setShowFlowBuilder(false);
     setEditingCadence(null);
-  }, []);
+    setHasUnsavedChanges(false);
+    setSaveSuccess(false);
+  }, [hasUnsavedChanges]);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -328,6 +374,8 @@ export default function CadencesPage() {
                 autoSave={false}
                 onSave={handleSaveFlow}
                 onClose={handleCloseFlowBuilder}
+                onChanges={setHasUnsavedChanges}
+                saveSuccess={saveSuccess}
               />
             </motion.div>
           </motion.div>

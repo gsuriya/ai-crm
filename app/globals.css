@@ -11,18 +11,23 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
   
-  /* Sidebar base styles with smooth transition */
+  /* Sidebar base styles */
   [data-sidebar] {
-    opacity: 1;
-    visibility: visible;
-    transition: opacity 0.3s ease-in 0.1s, visibility 0.3s ease-in 0.1s;
+    flex-shrink: 0 !important;
+    width: 16rem !important; /* 256px / w-64 */
+    position: relative !important;
+    z-index: 10 !important;
+  }
+  
+  /* Ensure main content doesn't overlap sidebar */
+  main {
+    min-width: 0 !important; /* Prevents flex items from overflowing */
   }
   
   /* Hide sidebar when modal is open with smooth transition */
   body.modal-open [data-sidebar] {
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+    opacity: 1;
+    visibility: visible;
   }
 }
 

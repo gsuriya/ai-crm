@@ -1,0 +1,653 @@
+import { FlowBlock } from '@/components/cadence-flow-builder';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+export interface CadenceExecution {
+  id: string;
+  company_cadence_id: string;
+  current_block_id: string;
+  status: 'active' | 'paused' | 'completed' | 'error';
+  scheduled_for?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Start workflow execution for a company
+ */
+export async function startWorkflowExecution(
+  supabase: SupabaseClient,
+  companyId: string,
+  cadenceId: string,
+  blocks: FlowBlock[]
+): Promise<{ companyCadenceId: string; executionId: string }> {
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  // Find trigger block
+  const triggerBlock = blocks.find(b => b.type === 'trigger');
+  if (!triggerBlock) {
+    throw new Error('No trigger block found in cadence');
+  }
+
+  // Create or get company_cadence entry
+  const { data: companyCadence, error: ccError } = await supabase
+    .from('company_cadences')
+    .upsert({
+      company_id: companyId,
+      cadence_id: cadenceId,
+      status: 'active',
+      start_date: new Date().toISOString(),
+      current_node_id: triggerBlock.id,
+    }, {
+      onConflict: 'company_id,cadence_id',
+    })
+    .select()
+    .single();
+
+  if (ccError || !companyCadence) {
+    throw new Error(`Failed to create company_cadence: ${ccError?.message}`);
+  }
+
+  // Create cadence_execution entry
+  const { data: execution, error: execError } = await supabase
+    .from('cadence_executions')
+    .insert({
+      company_cadence_id: companyCadence.id,
+      current_block_id: triggerBlock.id,
+      status: 'active',
+      metadata: {
+        company_id: companyId,
+        cadence_id: cadenceId,
+        blocks: blocks,
+      },
+    })
+    .select()
+    .single();
+
+  if (execError || !execution) {
+    throw new Error(`Failed to create cadence_execution: ${execError?.message}`);
+  }
+
+  return {
+    companyCadenceId: companyCadence.id,
+    executionId: execution.id,
+  };
+}
+
+/**
+ * Update execution state
+ */
+export async function updateExecutionState(
+  supabase: SupabaseClient,
+  executionId: string,
+  updates: {
+    current_block_id?: string;
+    status?: 'active' | 'paused' | 'completed' | 'error';
+    scheduled_for?: Date | null;
+    metadata?: Record<string, any>;
+  }
+): Promise<void> {
+  const updateData: any = {};
+  
+  if (updates.current_block_id !== undefined) {
+    updateData.current_block_id = updates.current_block_id;
+  }
+  if (updates.status !== undefined) {
+    updateData.status = updates.status;
+  }
+  if (updates.scheduled_for !== undefined) {
+    updateData.scheduled_for = updates.scheduled_for ? updates.scheduled_for.toISOString() : null;
+  }
+  if (updates.metadata !== undefined) {
+    updateData.metadata = updates.metadata;
+  }
+
+  const { error } = await supabase
+    .from('cadence_executions')
+    .update(updateData)
+    .eq('id', executionId);
+
+  if (error) {
+    throw new Error(`Failed to update execution: ${error.message}`);
+  }
+}
+
+/**
+ * Get execution by ID
+ */
+export async function getExecution(supabase: SupabaseClient, executionId: string): Promise<CadenceExecution | null> {
+  const { data, error } = await supabase
+    .from('cadence_executions')
+    .select('*')
+    .eq('id', executionId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null; // Not found
+    }
+    throw new Error(`Failed to get execution: ${error.message}`);
+  }
+
+  return data as CadenceExecution;
+}
+
+/**
+ * Get execution by company_cadence_id
+ */
+export async function getExecutionByCompanyCadence(
+  supabase: SupabaseClient,
+  companyCadenceId: string
+): Promise<CadenceExecution | null> {
+  const { data, error } = await supabase
+    .from('cadence_executions')
+    .select('*')
+    .eq('company_cadence_id', companyCadenceId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null; // Not found
+    }
+    throw new Error(`Failed to get execution: ${error.message}`);
+  }
+
+  return data as CadenceExecution;
+}
+
+/**
+ * Schedule delayed execution
+ */
+export async function scheduleDelayedExecution(
+  supabase: SupabaseClient,
+  executionId: string,
+  delayDays: number,
+  delayHours: number,
+  nextBlockId: string
+): Promise<void> {
+  const scheduledFor = new Date();
+  scheduledFor.setDate(scheduledFor.getDate() + delayDays);
+  scheduledFor.setHours(scheduledFor.getHours() + delayHours);
+
+  await updateExecutionState(supabase, executionId, {
+    current_block_id: nextBlockId,
+    scheduled_for: scheduledFor,
+    status: 'active',
+  });
+}
+
+/**
+ * Get scheduled executions ready to process
+ * Also includes executions stuck at delay blocks (scheduled_for is null but current_block_id is delay)
+ */
+export async function getScheduledExecutions(supabase: SupabaseClient): Promise<CadenceExecution[]> {
+  const now = new Date().toISOString();
+
+  // Get executions that are scheduled and ready
+  const { data: scheduledExecutions, error: scheduledError } = await supabase
+    .from('cadence_executions')
+    .select('*')
+    .eq('status', 'active')
+    .not('scheduled_for', 'is', null)
+    .lte('scheduled_for', now)
+    .order('scheduled_for', { ascending: true });
+
+  if (scheduledError) {
+    throw new Error(`Failed to get scheduled executions: ${scheduledError.message}`);
+  }
+
+  // Also get executions stuck at delay blocks (scheduled_for is null but they're at a delay block)
+  // We need to get the cadence to check if current_block_id is a delay block
+  const { data: allActiveExecutions, error: activeError } = await supabase
+    .from('cadence_executions')
+    .select('*, company_cadence:company_cadences(cadence_id)')
+    .eq('status', 'active')
+    .is('scheduled_for', null);
+
+  if (activeError) {
+    throw new Error(`Failed to get active executions: ${activeError.message}`);
+  }
+
+  const stuckDelayBlocks: CadenceExecution[] = [];
+  
+  if (allActiveExecutions && allActiveExecutions.length > 0) {
+    for (const execution of allActiveExecutions) {
+      const companyCadence = (execution as any).company_cadence;
+      if (!companyCadence?.cadence_id) continue;
+
+      // Get cadence to check block type
+      const { data: cadence } = await supabase
+        .from('cadences')
+        .select('nodes')
+        .eq('id', companyCadence.cadence_id)
+        .single();
+
+      if (cadence?.nodes) {
+        const blocks = cadence.nodes as FlowBlock[];
+        const currentBlock = blocks.find(b => b.id === execution.current_block_id);
+        
+        // If current block is a delay block and scheduled_for is null, it's stuck
+        if (currentBlock?.type === 'delay') {
+          stuckDelayBlocks.push(execution as CadenceExecution);
+        }
+      }
+    }
+  }
+
+  // Combine scheduled executions and stuck delay blocks
+  const allExecutions = [...(scheduledExecutions || []), ...stuckDelayBlocks];
+  
+  return allExecutions as CadenceExecution[];
+}
+
+/**
+ * Execute next block in workflow - ACTUALLY EXECUTES THE BLOCK ACTIONS
+ */
+export async function executeNextBlock(
+  supabase: SupabaseClient,
+  execution: CadenceExecution,
+  blocks: FlowBlock[]
+): Promise<void> {
+  const currentBlock = blocks.find(b => b.id === execution.current_block_id);
+  if (!currentBlock) {
+    console.error(`[Workflow] ❌ Block ${execution.current_block_id} not found in blocks array`);
+    console.error(`[Workflow] Available block IDs: ${blocks.map(b => `${b.id} (${b.type})`).join(', ')}`);
+    console.error(`[Workflow] Execution metadata:`, JSON.stringify(execution.metadata, null, 2));
+    throw new Error(`Block ${execution.current_block_id} not found`);
+  }
+
+  console.log(`[Workflow] ✅ Found current block:`, {
+    id: currentBlock.id,
+    type: currentBlock.type,
+    title: currentBlock.title,
+    connections: currentBlock.connections || [],
+  });
+
+  // Get company and cadence info from metadata
+  const metadata = execution.metadata || {};
+  const companyId = metadata.company_id;
+  const cadenceId = metadata.cadence_id;
+
+  if (!companyId || !cadenceId) {
+    throw new Error('Company ID or Cadence ID missing from execution metadata');
+  }
+
+  // Get user
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    console.error('[Workflow] User auth error:', userError);
+    throw new Error(`User not authenticated: ${userError?.message || 'No user found'}`);
+  }
+
+  console.log(`[Workflow] Executing block for user: ${user.id} (${user.email})`);
+
+  // Get company email and phone
+  const { data: company } = await supabase
+    .from('companies')
+    .select('email, phone_number')
+    .eq('id', companyId)
+    .single();
+
+  const companyEmail = company?.email || '';
+  const companyPhone = company?.phone_number || '';
+
+  // Get thread info from metadata
+  const threadInfoMap = new Map<string, { threadId: string; messageId: string }>(
+    Object.entries(metadata.threadInfoMap || {})
+  );
+
+  // Execute the current block based on type
+  console.log(`[Workflow] ========== EXECUTING BLOCK ==========`);
+  console.log(`[Workflow] Block ID: ${currentBlock.id}`);
+  console.log(`[Workflow] Block type: ${currentBlock.type}`);
+  console.log(`[Workflow] Block title: ${currentBlock.title}`);
+  console.log(`[Workflow] Block connections: ${JSON.stringify(currentBlock.connections || [])}`);
+  console.log(`[Workflow] Block config: ${JSON.stringify(currentBlock.config || {})}`);
+  console.log(`[Workflow] ====================================`);
+
+  // Handle delay block BEFORE switch (needs to advance to next block before scheduling)
+  if (currentBlock.type === 'delay') {
+    const seconds = currentBlock.config?.delaySeconds || 0;
+    const minutes = currentBlock.config?.delayMinutes || 0;
+    const hours = currentBlock.config?.delayHours || 0;
+    const days = currentBlock.config?.delayDays || 0;
+    
+    console.log(`[Workflow] ⏳ Delay block: ${days}d ${hours}h ${minutes}m ${seconds}s`);
+    
+    // Calculate total delay in milliseconds
+    const totalMs = 
+      (seconds * 1000) +
+      (minutes * 60 * 1000) +
+      (hours * 60 * 60 * 1000) +
+      (days * 24 * 60 * 60 * 1000);
+    
+    const scheduledFor = new Date(Date.now() + totalMs);
+    
+    console.log(`[Workflow] ⏳ Scheduling next block for: ${scheduledFor.toISOString()}`);
+
+    // Get the next block ID before scheduling
+    const nextBlockId = currentBlock.connections && currentBlock.connections.length > 0 
+      ? currentBlock.connections[0] 
+      : null;
+
+    if (!nextBlockId) {
+      console.error(`[Workflow] ❌ Delay block has no next block!`);
+      throw new Error('Delay block must have a connection to the next block');
+    }
+
+    // Update execution to point to next block and schedule it
+    await updateExecutionState(supabase, execution.id, {
+      current_block_id: nextBlockId,
+      scheduled_for: scheduledFor,
+    });
+
+    console.log(`[Workflow] ⏳ Scheduled next block (${nextBlockId}) for ${scheduledFor.toISOString()}`);
+    // Don't proceed to next block yet - wait for scheduled time
+    return;
+  }
+
+  // Handle end block
+  if (currentBlock.type === 'end') {
+    await updateExecutionState(supabase, execution.id, {
+      status: 'completed',
+    });
+    
+    await supabase
+      .from('company_cadences')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', execution.company_cadence_id);
+
+    return;
+  }
+
+  // Handle conditional blocks
+  if (currentBlock.type === 'conditional') {
+    // Condition evaluation is handled by API route
+    return;
+  }
+
+  switch (currentBlock.type) {
+    case 'email': {
+      console.log(`[Workflow] 📧 EMAIL BLOCK STARTING EXECUTION`);
+      const { sendEmail } = await import('@/lib/services/gmail-direct');
+      
+      if (!companyEmail) {
+        console.error(`[Workflow] ❌ No email address found for company ${companyId}`);
+        throw new Error(`No email address found for company ${companyId}. Please set the company email address first.`);
+      }
+
+      console.log(`[Workflow] 📧 Sending email to ${companyEmail}`);
+      console.log(`[Workflow] 📧 Subject: ${currentBlock.config?.subject || '(empty)'}`);
+      console.log(`[Workflow] 📧 Body length: ${(currentBlock.config?.body || '').length} characters`);
+      console.log(`[Workflow] 📧 Full config:`, JSON.stringify(currentBlock.config, null, 2));
+      
+      if (!currentBlock.config?.subject || !currentBlock.config?.body) {
+        console.error(`[Workflow] ❌ Email block missing subject or body`);
+        console.error(`[Workflow] ❌ Subject:`, currentBlock.config?.subject);
+        console.error(`[Workflow] ❌ Body:`, currentBlock.config?.body);
+        throw new Error(`Email block is missing subject or body. Please configure the email block in the cadence editor.`);
+      }
+      
+      // Determine thread selection
+      const threadSelection = currentBlock.config?.threadSelection || 
+                             (currentBlock.config?.replyToThread ? 'previous' : 'new');
+      
+      let threadId: string | undefined = undefined;
+      let messageId: string | undefined = undefined;
+      
+      if (threadSelection !== 'new') {
+        const selectedBlockId = threadSelection === 'previous' 
+          ? blocks.find(b => b.type === 'email' && b.id !== currentBlock.id && threadInfoMap.has(b.id))?.id
+          : threadSelection;
+        
+        if (selectedBlockId && threadInfoMap.has(selectedBlockId)) {
+          const threadInfo = threadInfoMap.get(selectedBlockId)!;
+          threadId = threadInfo.threadId;
+          messageId = threadInfo.messageId;
+        }
+      }
+
+      try {
+        console.log(`[Workflow] 📧 About to call sendEmail...`);
+        const result = await sendEmail(user.id, {
+          to: companyEmail,
+          subject: currentBlock.config?.subject || '',
+          body: currentBlock.config?.body || '',
+          threadId,
+          messageId,
+        }, supabase);
+
+        console.log(`[Workflow] ✅ Email sent successfully. Thread ID: ${result.threadId}, Message ID: ${result.messageId}`);
+
+        // Store thread info
+        threadInfoMap.set(currentBlock.id, {
+          threadId: result.threadId,
+          messageId: result.messageId,
+        });
+
+        // Log email
+        const { error: logError } = await supabase
+          .from('email_logs')
+          .insert({
+            company_id: companyId,
+            cadence_id: cadenceId,
+            direction: 'sent',
+            subject: currentBlock.config?.subject || '',
+            body: currentBlock.config?.body || '',
+            thread_id: result.threadId,
+            message_id: result.messageId,
+            from_email: user.email || '',
+            to_email: companyEmail,
+            sent_at: new Date().toISOString(),
+          });
+
+        if (logError) {
+          console.error(`[Workflow] Error logging email:`, logError);
+        } else {
+          console.log(`[Workflow] Email logged successfully`);
+        }
+      } catch (emailError: any) {
+        console.error(`[Workflow] ❌ ERROR SENDING EMAIL:`, emailError);
+        console.error(`[Workflow] ❌ Error message:`, emailError.message);
+        console.error(`[Workflow] ❌ Error stack:`, emailError.stack);
+        throw new Error(`Failed to send email: ${emailError.message || String(emailError)}`);
+      }
+
+      console.log(`[Workflow] 📧 EMAIL BLOCK COMPLETED SUCCESSFULLY`);
+      break;
+    }
+
+    case 'voicemail': {
+      const { sendVoicemail } = await import('@/lib/services/vapi');
+      
+      // Use phone number from company record
+      const phoneNumber = companyPhone || '';
+      if (!phoneNumber) {
+        throw new Error('Company phone number not found. Please set it in company details.');
+      }
+
+      const result = await sendVoicemail({
+        phoneNumber,
+        script: currentBlock.config?.script || '',
+        companyId,
+        cadenceId,
+      });
+
+      // Log voicemail
+      await supabase
+        .from('company_content')
+        .insert({
+          company_id: companyId,
+          content_type: 'outreach_log',
+          content: `Voicemail left: ${currentBlock.config?.script?.substring(0, 100)}...`,
+          source: 'CRM Cadence',
+          metadata: {
+            cadence_id: cadenceId,
+            vapi_call_id: result.callId,
+            vapi_status: result.status,
+            phone_number: phoneNumber,
+          },
+        });
+
+      break;
+    }
+
+    case 'calendar': {
+      const { createCalendarEvent } = await import('@/lib/services/calendar');
+      
+      if (!companyEmail) {
+        console.error(`[Workflow] ❌ No email address found for company ${companyId}`);
+        throw new Error(`No email address found for company ${companyId}. Please set the company email address first.`);
+      }
+
+      if (!currentBlock.config?.calendarTitle) {
+        console.error(`[Workflow] ❌ Calendar block missing title`);
+        throw new Error(`Calendar block is missing title. Please configure the calendar block in the cadence editor.`);
+      }
+
+      console.log(`[Workflow] 📅 Creating calendar invite for ${companyEmail}`);
+      console.log(`[Workflow] 📅 Title: ${currentBlock.config.calendarTitle}`);
+      console.log(`[Workflow] 📅 Duration: ${currentBlock.config.duration || 30} minutes`);
+      
+      try {
+        const result = await createCalendarEvent(user.id, {
+          toEmail: companyEmail,
+          title: currentBlock.config.calendarTitle,
+          description: currentBlock.config?.calendarDescription || '',
+          durationMinutes: currentBlock.config?.duration || 30,
+          timeConstraint: currentBlock.config?.timeConstraint || 'business_hours',
+          checkAvailability: currentBlock.config?.checkAvailability !== false,
+        }, supabase);
+
+        console.log(`[Workflow] ✅ Calendar invite created! Event ID: ${result.eventId}`);
+
+        // Log calendar invite
+        await supabase
+          .from('company_content')
+          .insert({
+            company_id: companyId,
+            content_type: 'outreach_log',
+            content: `Calendar invite sent: ${currentBlock.config.calendarTitle}`,
+            source: 'CRM Cadence',
+            metadata: {
+              cadence_id: cadenceId,
+              calendar_event_id: result.eventId,
+            },
+          });
+      } catch (calendarError: any) {
+        console.error(`[Workflow] ❌ Error creating calendar invite:`, calendarError.message);
+        throw new Error(`Failed to create calendar invite: ${calendarError.message}`);
+      }
+
+      break;
+    }
+
+    case 'trigger':
+      // Trigger block just starts the flow - follow connections
+      console.log(`[Workflow] Trigger block executed, following connections...`);
+      break;
+  }
+
+  // Update metadata with thread info
+  const updatedMetadata = {
+    ...metadata,
+    threadInfoMap: Object.fromEntries(threadInfoMap),
+  };
+
+  // Determine next block based on current block type
+  // Note: conditional, delay, and end blocks already returned above
+  let nextBlockId: string | null = null;
+
+  console.log(`[Workflow] 🔍 Determining next block after ${currentBlock.type} block (${currentBlock.id})`);
+  console.log(`[Workflow] 🔍 Current block connections:`, JSON.stringify(currentBlock.connections || []));
+
+  if (currentBlock.type === 'trigger') {
+    // Follow first connection
+    console.log(`[Workflow] Trigger block found, checking connections...`);
+    console.log(`[Workflow] Trigger connections: ${JSON.stringify(currentBlock.connections || [])}`);
+    if (currentBlock.connections && currentBlock.connections.length > 0) {
+      nextBlockId = currentBlock.connections[0];
+      console.log(`[Workflow] ✅ Found next block after trigger: ${nextBlockId}`);
+    } else {
+      console.error(`[Workflow] ❌ Trigger block has no connections!`);
+    }
+  } else {
+    // Regular blocks (email, voicemail, calendar) follow their connection
+    if (currentBlock.connections && currentBlock.connections.length > 0) {
+      nextBlockId = currentBlock.connections[0];
+      console.log(`[Workflow] ✅ Found next block after ${currentBlock.type}: ${nextBlockId}`);
+    } else {
+      console.log(`[Workflow] ⚠️ ${currentBlock.type} block has no connections`);
+    }
+  }
+
+  if (nextBlockId) {
+    console.log(`[Workflow] 🔄 Moving to next block: ${nextBlockId}`);
+    const nextBlock = blocks.find(b => b.id === nextBlockId);
+    
+    if (!nextBlock) {
+      console.error(`[Workflow] ❌ Next block ${nextBlockId} NOT FOUND in blocks array!`);
+      console.error(`[Workflow] Available blocks: ${blocks.map(b => b.id).join(', ')}`);
+      throw new Error(`Next block ${nextBlockId} not found`);
+    }
+    
+    console.log(`[Workflow] ✅ Found next block:`, {
+      id: nextBlock.id,
+      type: nextBlock.type,
+      title: nextBlock.title,
+    });
+    
+    await updateExecutionState(supabase, execution.id, {
+      current_block_id: nextBlockId,
+      scheduled_for: null, // Clear scheduled_for if set
+      metadata: updatedMetadata,
+    });
+    
+    console.log(`[Workflow] 📝 Updated execution state: current_block_id = ${nextBlockId}`);
+    
+    // Recursively execute next block (but only if not a delay/conditional/end)
+    if (nextBlock.type !== 'delay' && nextBlock.type !== 'conditional' && nextBlock.type !== 'end') {
+      console.log(`[Workflow] 🔄 Executing next block immediately (type: ${nextBlock.type}, id: ${nextBlock.id})`);
+      const updatedExecution = await getExecution(supabase, execution.id);
+      if (updatedExecution) {
+        await executeNextBlock(supabase, updatedExecution, blocks);
+      } else {
+        console.error(`[Workflow] ❌ Failed to get updated execution`);
+      }
+    } else {
+      console.log(`[Workflow] ⏸️ Next block is ${nextBlock.type}, pausing execution`);
+    }
+  } else {
+    // No next block, mark as completed
+    console.log(`[Workflow] No next block found, marking workflow as completed for execution ${execution.id}`);
+    await updateExecutionState(supabase, execution.id, {
+      status: 'completed',
+      metadata: updatedMetadata,
+    });
+    
+    const { error: updateError } = await supabase
+      .from('company_cadences')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', execution.company_cadence_id);
+    
+    if (updateError) {
+      console.error(`[Workflow] Error updating company_cadence status:`, updateError);
+    } else {
+      console.log(`[Workflow] Successfully marked workflow as completed`);
+    }
+  }
+}
+

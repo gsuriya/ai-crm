@@ -19,14 +19,21 @@ export interface FlowBlock {
   config?: {
     subject?: string;
     body?: string;
-    replyToThread?: boolean;
+    replyToThread?: boolean; // Legacy: true = reply to previous email
+    threadSelection?: 'new' | string; // 'new' for new thread, or block ID to reply to
     script?: string;
     calendarTitle?: string;
     calendarDescription?: string;
     duration?: number;
+    timeConstraint?: 'none' | 'business_hours'; // 'none' or 'business_hours' (9am-5pm)
+    checkAvailability?: boolean; // Whether to check availability before scheduling
     condition?: string;
+    conditionType?: 'email_opened' | 'email_not_opened' | 'email_replied' | 'email_not_replied' | 'email_opened_within_days' | 'email_replied_within_days';
+    conditionValue?: string; // For "within_days" conditions
     delayDays?: number;
     delayHours?: number;
+    delayMinutes?: number;
+    delaySeconds?: number;
   };
   connections?: string[]; // Array of connected block IDs
   truePath?: string;
@@ -38,7 +45,7 @@ const blockTypeConfig = {
     color: 'bg-purple-500', 
     label: 'Start', 
     icon: Play,
-    canHaveMultipleOutputs: false,
+    canHaveMultipleOutputs: true, // Trigger can have multiple connections
   },
   email: { 
     color: 'bg-blue-500', 
@@ -83,12 +90,15 @@ interface CadenceFlowBuilderProps {
   cadenceId?: string; // Optional: if editing existing cadence
   cadenceName?: string; // Optional: name of the cadence
   cadenceDescription?: string; // Optional: description of the cadence
+  companyId?: string; // Optional: company ID for workflow execution
   onSave?: (blocks: FlowBlock[], name?: string, description?: string) => void;
-  onClose?: () => void;
+  onClose?: (force?: boolean) => void;
   autoSave?: boolean; // Whether to auto-save to Supabase
+  onChanges?: (hasChanges: boolean) => void; // Callback when changes are detected
+  saveSuccess?: boolean; // Whether save was successful (to show message)
 }
 
-export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName = '', cadenceDescription = '', onSave, onClose, autoSave = false }: CadenceFlowBuilderProps) {
+export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName = '', cadenceDescription = '', companyId, onSave, onClose, autoSave = false, onChanges, saveSuccess = false }: CadenceFlowBuilderProps) {
   // Normalize initial blocks: ensure exactly one trigger block
   const normalizeInitialBlocks = (blocks: FlowBlock[]): FlowBlock[] => {
     if (blocks.length === 0) {
@@ -158,6 +168,388 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   const [hasScrollableContent, setHasScrollableContent] = useState(false);
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionLog, setExecutionLog] = useState<string[]>([]);
+  // Local state for delay inputs to allow clearing
+  const [delayInputs, setDelayInputs] = useState<Record<string, { seconds?: string; minutes?: string; hours?: string; days?: string }>>({});
+
+  // Execute workflow starting from trigger block - NOW READS FROM SUPABASE
+  const executeWorkflow = async () => {
+    if (isExecuting) return;
+    
+    // Check if we have companyId and cadenceId for real execution
+    if (!companyId || !cadenceId) {
+      alert('To run a workflow, go to a company\'s detail page and click "Add to Cadence".\n\nThe cadence builder is for designing workflows, not running them. Workflows need to be associated with a specific company.');
+      return;
+    }
+    
+    setIsExecuting(true);
+    setExecutionLog([]);
+    
+    const log = (message: string) => {
+      setExecutionLog(prev => [...prev, message]);
+      console.log(`[Workflow] ${message}`);
+    };
+
+    try {
+      // IMPORTANT: Fetch cadence and blocks from Supabase, not local state
+      log('📥 Fetching cadence from Supabase...');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        log('❌ User not authenticated');
+        setIsExecuting(false);
+        return;
+      }
+
+      const { data: cadence, error: cadenceError } = await supabase
+        .from('cadences')
+        .select('*')
+        .eq('id', cadenceId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (cadenceError || !cadence) {
+        log(`❌ Failed to load cadence: ${cadenceError?.message || 'Not found'}`);
+        setIsExecuting(false);
+        return;
+      }
+
+      const blocksFromSupabase = (cadence.nodes || []) as FlowBlock[];
+      if (!blocksFromSupabase || blocksFromSupabase.length === 0) {
+        log('❌ Cadence has no blocks');
+        setIsExecuting(false);
+        return;
+      }
+
+      log(`✅ Loaded ${blocksFromSupabase.length} blocks from Supabase`);
+
+      // Get company email for sending emails
+      const { data: company } = await supabase
+        .from('companies')
+        .select('email')
+        .eq('id', companyId)
+        .single();
+
+      const companyEmail = company?.email || '';
+      if (!companyEmail) {
+        log('⚠️ Company email not found. Some blocks may fail.');
+      }
+
+      // Find trigger block
+      const triggerBlock = blocksFromSupabase.find(b => b.type === 'trigger');
+      if (!triggerBlock) {
+        log('❌ No trigger block found');
+        setIsExecuting(false);
+        return;
+      }
+
+      log(`🚀 Starting workflow from: ${triggerBlock.title}`);
+      log(`📊 Using blocks from Supabase (not local browser state)`);
+
+      // Track thread info for each email block (blockId -> { threadId, messageId })
+      const threadInfoMap = new Map<string, { threadId: string; messageId: string }>();
+
+      // Execute workflow recursively using Supabase blocks
+      const executeBlock = async (blockId: string): Promise<void> => {
+        const block = blocksFromSupabase.find(b => b.id === blockId);
+        if (!block) {
+          log(`⚠️ Block ${blockId} not found`);
+          return;
+        }
+
+        // Execute based on block type
+        switch (block.type) {
+          case 'email':
+            log(`📧 Executing: ${block.title}`);
+            log(`   Subject: ${block.config?.subject || '(empty)'}`);
+            log(`   Body: ${block.config?.body || '(empty)'}`);
+            
+            try {
+              // Determine thread selection
+              const threadSelection = block.config?.threadSelection || 
+                                     (block.config?.replyToThread ? 'previous' : 'new'); // Support legacy
+              
+              let threadId: string | undefined = undefined;
+              let messageId: string | undefined = undefined;
+              
+              if (threadSelection !== 'new') {
+                // Find the thread info from the selected block
+                const selectedBlockId = threadSelection === 'previous' 
+                  ? blocksFromSupabase.find(b => b.type === 'email' && b.id !== block.id && threadInfoMap.has(b.id))?.id
+                  : threadSelection;
+                
+                if (selectedBlockId && threadInfoMap.has(selectedBlockId)) {
+                  const threadInfo = threadInfoMap.get(selectedBlockId)!;
+                  threadId = threadInfo.threadId;
+                  messageId = threadInfo.messageId;
+                  log(`   Replying to thread from block ${selectedBlockId}`);
+                  
+                  // IMPORTANT: Subject must match exactly for threading
+                  const originalSubject = blocksFromSupabase.find(b => b.id === selectedBlockId)?.config?.subject || '';
+                  if (originalSubject && block.config?.subject !== originalSubject) {
+                    log(`   ⚠️ Warning: Subject doesn't match original. Gmail requires exact match for threading.`);
+                    log(`   Original: "${originalSubject}"`);
+                    log(`   Current: "${block.config?.subject}"`);
+                  }
+                } else {
+                  log(`   ⚠️ Warning: Selected thread block not found or hasn't sent yet. Creating new thread.`);
+                }
+              } else {
+                log(`   Creating new thread`);
+              }
+              
+              const emailResponse = await fetch('/api/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to_email: companyEmail,
+                  subject: block.config?.subject || '',
+                  body: block.config?.body || '',
+                  thread_id: threadId,
+                  message_id: messageId,
+                  company_id: companyId,
+                  cadence_id: cadenceId,
+                  user_id: user.id,
+                }),
+              });
+
+              if (!emailResponse.ok) {
+                const error = await emailResponse.json();
+                throw new Error(error.error || 'Failed to send email');
+              }
+
+              const emailData = await emailResponse.json();
+              
+              // Store thread info for this block
+              threadInfoMap.set(block.id, {
+                threadId: emailData.threadId,
+                messageId: emailData.messageId || emailData.gmailMessageId,
+              });
+              
+              log(`   ✅ Email sent (Thread ID: ${emailData.threadId}, Message ID: ${emailData.messageId || 'N/A'})`);
+            } catch (error: any) {
+              log(`   ❌ Error sending email: ${error.message}`);
+              throw error;
+            }
+            break;
+
+          case 'voicemail':
+            log(`📞 Executing: ${block.title}`);
+            log(`   Script: ${block.config?.script || '(empty)'}`);
+            
+            try {
+              // Get company phone number from metadata or use placeholder
+              const { data: companyMetadata } = await supabase
+                .from('company_metadata')
+                .select('value')
+                .eq('company_id', companyId)
+                .eq('key', 'phone_number')
+                .single();
+
+              const phoneNumber = companyMetadata?.value || '';
+              if (!phoneNumber) {
+                throw new Error('Company phone number not found');
+              }
+
+              const voicemailResponse = await fetch('/api/voicemail/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  phone_number: phoneNumber,
+                  script: block.config?.script || '',
+                  company_id: companyId,
+                  cadence_id: cadenceId,
+                }),
+              });
+
+              if (!voicemailResponse.ok) {
+                const error = await voicemailResponse.json();
+                throw new Error(error.error || 'Failed to send voicemail');
+              }
+
+              const voicemailData = await voicemailResponse.json();
+              log(`   ✅ Voicemail left (Call ID: ${voicemailData.callId})`);
+            } catch (error: any) {
+              log(`   ❌ Error sending voicemail: ${error.message}`);
+              throw error;
+            }
+            break;
+
+          case 'calendar':
+            log(`📅 Executing: ${block.title}`);
+            log(`   Title: ${block.config?.calendarTitle || '(empty)'}`);
+            log(`   Description: ${block.config?.calendarDescription || '(empty)'}`);
+            log(`   Duration: ${block.config?.duration || 30} minutes`);
+            
+            try {
+              const calendarResponse = await fetch('/api/calendar/invite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to_email: companyEmail,
+                  title: block.config?.calendarTitle || '',
+                  description: block.config?.calendarDescription || '',
+                  duration: block.config?.duration || 30,
+                  company_id: companyId,
+                  cadence_id: cadenceId,
+                  user_id: user.id,
+                }),
+              });
+
+              if (!calendarResponse.ok) {
+                const error = await calendarResponse.json();
+                throw new Error(error.error || 'Failed to send calendar invite');
+              }
+
+              const calendarData = await calendarResponse.json();
+              log(`   ✅ Calendar invite sent (Event ID: ${calendarData.eventId})`);
+            } catch (error: any) {
+              log(`   ❌ Error sending calendar invite: ${error.message}`);
+              throw error;
+            }
+            break;
+
+          case 'conditional':
+            log(`🔀 Executing: ${block.title}`);
+            log(`   Condition: ${block.config?.conditionType || '(empty)'}`);
+            
+            try {
+              const conditionType = block.config?.conditionType;
+              if (!conditionType) {
+                throw new Error('Condition type not configured');
+              }
+
+              const conditionResponse = await fetch('/api/cadence/condition', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  company_id: companyId,
+                  condition_type: conditionType,
+                  condition_value: block.config?.conditionValue,
+                }),
+              });
+
+              if (!conditionResponse.ok) {
+                const error = await conditionResponse.json();
+                throw new Error(error.error || 'Failed to evaluate condition');
+              }
+
+              const conditionData = await conditionResponse.json();
+              const conditionResult = conditionData.result;
+              log(`   Condition result: ${conditionResult ? 'TRUE' : 'FALSE'} (${conditionData.reason})`);
+              
+              if (conditionResult && block.truePath) {
+                log(`   → Following TRUE path`);
+                await executeBlock(block.truePath);
+              } else if (!conditionResult && block.falsePath) {
+                log(`   → Following FALSE path`);
+                await executeBlock(block.falsePath);
+              }
+            } catch (error: any) {
+              log(`   ❌ Error evaluating condition: ${error.message}`);
+              throw error;
+            }
+            // Don't follow regular connections for conditional - return early
+            return;
+
+          case 'delay':
+            log(`⏳ Executing: ${block.title}`);
+            const days = block.config?.delayDays || 0;
+            const hours = block.config?.delayHours || 0;
+            log(`   Scheduling wait: ${days} day(s), ${hours} hour(s)`);
+            
+            // For demo/test purposes, use shorter delay (1 second per day/hour, max 5 seconds)
+            // In production, this would be handled by the background job processor
+            const demoDelay = Math.min((days * 24 + hours) * 1000, 5000);
+            log(`   ⏳ Waiting ${demoDelay}ms (demo mode)...`);
+            await new Promise(resolve => setTimeout(resolve, demoDelay));
+            log(`   ✅ Wait completed`);
+            break;
+
+          case 'end':
+            log(`🏁 Reached: ${block.title}`);
+            return; // Stop execution
+
+          case 'trigger':
+            log(`▶️ Trigger: ${block.title}`);
+            break;
+
+          default:
+            log(`⚠️ Unknown block type: ${block.type}`);
+        }
+
+        // Follow connections (conditional blocks return early, so they won't reach here)
+        if (block.connections && block.connections.length > 0) {
+          // For trigger blocks, execute all connections
+          if (block.type === 'trigger') {
+            for (const nextId of block.connections) {
+              await executeBlock(nextId);
+            }
+          } else {
+            // For other blocks, follow first connection
+            await executeBlock(block.connections[0]);
+          }
+        }
+      };
+
+      // Start execution from trigger's connections
+      if (triggerBlock.connections && triggerBlock.connections.length > 0) {
+        for (const nextId of triggerBlock.connections) {
+          await executeBlock(nextId);
+        }
+      }
+
+      log(`✅ Workflow execution completed`);
+    } catch (error: any) {
+      log(`❌ Error executing workflow: ${error.message || error}`);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // Track changes by comparing current state with initial state
+  useEffect(() => {
+    if (!onChanges) return;
+
+    const normalizedInitial = normalizeInitialBlocks(initialBlocks);
+    const normalizedCurrent = normalizeInitialBlocks(blocks);
+    
+    // Deep comparison function
+    const blocksEqual = (a: FlowBlock[], b: FlowBlock[]): boolean => {
+      if (a.length !== b.length) return false;
+      return a.every((blockA, i) => {
+        const blockB = b[i];
+        if (!blockB) return false;
+        return (
+          blockA.id === blockB.id &&
+          blockA.type === blockB.type &&
+          blockA.x === blockB.x &&
+          blockA.y === blockB.y &&
+          blockA.title === blockB.title &&
+          blockA.subtitle === blockB.subtitle &&
+          JSON.stringify(blockA.config) === JSON.stringify(blockB.config) &&
+          JSON.stringify(blockA.connections) === JSON.stringify(blockB.connections) &&
+          blockA.truePath === blockB.truePath &&
+          blockA.falsePath === blockB.falsePath
+        );
+      });
+    };
+
+    const hasChanges = 
+      name !== cadenceName ||
+      description !== cadenceDescription ||
+      !blocksEqual(normalizedCurrent, normalizedInitial);
+
+    onChanges(hasChanges);
+  }, [blocks, name, description, cadenceName, cadenceDescription, initialBlocks, onChanges]);
+
+  // Show success message when saveSuccess prop changes
+  useEffect(() => {
+    if (saveSuccess) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
+  }, [saveSuccess]);
 
   const handleSave = useCallback(async () => {
     setSaved(true);
@@ -218,6 +610,14 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             newBlock.truePath = toId;
           } else if (point === 'false') {
             newBlock.falsePath = toId;
+          }
+        } else if (block.type === 'trigger') {
+          // Trigger blocks can have multiple connections
+          if (!newBlock.connections) {
+            newBlock.connections = [];
+          }
+          if (!newBlock.connections.includes(toId)) {
+            newBlock.connections = [...newBlock.connections, toId];
           }
         } else {
           // Non-conditional blocks can only have ONE connection
@@ -319,7 +719,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
       case 'voicemail': return 'Leave voicemail';
       case 'calendar': return 'Send calendar invite';
       case 'conditional': return 'Check condition';
-      case 'delay': return 'Wait 1 day';
+      case 'delay': return 'Wait';
       case 'end': return 'End cadence';
       default: return 'Start';
     }
@@ -328,18 +728,66 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   const getDefaultConfig = (type: BlockType) => {
     switch (type) {
       case 'email':
-        return { subject: '', body: '', replyToThread: false };
+        return { subject: '', body: '', threadSelection: 'new' as const };
       case 'voicemail':
         return { script: '' };
       case 'calendar':
         return { calendarTitle: '', calendarDescription: '', duration: 30 };
       case 'conditional':
-        return { condition: '' };
+        return { conditionType: undefined as any, conditionValue: '' };
       case 'delay':
         return { delayDays: 1, delayHours: 0 };
       default:
         return {};
     }
+  };
+
+  // Get all email blocks that come before the given block (for thread selection)
+  const getPreviousEmailBlocks = (blockId: string): FlowBlock[] => {
+    const visited = new Set<string>();
+    const previousBlocks: FlowBlock[] = [];
+    
+    // Traverse forward from trigger to find all email blocks that come before target block
+    const traverseForward = (currentId: string) => {
+      if (visited.has(currentId)) return;
+      visited.add(currentId);
+      
+      // If we've reached the target block, stop
+      if (currentId === blockId) return;
+      
+      const currentBlock = blocks.find(b => b.id === currentId);
+      if (!currentBlock) return;
+      
+      // If this is an email block and comes before our target block, add it
+      if (currentBlock.type === 'email' && currentBlock.id !== blockId) {
+        previousBlocks.push(currentBlock);
+      }
+      
+      // Continue traversing forward through connections
+      if (currentBlock.connections && currentBlock.connections.length > 0) {
+        for (const nextId of currentBlock.connections) {
+          traverseForward(nextId);
+        }
+      }
+      
+      // Also check true/false paths for conditional blocks
+      if (currentBlock.type === 'conditional') {
+        if (currentBlock.truePath) {
+          traverseForward(currentBlock.truePath);
+        }
+        if (currentBlock.falsePath) {
+          traverseForward(currentBlock.falsePath);
+        }
+      }
+    };
+    
+    // Start from trigger and traverse forward
+    const triggerBlock = blocks.find(b => b.type === 'trigger');
+    if (triggerBlock) {
+      traverseForward(triggerBlock.id);
+    }
+    
+    return previousBlocks;
   };
 
   useEffect(() => {
@@ -703,12 +1151,20 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                   {block.type === 'email' && block.config.subject && (
                     <div>Subject: {block.config.subject}</div>
                   )}
-                  {block.type === 'delay' && (
-                    <div>
-                      {block.config.delayDays} day{block.config.delayDays !== 1 ? 's' : ''}
-                      {block.config.delayHours && block.config.delayHours > 0 && ` ${block.config.delayHours} hour${block.config.delayHours !== 1 ? 's' : ''}`}
-                    </div>
-                  )}
+                  {block.type === 'delay' && (() => {
+                    const parts: string[] = [];
+                    const days = block.config.delayDays || 0;
+                    const hours = block.config.delayHours || 0;
+                    const minutes = block.config.delayMinutes || 0;
+                    const seconds = block.config.delaySeconds || 0;
+                    
+                    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+                    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+                    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+                    if (seconds > 0) parts.push(`${seconds} second${seconds !== 1 ? 's' : ''}`);
+                    
+                    return parts.length > 0 ? <div>{parts.join(', ')}</div> : null;
+                  })()}
                 </div>
               )}
             </div>
@@ -839,6 +1295,9 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       onChange={(e) => updateBlockConfig(block.id, { subject: e.target.value })}
                       placeholder="Email subject"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ⚠️ For replies, subject must match exactly (including "Re:" prefix)
+                    </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Body</label>
@@ -846,43 +1305,68 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       value={block.config?.body || ''}
                       onChange={(e) => updateBlockConfig(block.id, { body: e.target.value })}
                       placeholder="Email body"
-                      className="w-full min-h-[100px] p-2 border rounded"
+                      className="w-full min-h-[100px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={block.config?.replyToThread || false}
-                      onChange={(e) => updateBlockConfig(block.id, { replyToThread: e.target.checked })}
-                      id={`reply-${block.id}`}
-                    />
-                    <label htmlFor={`reply-${block.id}`} className="text-sm">
-                      Reply in thread (continues conversation)
-                    </label>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Thread</label>
+                    <select
+                      value={block.config?.threadSelection || (block.config?.replyToThread ? 'previous' : 'new')}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const updates: any = { 
+                          threadSelection: value,
+                          replyToThread: value !== 'new' // Legacy support
+                        };
+                        
+                        // If replying to a specific thread, auto-copy the subject
+                        if (value !== 'new') {
+                          const prevBlock = blocks.find(b => b.id === value);
+                          if (prevBlock?.config?.subject) {
+                            // Ensure subject matches exactly for threading
+                            updates.subject = prevBlock.config.subject;
+                          }
+                        }
+                        
+                        updateBlockConfig(block.id, updates);
+                      }}
+                      className="w-full p-2 border rounded bg-white text-gray-900"
+                    >
+                      <option value="new">New thread</option>
+                      {getPreviousEmailBlocks(block.id).map((prevBlock) => (
+                        <option key={prevBlock.id} value={prevBlock.id}>
+                          Reply to: {prevBlock.config?.subject || prevBlock.title || `Email ${prevBlock.id}`}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Select which thread to reply to. Subject will auto-match for proper threading.
+                    </p>
                   </div>
                 </>
               )}
 
               {block.type === 'voicemail' && (
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Script</label>
-                  <textarea
-                    value={block.config?.script || ''}
-                    onChange={(e) => updateBlockConfig(block.id, { script: e.target.value })}
-                    placeholder="Voicemail script"
-                    className="w-full min-h-[100px] p-2 border rounded"
-                  />
-                </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Script</label>
+                    <textarea
+                      value={block.config?.script || ''}
+                      onChange={(e) => updateBlockConfig(block.id, { script: e.target.value })}
+                      placeholder="Voicemail script"
+                      className="w-full min-h-[100px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
+                    />
+                  </div>
               )}
 
               {block.type === 'calendar' && (
                 <>
                   <div>
-                    <label className="text-sm font-medium mb-1 block">Event Title</label>
+                    <label className="text-sm font-medium mb-1 block">Event Title *</label>
                     <Input
                       value={block.config?.calendarTitle || ''}
                       onChange={(e) => updateBlockConfig(block.id, { calendarTitle: e.target.value })}
                       placeholder="Meeting title"
+                      required
                     />
                   </div>
                   <div>
@@ -891,47 +1375,201 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       value={block.config?.calendarDescription || ''}
                       onChange={(e) => updateBlockConfig(block.id, { calendarDescription: e.target.value })}
                       placeholder="Event description"
-                      className="w-full min-h-[80px] p-2 border rounded"
+                      className="w-full min-h-[80px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
                     />
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Duration (minutes)</label>
                     <Input
                       type="number"
-                      value={block.config?.duration || 30}
-                      onChange={(e) => updateBlockConfig(block.id, { duration: parseInt(e.target.value) || 30 })}
+                      min="15"
+                      step="15"
+                      value={block.config?.duration ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updateBlockConfig(block.id, { duration: val === '' ? 30 : parseInt(val) || 30 });
+                      }}
                     />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Time Constraints</label>
+                    <select
+                      value={block.config?.timeConstraint || 'business_hours'}
+                      onChange={(e) => updateBlockConfig(block.id, { timeConstraint: e.target.value as any })}
+                      className="w-full p-2 border rounded bg-white text-gray-900"
+                    >
+                      <option value="none">No constraints (any time)</option>
+                      <option value="business_hours">Business Hours (9am - 5pm)</option>
+                    </select>
+                    {block.config?.timeConstraint === 'business_hours' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Meeting will be scheduled between 9:00 AM and 5:00 PM on weekdays
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={block.config?.checkAvailability !== false}
+                        onChange={(e) => updateBlockConfig(block.id, { checkAvailability: e.target.checked })}
+                        className="rounded"
+                      />
+                      <span className="text-sm font-medium">Check availability before scheduling</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1 ml-6">
+                      If checked, will find the next available slot within your constraints
+                    </p>
                   </div>
                 </>
               )}
 
               {block.type === 'conditional' && (
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Condition</label>
-                  <Input
-                    value={block.config?.condition || ''}
-                    onChange={(e) => updateBlockConfig(block.id, { condition: e.target.value })}
-                    placeholder="e.g., Email opened, Response received"
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Condition Type</label>
+                    <select
+                      value={block.config?.conditionType || ''}
+                      onChange={(e) => updateBlockConfig(block.id, { conditionType: e.target.value as any })}
+                      className="w-full p-2 border rounded bg-white text-gray-900"
+                    >
+                      <option value="">Select condition...</option>
+                      <option value="email_opened">Email opened</option>
+                      <option value="email_not_opened">Email not opened</option>
+                      <option value="email_replied">Email replied</option>
+                      <option value="email_not_replied">Email not replied</option>
+                      <option value="email_opened_within_days">Email opened within days</option>
+                      <option value="email_replied_within_days">Email replied within days</option>
+                    </select>
+                  </div>
+                  {(block.config?.conditionType === 'email_opened_within_days' || 
+                    block.config?.conditionType === 'email_replied_within_days') && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Days</label>
+                      <Input
+                        type="number"
+                        value={block.config?.conditionValue || ''}
+                        onChange={(e) => updateBlockConfig(block.id, { conditionValue: e.target.value })}
+                        placeholder="e.g., 3"
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
               {block.type === 'delay' && (
                 <>
                   <div>
-                    <label className="text-sm font-medium mb-1 block">Days</label>
+                    <label className="text-sm font-medium mb-1 block">Seconds</label>
                     <Input
                       type="number"
-                      value={block.config?.delayDays || 1}
-                      onChange={(e) => updateBlockConfig(block.id, { delayDays: parseInt(e.target.value) || 1 })}
+                      min="0"
+                      value={delayInputs[block.id]?.seconds !== undefined ? delayInputs[block.id].seconds : (block.config?.delaySeconds ?? 0)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDelayInputs(prev => ({
+                          ...prev,
+                          [block.id]: { ...prev[block.id], seconds: val }
+                        }));
+                        const numVal = val === '' ? 0 : (parseInt(val) || 0);
+                        updateBlockConfig(block.id, { delaySeconds: numVal });
+                      }}
+                      onBlur={() => {
+                        // Clear local state on blur so it syncs with config
+                        setDelayInputs(prev => {
+                          const next = { ...prev };
+                          delete next[block.id]?.seconds;
+                          if (Object.keys(next[block.id] || {}).length === 0) {
+                            delete next[block.id];
+                          }
+                          return next;
+                        });
+                      }}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Minutes</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={delayInputs[block.id]?.minutes !== undefined ? delayInputs[block.id].minutes : (block.config?.delayMinutes ?? 0)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDelayInputs(prev => ({
+                          ...prev,
+                          [block.id]: { ...prev[block.id], minutes: val }
+                        }));
+                        const numVal = val === '' ? 0 : (parseInt(val) || 0);
+                        updateBlockConfig(block.id, { delayMinutes: numVal });
+                      }}
+                      onBlur={() => {
+                        setDelayInputs(prev => {
+                          const next = { ...prev };
+                          delete next[block.id]?.minutes;
+                          if (Object.keys(next[block.id] || {}).length === 0) {
+                            delete next[block.id];
+                          }
+                          return next;
+                        });
+                      }}
+                      placeholder="0"
                     />
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Hours</label>
                     <Input
                       type="number"
-                      value={block.config?.delayHours || 0}
-                      onChange={(e) => updateBlockConfig(block.id, { delayHours: parseInt(e.target.value) || 0 })}
+                      min="0"
+                      value={delayInputs[block.id]?.hours !== undefined ? delayInputs[block.id].hours : (block.config?.delayHours ?? 0)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDelayInputs(prev => ({
+                          ...prev,
+                          [block.id]: { ...prev[block.id], hours: val }
+                        }));
+                        const numVal = val === '' ? 0 : (parseInt(val) || 0);
+                        updateBlockConfig(block.id, { delayHours: numVal });
+                      }}
+                      onBlur={() => {
+                        setDelayInputs(prev => {
+                          const next = { ...prev };
+                          delete next[block.id]?.hours;
+                          if (Object.keys(next[block.id] || {}).length === 0) {
+                            delete next[block.id];
+                          }
+                          return next;
+                        });
+                      }}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Days</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={delayInputs[block.id]?.days !== undefined ? delayInputs[block.id].days : (block.config?.delayDays ?? 0)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDelayInputs(prev => ({
+                          ...prev,
+                          [block.id]: { ...prev[block.id], days: val }
+                        }));
+                        const numVal = val === '' ? 0 : (parseInt(val) || 0);
+                        updateBlockConfig(block.id, { delayDays: numVal });
+                      }}
+                      onBlur={() => {
+                        setDelayInputs(prev => {
+                          const next = { ...prev };
+                          delete next[block.id]?.days;
+                          if (Object.keys(next[block.id] || {}).length === 0) {
+                            delete next[block.id];
+                          }
+                          return next;
+                        });
+                      }}
+                      placeholder="0"
                     />
                   </div>
                 </>
@@ -970,7 +1608,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               )}
             </AnimatePresence>
             {onClose && (
-              <Button variant="outline" size="sm" onClick={onClose}>
+              <Button variant="outline" size="sm" onClick={() => onClose(false)}>
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -995,20 +1633,23 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               className="w-full"
             />
           </div>
-          <div className="flex items-end">
-            <Button
-              onClick={() => {
-                if (!name.trim()) {
-                  alert('Please enter a cadence name');
-                  return;
-                }
-                handleSave();
-              }}
-              disabled={!name.trim()}
-            >
-              Save Cadence
-            </Button>
-          </div>
+              <div className="flex items-end gap-2">
+                <Button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!name.trim()) {
+                      alert('Please enter a cadence name');
+                      return;
+                    }
+                    handleSave();
+                  }}
+                  disabled={!name.trim()}
+                  type="button"
+                >
+                  Save Cadence
+                </Button>
+              </div>
         </div>
       </div>
 
@@ -1315,6 +1956,30 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
 
                 <div ref={chatEndRef} />
               </div>
+
+              {/* Execution Log */}
+              {executionLog.length > 0 && (
+                <div className="border-t border-border p-4 bg-muted/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-foreground">Execution Log</h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setExecutionLog([])}
+                      className="h-6 text-xs"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto text-xs font-mono space-y-1 bg-background p-2 rounded border border-border">
+                    {executionLog.map((log, idx) => (
+                      <div key={idx} className="text-muted-foreground">
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Chat Input */}
               <div className="p-4 border-t">

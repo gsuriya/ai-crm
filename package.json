@@ -9,15 +9,24 @@
     "lint": "next lint",
     "seed": "tsx scripts/seed.ts",
     "seed:semantic": "tsx scripts/seed-semantic.ts",
-    "backfill:names": "tsx scripts/backfill-name-embeddings.ts"
+    "backfill:names": "tsx scripts/backfill-name-embeddings.ts",
+    "test:apis": "tsx scripts/test-all-apis.ts",
+    "test:real": "tsx scripts/test-real-apis.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.39.0",
+    "@types/passport": "^1.0.17",
+    "@types/passport-google-oauth20": "^2.0.17",
+    "@vapi-ai/server-sdk": "^0.10.2",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.0",
+    "googleapis": "^164.1.0",
     "lucide-react": "^0.344.0",
     "next": "^14.2.0",
     "openai": "^6.7.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "tailwind-merge": "^2.2.0"

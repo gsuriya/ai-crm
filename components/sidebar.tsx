@@ -26,7 +26,11 @@ export function Sidebar() {
   };
 
   return (
-    <div data-sidebar className="flex w-64 flex-col border-r border-border bg-background relative z-[60]">
+    <div 
+      data-sidebar 
+      className="flex w-64 flex-shrink-0 flex-col border-r border-border bg-background" 
+      style={{ zIndex: 10 }}
+    >
       <div className="flex h-16 items-center border-b border-border px-6">
         <Link href="/" className="flex items-center space-x-2">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">

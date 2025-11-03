@@ -154,3 +154,9 @@ If you run into issues:
 - Make sure redirect URIs match exactly
 - Check Supabase logs for auth errors
 
+
+
+
+
+
+

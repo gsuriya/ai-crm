@@ -11,31 +11,42 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname.startsWith('/auth');
 
   useEffect(() => {
+    // Skip auth check for auth pages - let them render immediately
+    if (isAuthPage) {
+      setIsChecking(false);
+      return;
+    }
+
     const checkAuth = async () => {
-      const session = await getSession();
-      
-      // Allow access to auth pages
-      if (isAuthPage) {
-        if (session) {
-          router.push('/companies');
+      try {
+        // Add a timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 5000)
+        );
+        
+        const sessionPromise = getSession();
+        const session = await Promise.race([sessionPromise, timeoutPromise]).catch((err) => {
+          console.warn('Auth check timeout or error:', err);
+          return null;
+        }) as any;
+        
+        // Protect all other routes
+        if (!session) {
+          router.push('/auth/signin');
         } else {
           setIsChecking(false);
         }
-        return;
-      }
-
-      // Protect all other routes
-      if (!session) {
-        router.push('/auth/signin');
-      } else {
+      } catch (error) {
+        console.error('Auth check error:', error);
         setIsChecking(false);
+        router.push('/auth/signin');
       }
     };
 
     checkAuth();
   }, [router, pathname, isAuthPage]);
 
-  // Show loading state while checking auth
+  // Show loading state while checking auth (only for protected routes)
   if (isChecking && !isAuthPage) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
