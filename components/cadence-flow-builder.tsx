@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 
-export type BlockType = 'trigger' | 'email' | 'voicemail' | 'voicecall' | 'calendar' | 'conditional' | 'delay' | 'end';
+export type BlockType = 'trigger' | 'email' | 'voicecall' | 'calendar' | 'conditional' | 'delay' | 'end';
 
 export interface FlowBlock {
   id: string;
@@ -56,14 +56,8 @@ const blockTypeConfig = {
     icon: Mail,
     canHaveMultipleOutputs: false,
   },
-  voicemail: { 
-    color: 'bg-orange-500', 
-    label: 'Leave Voicemail', 
-    icon: Phone,
-    canHaveMultipleOutputs: false,
-  },
   voicecall: { 
-    color: 'bg-teal-500', 
+    color: 'bg-orange-500', 
     label: 'Voice Call', 
     icon: Phone,
     canHaveMultipleOutputs: false,
@@ -290,15 +284,21 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                 if (selectedBlockId && threadInfoMap.has(selectedBlockId)) {
                   const threadInfo = threadInfoMap.get(selectedBlockId)!;
                   threadId = threadInfo.threadId;
-                  messageId = threadInfo.messageId;
+                  // Ensure messageId is in correct format with angle brackets if not already
+                  let msgId = threadInfo.messageId;
+                  if (msgId && !msgId.startsWith('<')) {
+                    msgId = `<${msgId}>`;
+                  }
+                  messageId = msgId;
                   log(`   Replying to thread from block ${selectedBlockId}`);
+                  log(`   Thread ID: ${threadId}, Message ID: ${messageId}`);
                   
-                  // IMPORTANT: Subject must match exactly for threading
+                  // IMPORTANT: Use the original subject exactly as stored
                   const originalSubject = blocksFromSupabase.find(b => b.id === selectedBlockId)?.config?.subject || '';
-                  if (originalSubject && block.config?.subject !== originalSubject) {
-                    log(`   ⚠️ Warning: Subject doesn't match original. Gmail requires exact match for threading.`);
-                    log(`   Original: "${originalSubject}"`);
-                    log(`   Current: "${block.config?.subject}"`);
+                  if (originalSubject) {
+                    // Force subject to match original for threading
+                    block.config = { ...block.config, subject: originalSubject };
+                    log(`   Subject locked to: "${originalSubject}"`);
                   }
                 } else {
                   log(`   ⚠️ Warning: Selected thread block not found or hasn't sent yet. Creating new thread.`);
@@ -338,48 +338,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               log(`   ✅ Email sent (Thread ID: ${emailData.threadId}, Message ID: ${emailData.messageId || 'N/A'})`);
             } catch (error: any) {
               log(`   ❌ Error sending email: ${error.message}`);
-              throw error;
-            }
-            break;
-
-          case 'voicemail':
-            log(`📞 Executing: ${block.title}`);
-            log(`   Script: ${block.config?.script || '(empty)'}`);
-            
-            try {
-              // Get company phone number from metadata or use placeholder
-              const { data: companyMetadata } = await supabase
-                .from('company_metadata')
-                .select('value')
-                .eq('company_id', companyId)
-                .eq('key', 'phone_number')
-                .single();
-
-              const phoneNumber = companyMetadata?.value || '';
-              if (!phoneNumber) {
-                throw new Error('Company phone number not found');
-              }
-
-              const voicemailResponse = await fetch('/api/voicemail/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  phone_number: phoneNumber,
-                  script: block.config?.script || '',
-                  company_id: companyId,
-                  cadence_id: cadenceId,
-                }),
-              });
-
-              if (!voicemailResponse.ok) {
-                const error = await voicemailResponse.json();
-                throw new Error(error.error || 'Failed to send voicemail');
-              }
-
-              const voicemailData = await voicemailResponse.json();
-              log(`   ✅ Voicemail left (Call ID: ${voicemailData.callId})`);
-            } catch (error: any) {
-              log(`   ❌ Error sending voicemail: ${error.message}`);
               throw error;
             }
             break;
@@ -769,7 +727,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   const getDefaultTitle = (type: BlockType): string => {
     switch (type) {
       case 'email': return 'Send email';
-      case 'voicemail': return 'Leave voicemail';
       case 'voicecall': return 'Make voice call';
       case 'calendar': return 'Send calendar invite';
       case 'conditional': return 'Check condition';
@@ -783,8 +740,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     switch (type) {
       case 'email':
         return { subject: '', body: '', threadSelection: 'new' as const };
-      case 'voicemail':
-        return { script: '' };
       case 'voicecall':
         return { customPrompt: '', voicemailMessage: '', enableVoicemailFallback: true }; // Optional - uses defaults if empty
       case 'calendar':
@@ -1151,7 +1106,12 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   };
 
   const renderBlock = (block: FlowBlock) => {
-    const config = blockTypeConfig[block.type];
+    const config = blockTypeConfig[block.type] || {
+      color: 'bg-gray-500',
+      label: 'Unknown Block',
+      icon: Square,
+      canHaveMultipleOutputs: false,
+    };
     const Icon = config.icon;
     const isSelected = selectedBlock === block.id;
     const isConfiguring = configuringBlock === block.id;
@@ -1346,14 +1306,49 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                 <>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Subject</label>
-                    <Input
-                      value={block.config?.subject || ''}
-                      onChange={(e) => updateBlockConfig(block.id, { subject: e.target.value })}
-                      placeholder="Email subject"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      ⚠️ For replies, subject must match exactly (including "Re:" prefix)
-                    </p>
+                    {(() => {
+                      const threadSelection = block.config?.threadSelection || 
+                                             (block.config?.replyToThread ? 'previous' : 'new');
+                      const isReplying = threadSelection !== 'new';
+                      
+                      // If replying, find the original subject
+                      let originalSubject = '';
+                      if (isReplying) {
+                        const selectedBlockId = threadSelection === 'previous' 
+                          ? blocks.find(b => b.type === 'email' && b.id !== block.id && b.config?.subject)?.id
+                          : threadSelection;
+                        if (selectedBlockId) {
+                          const prevBlock = blocks.find(b => b.id === selectedBlockId);
+                          originalSubject = prevBlock?.config?.subject || '';
+                        }
+                      }
+                      
+                      return (
+                        <>
+                          <Input
+                            value={isReplying ? originalSubject : (block.config?.subject || '')}
+                            onChange={(e) => {
+                              if (!isReplying) {
+                                updateBlockConfig(block.id, { subject: e.target.value });
+                              }
+                            }}
+                            placeholder="Email subject"
+                            disabled={isReplying}
+                            className={isReplying ? "bg-gray-100 cursor-not-allowed" : ""}
+                          />
+                          {isReplying && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              ✓ Subject locked to match original thread for proper threading
+                            </p>
+                          )}
+                          {!isReplying && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Subject for new email thread
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Body</label>
@@ -1375,7 +1370,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                           replyToThread: value !== 'new' // Legacy support
                         };
                         
-                        // If replying to a specific thread, auto-copy the subject
+                        // If replying to a specific thread, auto-copy the subject and lock it
                         if (value !== 'new') {
                           const prevBlock = blocks.find(b => b.id === value);
                           if (prevBlock?.config?.subject) {
@@ -1396,22 +1391,10 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       ))}
                     </select>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Select which thread to reply to. Subject will auto-match for proper threading.
+                      Select which thread to reply to. Subject will be automatically locked to match the original for proper threading.
                     </p>
                   </div>
                 </>
-              )}
-
-              {block.type === 'voicemail' && (
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Script</label>
-                    <textarea
-                      value={block.config?.script || ''}
-                      onChange={(e) => updateBlockConfig(block.id, { script: e.target.value })}
-                      placeholder="Voicemail script"
-                      className="w-full min-h-[100px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
-                    />
-                  </div>
               )}
 
               {block.type === 'voicecall' && (
@@ -1437,7 +1420,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                         onChange={(e) => updateBlockConfig(block.id, { enableVoicemailFallback: e.target.checked })}
                         className="rounded"
                       />
-                      <span className="text-sm">Leave voicemail if call isn't answered</span>
+                      <span className="text-sm">Leave voicemail if call isn&apos;t answered</span>
                     </label>
                     <p className="text-xs text-muted-foreground mt-1">
                       If enabled, will automatically leave a voicemail with contact information if the call goes to voicemail.

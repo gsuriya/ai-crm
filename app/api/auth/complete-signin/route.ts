@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     let actualScopes: string[] = [];
     try {
       const tokenInfo = await oauth2Client.getTokenInfo(tokenData.access_token);
-      actualScopes = tokenInfo.scope ? tokenInfo.scope.split(' ') : [];
+      actualScopes = tokenInfo.scopes || [];
     } catch (error: any) {
       console.error('Error verifying token:', error);
     }

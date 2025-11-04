@@ -105,8 +105,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error sending voice call:', error);
+    const errorMessage = error.message || error.toString() || 'Failed to send voice call';
     return NextResponse.json(
-      { error: error.message || 'Failed to send voice call' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

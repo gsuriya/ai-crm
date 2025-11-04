@@ -228,7 +228,7 @@ export default function CompaniesPage() {
             {agentMode && (
               <div className="mt-2 text-xs text-muted-foreground text-center">
                 <Bot className="h-3 w-3 inline mr-1" />
-                Agent Mode: I'll automatically find companies and add them to cadences based on your commands
+                Agent Mode: I&apos;ll automatically find companies and add them to cadences based on your commands
               </div>
             )}
           </div>

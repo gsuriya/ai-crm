@@ -97,8 +97,8 @@ export default function SimpleEmailTestPage() {
             Click the button below to send a test email to <strong>sg.suriya.v@gmail.com</strong>
           </p>
           <p className="text-xs text-gray-500">
-            Subject: "yo"<br />
-            Body: "Test email from simple test page"
+            Subject: &quot;yo&quot;<br />
+            Body: &quot;Test email from simple test page&quot;
           </p>
         </div>
 

@@ -54,7 +54,7 @@ export default function APITestPage() {
             <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
               <p className="text-sm font-medium text-yellow-800 mb-2">⚠️ Important Notes:</p>
               <ul className="text-sm text-yellow-700 space-y-1 list-disc list-inside">
-                <li>Make sure you're signed in with Google OAuth</li>
+                <li>Make sure you&apos;re signed in with Google OAuth</li>
                 <li>VAPI requires VAPI_PHONE_NUMBER_ID in .env.local</li>
                 <li>Tests will send to: sg.suriya.v@gmail.com</li>
                 <li>VAPI will call: +1 (925) 577-2134</li>

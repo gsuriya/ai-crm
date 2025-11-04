@@ -34,10 +34,10 @@ export function Sidebar() {
   return (
     <div 
       data-sidebar 
-      className="flex w-64 flex-shrink-0 flex-col border-r border-border bg-background" 
+      className="flex w-64 flex-shrink-0 flex-col border-r border-border bg-background h-screen" 
       style={{ zIndex: 10 }}
     >
-      <div className="flex h-16 items-center border-b border-border px-6">
+      <div className="flex h-16 items-center border-b border-border px-6 flex-shrink-0">
         <Link href="/" className="flex items-center space-x-2">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
             <Building2 className="h-5 w-5 text-primary-foreground" />
@@ -45,7 +45,7 @@ export function Sidebar() {
           <span className="text-xl font-semibold text-foreground">AI CRM</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
           return (
@@ -65,7 +65,7 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-border p-4">
+      <div className="border-t border-border p-4 flex-shrink-0">
         <Button
           variant="outline"
           onClick={handleSignOut}

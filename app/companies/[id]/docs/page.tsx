@@ -7,7 +7,7 @@ import { DocsLibrary } from "@/components/company/docs-library";
 import { DocQA } from "@/components/company/doc-qa";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileUp, Upload } from "lucide-react";
+import { FileUp, Upload, Search } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 

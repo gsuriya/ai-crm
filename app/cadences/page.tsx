@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Edit, Trash2, Clock } from "lucide-react";
+import { Plus, Edit, Trash2, Clock, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CadenceFlowBuilder, FlowBlock } from "@/components/cadence-flow-builder";
 import { supabase } from "@/lib/supabase";
@@ -156,6 +156,145 @@ export default function CadencesPage() {
     } catch (error) {
       console.error('Error saving cadence:', error);
       alert('Failed to save cadence. Please try again.');
+    }
+  };
+
+  const handleRunCadence = async (cadenceId: string) => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert('You must be signed in to run cadences');
+        return;
+      }
+
+      // Test email and phone
+      const testEmail = 'sg.suriya.v@gmail.com';
+      const testPhone = '+19255772134';
+
+      // First, find or create a test company
+      let testCompanyId: string;
+      
+      // Try to find existing test company
+      const { data: existingCompany } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('email', testEmail)
+        .single();
+
+      if (existingCompany) {
+        testCompanyId = existingCompany.id;
+        // Update phone number if needed
+        await supabase
+          .from('companies')
+          .update({ phone_number: testPhone })
+          .eq('id', testCompanyId);
+      } else {
+        // Create test company
+        const { data: newCompany, error: createError } = await supabase
+          .from('companies')
+          .insert({
+            name: 'Test Company (Cadence Test)',
+            email: testEmail,
+            phone_number: testPhone,
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        testCompanyId = newCompany.id;
+      }
+
+      // Add company to cadence (or get existing association)
+      let companyCadenceId: string;
+      
+      const { data: existingAssociation } = await supabase
+        .from('company_cadences')
+        .select('id')
+        .eq('company_id', testCompanyId)
+        .eq('cadence_id', cadenceId)
+        .single();
+
+      if (existingAssociation) {
+        companyCadenceId = existingAssociation.id;
+        // Reset status to active
+        await supabase
+          .from('company_cadences')
+          .update({ status: 'active', completed_at: null })
+          .eq('id', companyCadenceId);
+      } else {
+        // Create new association
+        const { data: newAssociation, error: assocError } = await supabase
+          .from('company_cadences')
+          .insert({
+            company_id: testCompanyId,
+            cadence_id: cadenceId,
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (assocError) throw assocError;
+        companyCadenceId = newAssociation.id;
+      }
+
+      // Start the cadence
+      const response = await fetch('/api/cadence/start', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ company_cadence_id: companyCadenceId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to start cadence');
+      }
+
+      const result = await response.json();
+      console.log('✅ Cadence started:', result);
+      console.log('📋 Execution ID:', result.execution_id);
+      console.log('🔍 Check browser console for detailed threading logs');
+      console.log('📧 Look for logs starting with [Workflow] and [Email]');
+      
+      // Poll for execution status
+      const executionId = result.execution_id;
+      let pollCount = 0;
+      const maxPolls = 20; // Poll for 10 seconds (20 * 500ms)
+      
+      const pollStatus = async () => {
+        try {
+          const statusResponse = await fetch(`/api/cadence/execution-status?execution_id=${executionId}`);
+          if (statusResponse.ok) {
+            const status = await statusResponse.json();
+            console.log(`\n📊 Execution Status (poll ${pollCount + 1}/${maxPolls}):`, {
+              status: status.status,
+              current_block: status.current_block_id,
+              threadInfoMap: status.threadInfoMap,
+              threadInfoMapSize: Object.keys(status.threadInfoMap || {}).length
+            });
+            
+            if (Object.keys(status.threadInfoMap || {}).length > 0) {
+              console.log('✅ Thread Info Map populated!', status.threadInfoMap);
+            }
+          }
+        } catch (e) {
+          // Ignore polling errors
+        }
+        
+        pollCount++;
+        if (pollCount < maxPolls) {
+          setTimeout(pollStatus, 500);
+        }
+      };
+      
+      setTimeout(pollStatus, 1000); // Start polling after 1 second
+      
+      alert(`Cadence started!\n\nExecution ID: ${result.execution_id}\n\nCheck browser console (F12) for detailed status.\nServer logs are in the terminal running "npm run dev"`);
+    } catch (error: any) {
+      console.error('Error running cadence:', error);
+      alert(`Error: ${error.message || 'Failed to run cadence'}`);
     }
   };
 
@@ -322,6 +461,15 @@ export default function CadencesPage() {
                     </td>
                     <td className="px-8 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRunCadence(cadence.id)}
+                          className="h-8"
+                        >
+                          <Play className="h-3.5 w-3.5 mr-1.5" />
+                          Run Cadence
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"

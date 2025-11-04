@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           });
           
           const tokenInfo = await oauth2Client.getTokenInfo(session.access_token);
-          actualScopes = tokenInfo.scope ? tokenInfo.scope.split(' ') : [];
+          actualScopes = tokenInfo.scopes || [];
         }
       } catch (error: any) {
         tokenInfoError = error.message;

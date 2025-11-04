@@ -44,17 +44,17 @@ export async function GET(request: NextRequest) {
 
     try {
       const tokenInfo = await oauth2Client.getTokenInfo(session.access_token);
-      const actualScopes = tokenInfo.scope ? tokenInfo.scope.split(' ') : [];
+      const actualScopes = tokenInfo.scopes || [];
       
       return NextResponse.json({
         storedScopes: session.scope ? session.scope.split(' ') : [],
         actualScopesFromGoogle: actualScopes,
         hasGmailSend: actualScopes.includes('https://www.googleapis.com/auth/gmail.send') || 
-                     actualScopes.some(s => s.includes('gmail.send')),
+                     actualScopes.some((s: string) => s.includes('gmail.send')),
         missingScopes: [
           'https://www.googleapis.com/auth/gmail.send',
           'https://www.googleapis.com/auth/calendar.events',
-        ].filter(req => !actualScopes.includes(req) && !actualScopes.some(s => s.includes(req.split('/').pop() || ''))),
+        ].filter(req => !actualScopes.includes(req) && !actualScopes.some((s: string) => s.includes(req.split('/').pop() || ''))),
       });
     } catch (error: any) {
       return NextResponse.json({

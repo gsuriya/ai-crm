@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp, Users, Eye, AlertCircle } from "lucide-react";
 import { FunnelView } from "@/app/pipeline/components/funnel-view";
 import { TrendChart } from "@/app/pipeline/components/trend-chart";

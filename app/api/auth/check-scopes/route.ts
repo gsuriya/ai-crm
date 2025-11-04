@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     // Get token info from Google
     try {
       const tokenInfo = await oauth2Client.getTokenInfo(session.access_token);
-      const actualScopes = tokenInfo.scope ? tokenInfo.scope.split(' ') : [];
+      const actualScopes = tokenInfo.scopes || [];
       
       return NextResponse.json({
         success: true,

@@ -156,11 +156,10 @@ export async function sendVoiceCall(
   // Build assistant overrides object - only include fields if we need to override
   const assistantOverrides: any = {};
 
-  // Only override system prompt if custom prompt is provided
-  // Otherwise, use what's configured in VAPI dashboard
-  if (params.customPrompt) {
-    assistantOverrides.systemPrompt = params.customPrompt;
-  }
+  // NOTE: System prompt cannot be overridden via assistantOverrides
+  // It must be configured in the VAPI dashboard for the assistant
+  // The VOICE_CALL_SYSTEM_PROMPT constant is for reference/documentation only
+  // If you want to use a custom system prompt, configure it in VAPI dashboard or use a different assistant
 
   // Create a personalized first message if company name is provided
   // Otherwise, let it use the default from VAPI dashboard
@@ -207,17 +206,47 @@ export async function sendVoiceCall(
     };
   } catch (error: any) {
     console.error('VAPI voice call error:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     
     // Handle specific VAPI SDK errors
     if (error.statusCode === 400) {
-      throw new Error(`Bad request - check phone number format or configuration: ${error.body || error.message}`);
+      let errorMessage = 'Bad request';
+      if (error.body) {
+        if (typeof error.body === 'string') {
+          errorMessage = error.body;
+        } else if (error.body.message) {
+          errorMessage = error.body.message;
+        } else if (error.body.error) {
+          errorMessage = error.body.error;
+        } else {
+          errorMessage = JSON.stringify(error.body);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      throw new Error(`Bad request - check phone number format or configuration: ${errorMessage}`);
     }
     
     if (error.statusCode === 401) {
       throw new Error('Unauthorized - check VAPI credentials');
     }
     
-    throw new Error(`Failed to initiate voice call: ${error.message || String(error)}`);
+    // Better error message extraction
+    let errorMessage = 'Unknown error';
+    if (error.body) {
+      if (typeof error.body === 'string') {
+        errorMessage = error.body;
+      } else if (error.body.message) {
+        errorMessage = error.body.message;
+      } else if (error.body.error) {
+        errorMessage = error.body.error;
+      } else {
+        errorMessage = JSON.stringify(error.body);
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    throw new Error(`Failed to initiate voice call: ${errorMessage}`);
   }
 }
 

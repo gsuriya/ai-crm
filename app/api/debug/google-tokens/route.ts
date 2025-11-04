@@ -88,14 +88,14 @@ export async function GET(request: NextRequest) {
         hasAccessToken: !!session.access_token,
         hasRefreshToken: !!session.refresh_token,
         storedScope: session.scope || 'NONE',
-        storedScopes: session.scope ? session.scope.split(' ').filter(s => s.length > 0) : [],
+        storedScopes: session.scope ? session.scope.split(' ').filter((s: string) => s.length > 0) : [],
         tokenExpiresAt: session.token_expires_at,
         createdAt: session.created_at,
         updatedAt: session.updated_at,
       },
       currentToken: currentTokenInfo ? {
-        scopes: currentTokenInfo.scope ? currentTokenInfo.scope.split(' ').filter(s => s.length > 0) : [],
-        scopeString: currentTokenInfo.scope || 'NONE',
+        scopes: currentTokenInfo.scopes || [],
+        scopeString: currentTokenInfo.scopes ? currentTokenInfo.scopes.join(' ') : 'NONE',
         expiresIn: currentTokenInfo.expiry_date,
         hasGmailSend: currentTokenInfo.scope?.includes('gmail.send') || false,
       } : {
