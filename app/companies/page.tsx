@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
-import { Search, Star, Clock, Sparkles, ArrowUp } from "lucide-react";
+import { Search, Star, Clock, Sparkles, ArrowUp, Bot } from "lucide-react";
 import { motion } from "framer-motion";
 import { MatchIndicator } from "@/components/match-indicator";
 import { MatchSnippet } from "@/components/match-snippet";
@@ -36,6 +36,7 @@ export default function CompaniesPage() {
   const [isSemanticSearch, setIsSemanticSearch] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchInput, setSearchInput] = useState("");
+  const [agentMode, setAgentMode] = useState(false);
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -198,13 +199,24 @@ export default function CompaniesPage() {
             <div className="relative flex items-center bg-background border border-border rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all">
               <input
                 type="text"
-                placeholder="Search companies..."
+                placeholder={agentMode ? "Give agent commands (e.g., 'add SaaS companies to warm outreach cadence')..." : "Search companies..."}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="flex-1 bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-muted-foreground pr-2"
                 disabled={searchLoading}
               />
+              <button
+                onClick={() => setAgentMode(!agentMode)}
+                className={`ml-2 flex items-center justify-center h-8 w-8 rounded-full transition-all ${
+                  agentMode 
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+                title={agentMode ? "Disable Agent Mode" : "Enable Agent Mode"}
+              >
+                <Bot className="h-4 w-4" />
+              </button>
               <button
                 onClick={performSearch}
                 disabled={searchLoading || !searchInput.trim()}
@@ -213,6 +225,12 @@ export default function CompaniesPage() {
                 <ArrowUp className="h-4 w-4" />
               </button>
             </div>
+            {agentMode && (
+              <div className="mt-2 text-xs text-muted-foreground text-center">
+                <Bot className="h-3 w-3 inline mr-1" />
+                Agent Mode: I'll automatically find companies and add them to cadences based on your commands
+              </div>
+            )}
           </div>
         </div>
       </div>

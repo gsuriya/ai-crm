@@ -96,3 +96,128 @@ export async function getVoicemailStatus(callId: string): Promise<any> {
   }
 }
 
+/**
+ * System prompt for voice call AI agent
+ */
+const VOICE_CALL_SYSTEM_PROMPT = `You are an AI Agent calling from Insight Partner on behalf of Pranav Srigiriraju. Your goal is to schedule a meeting with the founder/decision maker.
+
+Your introduction should be:
+"Hey, I'm an AI Agent calling from Insight Partner on behalf of Pranav Srigiriraju. He's been trying to get in contact with you because we're super excited about your company, and I'm wondering if you'd be open to a chat sometime in the next week or so."
+
+Key guidelines:
+1. Try to set up a meeting whenever the founder might be free in the next week
+2. If they say no, politely accept and end the conversation - don't push or be aggressive
+3. If they press you for details about the firm or investment details, say: "I don't want to say incorrect things about the firm, and it'd be much easier to hop on a call with one of our investors like Pranav who would be more than happy to explain everything."
+4. Be professional, friendly, and concise
+5. Focus on scheduling a meeting - that's your primary objective
+6. If they ask questions you can't answer accurately, redirect them to scheduling a call with Pranav`;
+
+/**
+ * Default voicemail message for when calls aren't answered
+ */
+const DEFAULT_VOICEMAIL_MESSAGE = `Hey, this is an AI Agent calling on behalf of Insight Partners. Pranav Srigiriraju, one of our investors, is highly interested in your company and would love to chat. Please feel free to call him back at 630-853-9929 or shoot him an email at pss9179@stern.nyu.edu so we can set up a meeting and introduce you to the firm. Thanks for your time!`;
+
+/**
+ * Send voice call via VAPI (two-way conversation)
+ */
+export interface SendVoiceCallParams {
+  phoneNumber: string;
+  companyId: string;
+  cadenceId?: string;
+  companyName?: string;
+  customPrompt?: string; // Optional custom system prompt
+  voicemailMessage?: string; // Optional custom voicemail message (if call goes to voicemail)
+  enableVoicemailFallback?: boolean; // Whether to leave voicemail if not answered (default: true)
+}
+
+export interface VAPIVoiceCallResponse {
+  callId: string;
+  status: string;
+}
+
+/**
+ * Send voice call via VAPI SDK (two-way conversation with AI agent)
+ */
+export async function sendVoiceCall(
+  params: SendVoiceCallParams
+): Promise<VAPIVoiceCallResponse> {
+  const privateKey = process.env.VAPI_PRIVATE_KEY || process.env.VAPI_API_KEY;
+  if (!privateKey) {
+    throw new Error('VAPI_PRIVATE_KEY or VAPI_API_KEY environment variable is not set');
+  }
+
+  const phoneNumberId = process.env.VAPI_PHONE_NUMBER_ID;
+  if (!phoneNumberId) {
+    throw new Error('VAPI_PHONE_NUMBER_ID environment variable is not set. Please add a phone number in VAPI dashboard.');
+  }
+
+  const assistantId = process.env.VAPI_ASSISTANT_ID || '11182291-6fa9-46d2-8127-5a8b4536e00e';
+
+  // Build assistant overrides object - only include fields if we need to override
+  const assistantOverrides: any = {};
+
+  // Only override system prompt if custom prompt is provided
+  // Otherwise, use what's configured in VAPI dashboard
+  if (params.customPrompt) {
+    assistantOverrides.systemPrompt = params.customPrompt;
+  }
+
+  // Create a personalized first message if company name is provided
+  // Otherwise, let it use the default from VAPI dashboard
+  if (params.companyName) {
+    assistantOverrides.firstMessage = `Hey, I'm an AI Agent calling from Insight Partner on behalf of Pranav Srigiriraju. He's been trying to get in contact with you about ${params.companyName} because we're super excited about your company, and I'm wondering if you'd be open to a chat sometime in the next week or so.`;
+  }
+
+  // Configure voicemail fallback (default: enabled)
+  const enableVoicemail = params.enableVoicemailFallback !== false; // Default to true
+  const voicemailMessage = params.voicemailMessage || DEFAULT_VOICEMAIL_MESSAGE;
+
+  // Add voicemail configuration to assistant overrides
+  if (enableVoicemail) {
+    assistantOverrides.voicemailMessage = voicemailMessage;
+  }
+
+  try {
+    // Initialize VAPI SDK client
+    const vapi = new VapiClient({
+      token: privateKey,
+    });
+
+    // Make the call using outbound phone call
+    // Only override assistant settings if we have any overrides
+    const callOptions: any = {
+      type: 'outboundPhoneCall',
+      phoneNumberId: phoneNumberId,
+      customer: {
+        number: params.phoneNumber,
+      },
+      assistantId: assistantId,
+    };
+
+    // Only add overrides if we have any
+    if (Object.keys(assistantOverrides).length > 0) {
+      callOptions.assistantOverrides = assistantOverrides;
+    }
+
+    const call = await vapi.calls.create(callOptions);
+
+    return {
+      callId: call.id || '',
+      status: call.status || 'initiated',
+    };
+  } catch (error: any) {
+    console.error('VAPI voice call error:', error);
+    
+    // Handle specific VAPI SDK errors
+    if (error.statusCode === 400) {
+      throw new Error(`Bad request - check phone number format or configuration: ${error.body || error.message}`);
+    }
+    
+    if (error.statusCode === 401) {
+      throw new Error('Unauthorized - check VAPI credentials');
+    }
+    
+    throw new Error(`Failed to initiate voice call: ${error.message || String(error)}`);
+  }
+}
+

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       cadenceId: cadence_id,
     });
 
-    // Log voicemail to company_content table
+    // Log voicemail to company_content table (for backward compatibility)
     const { data: contentLog, error: logError } = await supabase
       .from('company_content')
       .insert({
@@ -55,7 +55,29 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (logError) {
-      console.error('Error logging voicemail:', logError);
+      console.error('Error logging voicemail to company_content:', logError);
+    }
+
+    // Also log to call_logs table
+    const { error: callLogError } = await supabase
+      .from('call_logs')
+      .insert({
+        company_id,
+        cadence_id: cadence_id || null,
+        call_type: 'voicemail',
+        direction: 'outbound',
+        phone_number: phone_number,
+        vapi_call_id: callId,
+        status: status,
+        notes: script, // Store script as notes
+        metadata: {
+          cadence_id: cadence_id || null,
+          script: script,
+        },
+      });
+
+    if (callLogError) {
+      console.error('Error logging voicemail to call_logs:', callLogError);
       // Still return success since voicemail was sent
     }
 

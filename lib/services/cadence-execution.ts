@@ -349,7 +349,30 @@ export async function executeNextBlock(
     });
 
     console.log(`[Workflow] ⏳ Scheduled next block (${nextBlockId}) for ${scheduledFor.toISOString()}`);
-    // Don't proceed to next block yet - wait for scheduled time
+    
+    // For short delays (< 2 minutes), wait inline and continue execution
+    // For longer delays, schedule and return (requires background processing)
+    if (totalMs < 2 * 60 * 1000) { // Less than 2 minutes
+      console.log(`[Workflow] ⏳ Short delay detected (${totalMs}ms), waiting inline...`);
+      await new Promise(resolve => setTimeout(resolve, totalMs));
+      console.log(`[Workflow] ✅ Delay completed, continuing execution...`);
+      
+      // Continue with next block execution
+      const updatedExecution = await getExecution(supabase, execution.id);
+      if (updatedExecution) {
+        // Clear scheduled_for since we're executing now
+        await updateExecutionState(supabase, execution.id, {
+          scheduled_for: null,
+        });
+        // Continue execution
+        await executeNextBlock(supabase, updatedExecution, blocks);
+      }
+      return;
+    }
+    
+    // For longer delays, schedule and return (requires /api/cadence/process to be called)
+    console.log(`[Workflow] ⏳ Long delay detected, scheduled for background processing`);
+    console.log(`[Workflow] ⚠️  Note: For delays longer than 2 minutes, make sure /api/cadence/process is called periodically`);
     return;
   }
 
@@ -498,6 +521,93 @@ export async function executeNextBlock(
             phone_number: phoneNumber,
           },
         });
+
+      break;
+    }
+
+    case 'voicecall': {
+      console.log(`[Workflow] 📞 VOICE CALL BLOCK STARTING EXECUTION`);
+      const { sendVoiceCall } = await import('@/lib/services/vapi');
+      
+      // Use phone number from company record
+      const phoneNumber = companyPhone || '';
+      if (!phoneNumber) {
+        throw new Error('Company phone number not found. Please set it in company details.');
+      }
+
+      // Get company name for personalized message
+      const { data: companyInfo } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', companyId)
+        .single();
+
+      const companyName = companyInfo?.name;
+
+      console.log(`[Workflow] 📞 Initiating voice call to ${phoneNumber}`);
+      console.log(`[Workflow] 📞 Company: ${companyName || '(unknown)'}`);
+
+      const result = await sendVoiceCall({
+        phoneNumber,
+        companyId,
+        cadenceId,
+        companyName: companyName,
+        customPrompt: currentBlock.config?.customPrompt, // Use custom prompt if provided
+        voicemailMessage: currentBlock.config?.voicemailMessage, // Custom voicemail message if provided
+        enableVoicemailFallback: currentBlock.config?.enableVoicemailFallback !== false, // Default to true
+      });
+
+      console.log(`[Workflow] ✅ Voice call initiated. Call ID: ${result.callId}, Status: ${result.status}`);
+
+      // Log voice call to company_content table (for backward compatibility)
+      const { error: logError } = await supabase
+        .from('company_content')
+        .insert({
+          company_id: companyId,
+          cadence_id: cadenceId,
+          content_type: 'outreach_log',
+          content: `Voice call initiated: AI agent call to schedule meeting with ${companyName || 'company'}`,
+          source: 'CRM Cadence',
+          metadata: {
+            cadence_id: cadenceId,
+            vapi_call_id: result.callId,
+            vapi_status: result.status,
+            phone_number: phoneNumber,
+            call_type: 'voice_call',
+            company_name: companyName,
+            custom_prompt_used: !!currentBlock.config?.customPrompt,
+          },
+        });
+
+      if (logError) {
+        console.error(`[Workflow] Error logging voice call to company_content:`, logError);
+      } else {
+        console.log(`[Workflow] Voice call logged successfully to company_content`);
+      }
+
+      // Also log to call_logs table
+      const { error: callLogError } = await supabase
+        .from('call_logs')
+        .insert({
+          company_id: companyId,
+          cadence_id: cadenceId,
+          call_type: 'voice_call',
+          direction: 'outbound',
+          phone_number: phoneNumber,
+          vapi_call_id: result.callId,
+          status: result.status,
+          metadata: {
+            cadence_id: cadenceId,
+            company_name: companyName,
+            custom_prompt_used: !!currentBlock.config?.customPrompt,
+          },
+        });
+
+      if (callLogError) {
+        console.error(`[Workflow] Error logging voice call to call_logs:`, callLogError);
+      } else {
+        console.log(`[Workflow] Voice call logged successfully to call_logs`);
+      }
 
       break;
     }

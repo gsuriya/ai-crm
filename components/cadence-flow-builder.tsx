@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 
-export type BlockType = 'trigger' | 'email' | 'voicemail' | 'calendar' | 'conditional' | 'delay' | 'end';
+export type BlockType = 'trigger' | 'email' | 'voicemail' | 'voicecall' | 'calendar' | 'conditional' | 'delay' | 'end';
 
 export interface FlowBlock {
   id: string;
@@ -22,6 +22,9 @@ export interface FlowBlock {
     replyToThread?: boolean; // Legacy: true = reply to previous email
     threadSelection?: 'new' | string; // 'new' for new thread, or block ID to reply to
     script?: string;
+    customPrompt?: string; // Custom system prompt for voice calls
+    voicemailMessage?: string; // Custom voicemail message if call goes to voicemail
+    enableVoicemailFallback?: boolean; // Whether to leave voicemail if not answered
     calendarTitle?: string;
     calendarDescription?: string;
     duration?: number;
@@ -56,6 +59,12 @@ const blockTypeConfig = {
   voicemail: { 
     color: 'bg-orange-500', 
     label: 'Leave Voicemail', 
+    icon: Phone,
+    canHaveMultipleOutputs: false,
+  },
+  voicecall: { 
+    color: 'bg-teal-500', 
+    label: 'Voice Call', 
     icon: Phone,
     canHaveMultipleOutputs: false,
   },
@@ -371,6 +380,50 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               log(`   ✅ Voicemail left (Call ID: ${voicemailData.callId})`);
             } catch (error: any) {
               log(`   ❌ Error sending voicemail: ${error.message}`);
+              throw error;
+            }
+            break;
+
+          case 'voicecall':
+            log(`📞 Executing: ${block.title}`);
+            log(`   Making AI voice call to schedule meeting`);
+            
+            try {
+              // Get company phone number
+              const { data: companyMetadata } = await supabase
+                .from('companies')
+                .select('phone_number, name')
+                .eq('id', companyId)
+                .single();
+
+              const phoneNumber = companyMetadata?.phone_number || '';
+              if (!phoneNumber) {
+                throw new Error('Company phone number not found');
+              }
+
+              const voiceCallResponse = await fetch('/api/voice-call/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  phone_number: phoneNumber,
+                  company_id: companyId,
+                  cadence_id: cadenceId,
+                  company_name: companyMetadata?.name,
+                  custom_prompt: block.config?.customPrompt,
+                  voicemail_message: block.config?.voicemailMessage,
+                  enable_voicemail_fallback: block.config?.enableVoicemailFallback !== false,
+                }),
+              });
+
+              if (!voiceCallResponse.ok) {
+                const error = await voiceCallResponse.json();
+                throw new Error(error.error || 'Failed to initiate voice call');
+              }
+
+              const voiceCallData = await voiceCallResponse.json();
+              log(`   ✅ Voice call initiated (Call ID: ${voiceCallData.callId})`);
+            } catch (error: any) {
+              log(`   ❌ Error initiating voice call: ${error.message}`);
               throw error;
             }
             break;
@@ -717,6 +770,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     switch (type) {
       case 'email': return 'Send email';
       case 'voicemail': return 'Leave voicemail';
+      case 'voicecall': return 'Make voice call';
       case 'calendar': return 'Send calendar invite';
       case 'conditional': return 'Check condition';
       case 'delay': return 'Wait';
@@ -731,6 +785,8 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         return { subject: '', body: '', threadSelection: 'new' as const };
       case 'voicemail':
         return { script: '' };
+      case 'voicecall':
+        return { customPrompt: '', voicemailMessage: '', enableVoicemailFallback: true }; // Optional - uses defaults if empty
       case 'calendar':
         return { calendarTitle: '', calendarDescription: '', duration: 30 };
       case 'conditional':
@@ -1356,6 +1412,52 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       className="w-full min-h-[100px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
                     />
                   </div>
+              )}
+
+              {block.type === 'voicecall' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Custom System Prompt (Optional)</label>
+                    <textarea
+                      value={block.config?.customPrompt || ''}
+                      onChange={(e) => updateBlockConfig(block.id, { customPrompt: e.target.value })}
+                      placeholder="Leave empty to use default prompt. Override to customize AI agent behavior."
+                      className="w-full min-h-[120px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      The AI agent will call to schedule a meeting. Default prompt includes your company name and meeting scheduling instructions.
+                    </p>
+                  </div>
+                  <div className="mt-4">
+                    <label className="text-sm font-medium mb-1 block">Voicemail Fallback</label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={block.config?.enableVoicemailFallback !== false}
+                        onChange={(e) => updateBlockConfig(block.id, { enableVoicemailFallback: e.target.checked })}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Leave voicemail if call isn't answered</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      If enabled, will automatically leave a voicemail with contact information if the call goes to voicemail.
+                    </p>
+                  </div>
+                  {block.config?.enableVoicemailFallback !== false && (
+                    <div className="mt-4">
+                      <label className="text-sm font-medium mb-1 block">Custom Voicemail Message (Optional)</label>
+                      <textarea
+                        value={block.config?.voicemailMessage || ''}
+                        onChange={(e) => updateBlockConfig(block.id, { voicemailMessage: e.target.value })}
+                        placeholder="Leave empty to use default voicemail message with contact information."
+                        className="w-full min-h-[100px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Custom message to leave if call goes to voicemail. Default includes your contact information.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {block.type === 'calendar' && (
