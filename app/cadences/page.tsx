@@ -50,10 +50,36 @@ export default function CadencesPage() {
       if (error) throw error;
 
       // Convert nodes JSONB to blocks
-      const cadencesWithBlocks = (data || []).map(cadence => ({
-        ...cadence,
-        blocks: cadence.nodes || [],
-      }));
+      const cadencesWithBlocks = (data || []).map(cadence => {
+        const nodes = cadence.nodes || [];
+        
+        // Ensure nodes is an array
+        const nodesArray = Array.isArray(nodes) ? nodes : [];
+        
+        // Filter out invalid blocks and deduplicate by ID
+        const validBlocks = nodesArray.filter((block: any, index: number, self: any[]) => {
+          if (!block || typeof block !== 'object' || !block.id || !block.type) {
+            return false;
+          }
+          // Deduplicate by ID (keep first occurrence)
+          return self.findIndex(b => b.id === block.id) === index;
+        });
+        
+        // Debug logging for the "yo" cadence
+        if (cadence.description === 'yo' || cadence.name?.toLowerCase().includes('yo')) {
+          console.log(`[Cadences] Debugging cadence "${cadence.name}":`, {
+            nodesLength: nodesArray.length,
+            validBlocksLength: validBlocks.length,
+            nodes: nodesArray.map((b: any) => ({ id: b?.id, type: b?.type, title: b?.title })),
+            validBlocks: validBlocks.map((b: any) => ({ id: b?.id, type: b?.type, title: b?.title })),
+          });
+        }
+        
+        return {
+          ...cadence,
+          blocks: validBlocks,
+        };
+      });
 
       setCadences(cadencesWithBlocks);
     } catch (error) {
