@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, X, Mail, Phone, Calendar, GitBranch, Clock, Play, Square, Settings, ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Check, X, Mail, Phone, Clock, Play, Square, Settings, ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 
-export type BlockType = 'trigger' | 'email' | 'voicecall' | 'calendar' | 'conditional' | 'delay' | 'end';
+export type BlockType = 'trigger' | 'email' | 'voicecall' | 'delay';
 
 export interface FlowBlock {
   id: string;
@@ -25,22 +25,12 @@ export interface FlowBlock {
     customPrompt?: string; // Custom system prompt for voice calls
     voicemailMessage?: string; // Custom voicemail message if call goes to voicemail
     enableVoicemailFallback?: boolean; // Whether to leave voicemail if not answered
-    calendarTitle?: string;
-    calendarDescription?: string;
-    duration?: number;
-    timeConstraint?: 'none' | 'business_hours'; // 'none' or 'business_hours' (9am-5pm)
-    checkAvailability?: boolean; // Whether to check availability before scheduling
-    condition?: string;
-    conditionType?: 'email_opened' | 'email_not_opened' | 'email_replied' | 'email_not_replied' | 'email_opened_within_days' | 'email_replied_within_days';
-    conditionValue?: string; // For "within_days" conditions
     delayDays?: number;
     delayHours?: number;
     delayMinutes?: number;
     delaySeconds?: number;
   };
   connections?: string[]; // Array of connected block IDs
-  truePath?: string;
-  falsePath?: string;
 }
 
 const blockTypeConfig = {
@@ -62,28 +52,10 @@ const blockTypeConfig = {
     icon: Phone,
     canHaveMultipleOutputs: false,
   },
-  calendar: { 
-    color: 'bg-green-500', 
-    label: 'Send Calendar Invite', 
-    icon: Calendar,
-    canHaveMultipleOutputs: false,
-  },
-  conditional: { 
-    color: 'bg-indigo-500', 
-    label: 'If / Else', 
-    icon: GitBranch,
-    canHaveMultipleOutputs: true,
-  },
   delay: { 
     color: 'bg-yellow-500', 
     label: 'Wait', 
     icon: Clock,
-    canHaveMultipleOutputs: false,
-  },
-  end: { 
-    color: 'bg-gray-500', 
-    label: 'End', 
-    icon: Square,
     canHaveMultipleOutputs: false,
   },
 };
@@ -387,83 +359,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             }
             break;
 
-          case 'calendar':
-            log(`📅 Executing: ${block.title}`);
-            log(`   Title: ${block.config?.calendarTitle || '(empty)'}`);
-            log(`   Description: ${block.config?.calendarDescription || '(empty)'}`);
-            log(`   Duration: ${block.config?.duration || 30} minutes`);
-            
-            try {
-              const calendarResponse = await fetch('/api/calendar/invite', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  to_email: companyEmail,
-                  title: block.config?.calendarTitle || '',
-                  description: block.config?.calendarDescription || '',
-                  duration: block.config?.duration || 30,
-                  company_id: companyId,
-                  cadence_id: cadenceId,
-                  user_id: user.id,
-                }),
-              });
-
-              if (!calendarResponse.ok) {
-                const error = await calendarResponse.json();
-                throw new Error(error.error || 'Failed to send calendar invite');
-              }
-
-              const calendarData = await calendarResponse.json();
-              log(`   ✅ Calendar invite sent (Event ID: ${calendarData.eventId})`);
-            } catch (error: any) {
-              log(`   ❌ Error sending calendar invite: ${error.message}`);
-              throw error;
-            }
-            break;
-
-          case 'conditional':
-            log(`🔀 Executing: ${block.title}`);
-            log(`   Condition: ${block.config?.conditionType || '(empty)'}`);
-            
-            try {
-              const conditionType = block.config?.conditionType;
-              if (!conditionType) {
-                throw new Error('Condition type not configured');
-              }
-
-              const conditionResponse = await fetch('/api/cadence/condition', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  company_id: companyId,
-                  condition_type: conditionType,
-                  condition_value: block.config?.conditionValue,
-                }),
-              });
-
-              if (!conditionResponse.ok) {
-                const error = await conditionResponse.json();
-                throw new Error(error.error || 'Failed to evaluate condition');
-              }
-
-              const conditionData = await conditionResponse.json();
-              const conditionResult = conditionData.result;
-              log(`   Condition result: ${conditionResult ? 'TRUE' : 'FALSE'} (${conditionData.reason})`);
-              
-              if (conditionResult && block.truePath) {
-                log(`   → Following TRUE path`);
-                await executeBlock(block.truePath);
-              } else if (!conditionResult && block.falsePath) {
-                log(`   → Following FALSE path`);
-                await executeBlock(block.falsePath);
-              }
-            } catch (error: any) {
-              log(`   ❌ Error evaluating condition: ${error.message}`);
-              throw error;
-            }
-            // Don't follow regular connections for conditional - return early
-            return;
-
           case 'delay':
             log(`⏳ Executing: ${block.title}`);
             const days = block.config?.delayDays || 0;
@@ -478,10 +373,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             log(`   ✅ Wait completed`);
             break;
 
-          case 'end':
-            log(`🏁 Reached: ${block.title}`);
-            return; // Stop execution
-
           case 'trigger':
             log(`▶️ Trigger: ${block.title}`);
             break;
@@ -490,7 +381,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             log(`⚠️ Unknown block type: ${block.type}`);
         }
 
-        // Follow connections (conditional blocks return early, so they won't reach here)
+        // Follow connections
         if (block.connections && block.connections.length > 0) {
           // For trigger blocks, execute all connections
           if (block.type === 'trigger') {
@@ -540,9 +431,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
           blockA.title === blockB.title &&
           blockA.subtitle === blockB.subtitle &&
           JSON.stringify(blockA.config) === JSON.stringify(blockB.config) &&
-          JSON.stringify(blockA.connections) === JSON.stringify(blockB.connections) &&
-          blockA.truePath === blockB.truePath &&
-          blockA.falsePath === blockB.falsePath
+          JSON.stringify(blockA.connections) === JSON.stringify(blockB.connections)
         );
       });
     };
@@ -612,18 +501,11 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     }
   };
 
-  const handleConnectBlocks = (fromId: string, toId: string, point: 'output' | 'true' | 'false' | null) => {
+  const handleConnectBlocks = (fromId: string, toId: string, point: 'output' | null) => {
     setBlocks(prev => prev.map(block => {
       if (block.id === fromId) {
         const newBlock = { ...block };
-        if (block.type === 'conditional') {
-          // Conditional blocks can have both true and false paths
-          if (point === 'true') {
-            newBlock.truePath = toId;
-          } else if (point === 'false') {
-            newBlock.falsePath = toId;
-          }
-        } else if (block.type === 'trigger') {
+        if (block.type === 'trigger') {
           // Trigger blocks can have multiple connections
           if (!newBlock.connections) {
             newBlock.connections = [];
@@ -632,7 +514,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             newBlock.connections = [...newBlock.connections, toId];
           }
         } else {
-          // Non-conditional blocks can only have ONE connection
+          // Non-trigger blocks can only have ONE connection
           // Replace any existing connection instead of adding to it
           newBlock.connections = [toId];
         }
@@ -643,7 +525,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     // Don't auto-save on connection - user must click Save Cadence button
   };
 
-  const handleStartConnection = (blockId: string, point: 'output' | 'true' | 'false', e: React.MouseEvent) => {
+  const handleStartConnection = (blockId: string, point: 'output', e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     
@@ -729,10 +611,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     switch (type) {
       case 'email': return 'Send email';
       case 'voicecall': return 'Make voice call';
-      case 'calendar': return 'Send calendar invite';
-      case 'conditional': return 'Check condition';
       case 'delay': return 'Wait';
-      case 'end': return 'End cadence';
       default: return 'Start';
     }
   };
@@ -743,10 +622,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         return { subject: '', body: '', threadSelection: 'new' as const };
       case 'voicecall':
         return { customPrompt: '', voicemailMessage: '', enableVoicemailFallback: true }; // Optional - uses defaults if empty
-      case 'calendar':
-        return { calendarTitle: '', calendarDescription: '', duration: 30 };
-      case 'conditional':
-        return { conditionType: undefined as any, conditionValue: '' };
       case 'delay':
         return { delayDays: 1, delayHours: 0 };
       default:
@@ -779,16 +654,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
       if (currentBlock.connections && currentBlock.connections.length > 0) {
         for (const nextId of currentBlock.connections) {
           traverseForward(nextId);
-        }
-      }
-      
-      // Also check true/false paths for conditional blocks
-      if (currentBlock.type === 'conditional') {
-        if (currentBlock.truePath) {
-          traverseForward(currentBlock.truePath);
-        }
-        if (currentBlock.falsePath) {
-          traverseForward(currentBlock.falsePath);
         }
       }
     };
@@ -1116,7 +981,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     const Icon = config.icon;
     const isSelected = selectedBlock === block.id;
     const isConfiguring = configuringBlock === block.id;
-    const isConditional = block.type === 'conditional';
 
     return (
       <div key={block.id}>
@@ -1187,52 +1051,19 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             </div>
 
             {/* Connection points */}
-            {block.type !== 'end' && (
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-                <button
-                  onMouseDown={(e) => handleStartConnection(block.id, 'output', e)}
-                  className={`w-6 h-6 rounded-full border-2 ${
-                    connectingFrom === block.id && connectionPoint === 'output'
-                      ? 'bg-green-500 border-green-600'
-                      : 'bg-white border-gray-400 hover:border-blue-500'
-                  } transition-colors cursor-grab active:cursor-grabbing`}
-                  title="Drag or click to connect"
-                >
-                  <ArrowDown className="h-3 w-3 mx-auto text-gray-600" />
-                </button>
-              </div>
-            )}
-
-            {isConditional && (
-              <>
-                <div className="absolute bottom-0 left-0 transform translate-y-1/2">
-                  <button
-                    onMouseDown={(e) => handleStartConnection(block.id, 'true', e)}
-                    className={`w-6 h-6 rounded-full border-2 ${
-                      connectingFrom === block.id && connectionPoint === 'true'
-                        ? 'bg-green-500 border-green-600'
-                        : 'bg-white border-gray-400 hover:border-blue-500'
-                    } transition-colors flex items-center justify-center cursor-grab active:cursor-grabbing`}
-                    title="True path - drag or click to connect"
-                  >
-                    <span className="text-[10px] font-bold text-gray-600">T</span>
-                  </button>
-                </div>
-                <div className="absolute bottom-0 right-0 transform translate-y-1/2">
-                  <button
-                    onMouseDown={(e) => handleStartConnection(block.id, 'false', e)}
-                    className={`w-6 h-6 rounded-full border-2 ${
-                      connectingFrom === block.id && connectionPoint === 'false'
-                        ? 'bg-green-500 border-green-600'
-                        : 'bg-white border-gray-400 hover:border-blue-500'
-                    } transition-colors flex items-center justify-center cursor-grab active:cursor-grabbing`}
-                    title="False path - drag or click to connect"
-                  >
-                    <span className="text-[10px] font-bold text-gray-600">F</span>
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
+              <button
+                onMouseDown={(e) => handleStartConnection(block.id, 'output', e)}
+                className={`w-6 h-6 rounded-full border-2 ${
+                  connectingFrom === block.id && connectionPoint === 'output'
+                    ? 'bg-green-500 border-green-600'
+                    : 'bg-white border-gray-400 hover:border-blue-500'
+                } transition-colors cursor-grab active:cursor-grabbing`}
+                title="Drag or click to connect"
+              >
+                <ArrowDown className="h-3 w-3 mx-auto text-gray-600" />
+              </button>
+            </div>
 
             {/* Settings button */}
             <button
@@ -1259,8 +1090,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       return newBlocks.map(b => ({
                         ...b,
                         connections: b.connections?.filter(c => c !== block.id),
-                        truePath: b.truePath === block.id ? undefined : b.truePath,
-                        falsePath: b.falsePath === block.id ? undefined : b.falsePath,
                       }));
                     });
                     // Don't auto-save on delete - user must click Save Cadence button
@@ -1439,105 +1268,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       <p className="text-xs text-muted-foreground mt-1">
                         Custom message to leave if call goes to voicemail. Default includes your contact information.
                       </p>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {block.type === 'calendar' && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Event Title *</label>
-                    <Input
-                      value={block.config?.calendarTitle || ''}
-                      onChange={(e) => updateBlockConfig(block.id, { calendarTitle: e.target.value })}
-                      placeholder="Meeting title"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Description</label>
-                    <textarea
-                      value={block.config?.calendarDescription || ''}
-                      onChange={(e) => updateBlockConfig(block.id, { calendarDescription: e.target.value })}
-                      placeholder="Event description"
-                      className="w-full min-h-[80px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Duration (minutes)</label>
-                    <Input
-                      type="number"
-                      min="15"
-                      step="15"
-                      value={block.config?.duration ?? ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        updateBlockConfig(block.id, { duration: val === '' ? 30 : parseInt(val) || 30 });
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Time Constraints</label>
-                    <select
-                      value={block.config?.timeConstraint || 'business_hours'}
-                      onChange={(e) => updateBlockConfig(block.id, { timeConstraint: e.target.value as any })}
-                      className="w-full p-2 border rounded bg-white text-gray-900"
-                    >
-                      <option value="none">No constraints (any time)</option>
-                      <option value="business_hours">Business Hours (9am - 5pm)</option>
-                    </select>
-                    {block.config?.timeConstraint === 'business_hours' && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Meeting will be scheduled between 9:00 AM and 5:00 PM on weekdays
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={block.config?.checkAvailability !== false}
-                        onChange={(e) => updateBlockConfig(block.id, { checkAvailability: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span className="text-sm font-medium">Check availability before scheduling</span>
-                    </label>
-                    <p className="text-xs text-gray-500 mt-1 ml-6">
-                      If checked, will find the next available slot within your constraints
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {block.type === 'conditional' && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Condition Type</label>
-                    <select
-                      value={block.config?.conditionType || ''}
-                      onChange={(e) => updateBlockConfig(block.id, { conditionType: e.target.value as any })}
-                      className="w-full p-2 border rounded bg-white text-gray-900"
-                    >
-                      <option value="">Select condition...</option>
-                      <option value="email_opened">Email opened</option>
-                      <option value="email_not_opened">Email not opened</option>
-                      <option value="email_replied">Email replied</option>
-                      <option value="email_not_replied">Email not replied</option>
-                      <option value="email_opened_within_days">Email opened within days</option>
-                      <option value="email_replied_within_days">Email replied within days</option>
-                    </select>
-                  </div>
-                  {(block.config?.conditionType === 'email_opened_within_days' || 
-                    block.config?.conditionType === 'email_replied_within_days') && (
-                    <div>
-                      <label className="text-sm font-medium mb-1 block">Days</label>
-                      <Input
-                        type="number"
-                        value={block.config?.conditionValue || ''}
-                        onChange={(e) => updateBlockConfig(block.id, { conditionValue: e.target.value })}
-                        placeholder="e.g., 3"
-                      />
                     </div>
                   )}
                 </>
@@ -1881,28 +1611,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       );
                     }
                   });
-                }
-                
-                if (block.truePath) {
-                  const targetBlock = blocks.find(b => b.id === block.truePath);
-                  if (targetBlock) {
-                    connections.push(
-                      <g key={`${block.id}-${block.truePath}-true`}>
-                        {renderConnectionLine(block, targetBlock, true, false)}
-                      </g>
-                    );
-                  }
-                }
-                
-                if (block.falsePath) {
-                  const targetBlock = blocks.find(b => b.id === block.falsePath);
-                  if (targetBlock) {
-                    connections.push(
-                      <g key={`${block.id}-${block.falsePath}-false`}>
-                        {renderConnectionLine(block, targetBlock, false, true)}
-                      </g>
-                    );
-                  }
                 }
 
                 return connections;

@@ -297,8 +297,8 @@ export async function executeNextBlock(
     console.log(`[Workflow] ⚠️ Auth check failed (background processor), using stored user_id: ${storedUserId}`);
     user = { id: storedUserId }; // Minimal user object - just need id for sendEmail
     console.log(`[Workflow] ✅ Using stored user_id: ${user.id}`);
-  } else {
-    console.error('[Workflow] User auth error:', userError);
+      } else {
+        console.error('[Workflow] User auth error:', userError);
     throw new Error(`User not authenticated: ${userError?.message || 'No user found'}. Stored user_id: ${storedUserId || 'not set'}`);
   }
 
@@ -496,29 +496,6 @@ export async function executeNextBlock(
     // when scheduled_for <= now and execute the next block
     // This ensures delays are properly respected and not executed immediately
     return; // Return immediately - background processor will handle continuation
-  }
-
-  // Handle end block
-  if (currentBlock.type === 'end') {
-    await updateExecutionState(supabase, execution.id, {
-      status: 'completed',
-    });
-    
-    await supabase
-      .from('company_cadences')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', execution.company_cadence_id);
-
-    return;
-  }
-
-  // Handle conditional blocks
-  if (currentBlock.type === 'conditional') {
-    // Condition evaluation is handled by API route
-    return;
   }
 
   switch (currentBlock.type) {
@@ -1005,56 +982,6 @@ export async function executeNextBlock(
       break;
     }
 
-    case 'calendar': {
-      const { createCalendarEvent } = await import('@/lib/services/calendar');
-      
-      if (!companyEmail) {
-        console.error(`[Workflow] ❌ No email address found for company ${companyId}`);
-        throw new Error(`No email address found for company ${companyId}. Please set the company email address first.`);
-      }
-
-      if (!currentBlock.config?.calendarTitle) {
-        console.error(`[Workflow] ❌ Calendar block missing title`);
-        throw new Error(`Calendar block is missing title. Please configure the calendar block in the cadence editor.`);
-      }
-
-      console.log(`[Workflow] 📅 Creating calendar invite for ${companyEmail}`);
-      console.log(`[Workflow] 📅 Title: ${currentBlock.config.calendarTitle}`);
-      console.log(`[Workflow] 📅 Duration: ${currentBlock.config.duration || 30} minutes`);
-      
-      try {
-        const result = await createCalendarEvent(user.id, {
-          toEmail: companyEmail,
-          title: currentBlock.config.calendarTitle,
-          description: currentBlock.config?.calendarDescription || '',
-          durationMinutes: currentBlock.config?.duration || 30,
-          timeConstraint: currentBlock.config?.timeConstraint || 'business_hours',
-          checkAvailability: currentBlock.config?.checkAvailability !== false,
-        }, supabase);
-
-        console.log(`[Workflow] ✅ Calendar invite created! Event ID: ${result.eventId}`);
-
-        // Log calendar invite
-        await supabase
-          .from('company_content')
-          .insert({
-            company_id: companyId,
-            content_type: 'outreach_log',
-            content: `Calendar invite sent: ${currentBlock.config.calendarTitle}`,
-            source: 'CRM Cadence',
-            metadata: {
-              cadence_id: cadenceId,
-              calendar_event_id: result.eventId,
-            },
-          });
-      } catch (calendarError: any) {
-        console.error(`[Workflow] ❌ Error creating calendar invite:`, calendarError.message);
-        throw new Error(`Failed to create calendar invite: ${calendarError.message}`);
-      }
-
-      break;
-    }
-
     case 'trigger':
       // Trigger block just starts the flow - follow connections
       console.log(`[Workflow] Trigger block executed, following connections...`);
@@ -1085,7 +1012,7 @@ export async function executeNextBlock(
   console.log(`[Workflow] 📝 Updated executedBlockIds (end of block):`, updatedExecutedBlockIds);
 
   // Determine next block based on current block type
-  // Note: conditional, delay, and end blocks already returned above
+  // Note: delay blocks already returned above
   let nextBlockId: string | null = null;
 
   console.log(`[Workflow] 🔍 Determining next block after ${currentBlock.type} block (${currentBlock.id})`);
@@ -1102,7 +1029,7 @@ export async function executeNextBlock(
       console.error(`[Workflow] ❌ Trigger block has no connections!`);
     }
   } else {
-    // Regular blocks (email, calendar, voicecall) follow their connection
+    // Regular blocks (email, voicecall) follow their connection
     if (currentBlock.connections && currentBlock.connections.length > 0) {
       nextBlockId = currentBlock.connections[0];
       console.log(`[Workflow] ✅ Found next block after ${currentBlock.type}: ${nextBlockId}`);
@@ -1137,9 +1064,6 @@ export async function executeNextBlock(
     
     // Recursively execute next block
     // CRITICAL: Delay blocks MUST be executed immediately so they can set scheduled_for
-    // Conditional blocks are handled by API route, so skip those
-    // End blocks don't need execution
-    if (nextBlock.type !== 'conditional' && nextBlock.type !== 'end') {
       const updatedExecution = await getExecution(supabase, execution.id);
       if (updatedExecution && updatedExecution.current_block_id === nextBlockId) {
         console.log(`[Workflow] 🔄 Executing next block immediately (type: ${nextBlock.type}, id: ${nextBlock.id})`);
@@ -1147,9 +1071,6 @@ export async function executeNextBlock(
       } else {
         console.log(`[Workflow] ⚠️ Skipping recursive execution - current_block_id mismatch or execution not found`);
         console.log(`[Workflow]   Expected: ${nextBlockId}, Got: ${updatedExecution?.current_block_id || 'null'}`);
-      }
-    } else {
-      console.log(`[Workflow] ⏸️ Next block is ${nextBlock.type}, pausing execution`);
     }
   } else {
     // No next block, mark as completed
