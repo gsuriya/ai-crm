@@ -266,12 +266,6 @@ export async function executeNextBlock(
     throw new Error(`Block ${execution.current_block_id} not found`);
   }
 
-  console.log(`[Workflow] ✅ Found current block:`, {
-    id: currentBlock.id,
-    type: currentBlock.type,
-    title: currentBlock.title,
-    connections: currentBlock.connections || [],
-  });
 
   // Get company and cadence info from metadata
   const metadata = execution.metadata || {};
@@ -298,7 +292,7 @@ export async function executeNextBlock(
     user = { id: storedUserId }; // Minimal user object - just need id for sendEmail
     console.log(`[Workflow] ✅ Using stored user_id: ${user.id}`);
       } else {
-        console.error('[Workflow] User auth error:', userError);
+    console.error('[Workflow] User auth error:', userError);
     throw new Error(`User not authenticated: ${userError?.message || 'No user found'}. Stored user_id: ${storedUserId || 'not set'}`);
   }
 
@@ -311,8 +305,8 @@ export async function executeNextBlock(
     .eq('id', companyId)
     .single();
 
-  // Use hardcoded email for testing: ethanzzheng@gmail.com
-  const companyEmail = 'ethanzzheng@gmail.com';
+  // Use company email from database (or fallback for testing)
+  const companyEmail = company?.email || 'pranavscontact@gmail.com';
   const companyPhone = company?.phone_number || '';
 
   // Get thread info from metadata
@@ -321,7 +315,7 @@ export async function executeNextBlock(
   const threadInfoMap = new Map<string, { threadId: string; messageId: string }>(
     Object.entries(metadata.threadInfoMap || {})
   );
-  
+
   // Get execution order tracking - this tells us which blocks were executed in THIS execution
   const executedBlockIds: string[] = metadata.executedBlockIds || [];
   
@@ -329,31 +323,6 @@ export async function executeNextBlock(
   const executionAgeMs = Date.now() - new Date(execution.created_at).getTime();
   const executionAgeMinutes = Math.round(executionAgeMs / 60000);
   
-  console.log(`[Workflow] 📋 Loaded threadInfoMap from execution metadata:`, {
-    size: threadInfoMap.size,
-    executionId: execution.id,
-    executionCreatedAt: execution.created_at,
-    executionAgeMinutes: executionAgeMinutes,
-    executedBlockIdsCount: executedBlockIds.length,
-    executedBlockIds: executedBlockIds,
-    entries: Array.from(threadInfoMap.entries()).map(([id, info]) => ({
-      blockId: id,
-      threadId: info.threadId,
-      messageId: info.messageId?.substring(0, 50) + '...',
-      wasExecutedInThisRun: executedBlockIds.includes(id),
-    }))
-  });
-  
-  // CRITICAL DEBUG: Log the full threadInfoMap contents
-  if (threadInfoMap.size > 0) {
-    console.log(`[Workflow] 🔍 FULL threadInfoMap contents (these are the threads we can reply to):`);
-    threadInfoMap.forEach((info, blockId) => {
-      const wasExecuted = executedBlockIds.includes(blockId);
-      console.log(`[Workflow]   Block ${blockId}: Thread ${info.threadId}, Message ${info.messageId?.substring(0, 40)}..., Executed in THIS run: ${wasExecuted}`);
-    });
-  } else {
-    console.log(`[Workflow] ✅ threadInfoMap is EMPTY - starting fresh for this execution`);
-  }
   
   // CRITICAL SAFETY CHECK: Only keep threadInfoMap entries for blocks that:
   // 1. Exist in current cadence
@@ -370,17 +339,6 @@ export async function executeNextBlock(
     if (existsInCadence && wasExecutedInThisRun) {
       // Block exists in current cadence AND was executed in THIS execution - keep it
       filteredThreadInfoMap.set(blockId, info);
-      console.log(`[Workflow] ✅ Keeping threadInfoMap entry for block ${blockId} (executed in THIS execution)`);
-    } else {
-      if (!existsInCadence) {
-        console.log(`[Workflow] ⚠️ Filtering out threadInfoMap entry for block ${blockId} (not in current cadence)`);
-      }
-      if (!wasExecutedInThisRun) {
-        console.log(`[Workflow] ⚠️⚠️⚠️ CRITICAL: Filtering out threadInfoMap entry for block ${blockId} (NOT executed in THIS execution - STALE from previous run!)`);
-        console.log(`[Workflow] ⚠️   Execution age: ${executionAgeMinutes} minutes`);
-        console.log(`[Workflow] ⚠️   executedBlockIds:`, executedBlockIds);
-        console.log(`[Workflow] ⚠️   This entry would cause replies to OLD threads!`);
-      }
     }
   });
   
@@ -388,28 +346,12 @@ export async function executeNextBlock(
   threadInfoMap.clear();
   filteredThreadInfoMap.forEach((info, blockId) => threadInfoMap.set(blockId, info));
   
-  if (originalSize !== threadInfoMap.size) {
-    console.log(`[Workflow] 🧹 Cleaned threadInfoMap: ${originalSize} -> ${threadInfoMap.size} entries (removed entries not from THIS execution)`);
-    console.log(`[Workflow] 🧹 Removed ${originalSize - threadInfoMap.size} STALE entries that could cause replies to old threads!`);
-  }
-  
-  // CRITICAL VALIDATION: If threadInfoMap has entries but executedBlockIds is empty or very small,
+  // CRITICAL VALIDATION: If threadInfoMap has entries but executedBlockIds is empty,
   // this is suspicious - we might have stale data
   if (threadInfoMap.size > 0 && executedBlockIds.length === 0) {
-    console.error(`[Workflow] ❌❌❌ CRITICAL WARNING: threadInfoMap has ${threadInfoMap.size} entries but executedBlockIds is EMPTY!`);
-    console.error(`[Workflow] ❌ This means we have threadInfoMap entries WITHOUT execution tracking - CLEARING THEM!`);
+    console.error(`[Workflow] ❌ CRITICAL: threadInfoMap has entries but executedBlockIds is EMPTY - clearing!`);
     threadInfoMap.clear();
-    console.error(`[Workflow] ❌ Cleared ALL threadInfoMap entries to prevent replies to old threads`);
   }
-
-  // Execute the current block based on type
-  console.log(`[Workflow] ========== EXECUTING BLOCK ==========`);
-  console.log(`[Workflow] Block ID: ${currentBlock.id}`);
-  console.log(`[Workflow] Block type: ${currentBlock.type}`);
-  console.log(`[Workflow] Block title: ${currentBlock.title}`);
-  console.log(`[Workflow] Block connections: ${JSON.stringify(currentBlock.connections || [])}`);
-  console.log(`[Workflow] Block config: ${JSON.stringify(currentBlock.config || {})}`);
-  console.log(`[Workflow] ====================================`);
 
   // Handle delay block BEFORE switch (needs to advance to next block before scheduling)
   // SIMPLIFIED: Copy sourcing pattern - capture threadInfoMap BEFORE delay, use it AFTER
@@ -501,17 +443,107 @@ export async function executeNextBlock(
   switch (currentBlock.type) {
     case 'email': {
       console.log(`[Workflow] 📧 EMAIL BLOCK STARTING EXECUTION`);
+      console.log(`[Workflow] 📧 User ID: ${metadata.user_id}`);
+      console.log(`[Workflow] 📧 Company ID: ${companyId}`);
+      
       const { sendEmail } = await import('@/lib/services/gmail-direct');
+      const { 
+        replaceBasicVariables, 
+        hasPersonalizationVariable, 
+        replacePersonalizationPlaceholder,
+        generatePersonalization
+      } = await import('@/lib/utils/email-variables');
       
       if (!companyEmail) {
         console.error(`[Workflow] ❌ No email address found for company ${companyId}`);
         throw new Error(`No email address found for company ${companyId}. Please set the company email address first.`);
       }
 
+      // Fetch company and contact data for variable replacement
+      console.log(`[Workflow] 📧 Fetching company and contact data for variables...`);
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('name, description, website')
+        .eq('id', companyId)
+        .single();
+
+      // Fetch contact by email address (more accurate than first contact)
+      // Use only first name for {name} placeholder
+      let contactName: string | undefined;
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('first_name, last_name')
+        .eq('email', companyEmail)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      if (contact?.first_name) {
+        contactName = contact.first_name;
+      }
+
+      const companyName = companyData?.name || '';
+      const companyDescription = companyData?.description || '';
+      const companyWebsite = companyData?.website || '';
+
+      console.log(`[Workflow] 📧 Variable context:`, {
+        contactName,
+        companyName,
+        hasDescription: !!companyDescription,
+        hasWebsite: !!companyWebsite,
+      });
+
+      // Replace basic variables in subject and body
+      let finalSubject = currentBlock.config?.subject || '';
+      let finalBody = currentBlock.config?.body || '';
+
+      finalSubject = replaceBasicVariables(finalSubject, {
+        contactName,
+        companyName,
+        companyDescription,
+        companyWebsite,
+      });
+
+      finalBody = replaceBasicVariables(finalBody, {
+        contactName,
+        companyName,
+        companyDescription,
+        companyWebsite,
+      });
+
+      // Handle {personalization} variable if present
+      if (hasPersonalizationVariable(finalBody)) {
+        console.log(`[Workflow] 📧 Generating personalization...`);
+        const personalization = await generatePersonalization(
+          finalBody,
+          companyName,
+          companyDescription,
+          companyWebsite
+        );
+        finalBody = replacePersonalizationPlaceholder(finalBody, personalization);
+        console.log(`[Workflow] 📧 Personalization generated: "${personalization}"`);
+      }
+
       console.log(`[Workflow] 📧 Sending email to ${companyEmail}`);
-      console.log(`[Workflow] 📧 Subject: ${currentBlock.config?.subject || '(empty)'}`);
-      console.log(`[Workflow] 📧 Body length: ${(currentBlock.config?.body || '').length} characters`);
-      console.log(`[Workflow] 📧 Full config:`, JSON.stringify(currentBlock.config, null, 2));
+      console.log(`[Workflow] 📧 Subject: ${finalSubject || '(empty)'}`);
+      console.log(`[Workflow] 📧 Body length: ${finalBody.length} characters`);
+      
+      // Check if user has valid session before attempting to send
+      console.log(`[Workflow] 📧 Checking user session for user_id: ${metadata.user_id}...`);
+      const { data: userSession, error: sessionError } = await supabase
+        .from('user_sessions')
+        .select('access_token, refresh_token, email')
+        .eq('user_id', metadata.user_id)
+        .single();
+      
+      if (sessionError || !userSession) {
+        console.error(`[Workflow] ❌ No user session found:`, sessionError);
+        throw new Error(`No Google OAuth session found. Please sign in with Google and grant Gmail permissions.`);
+      }
+      
+      if (!userSession.access_token) {
+        console.error(`[Workflow] ❌ No access token in user session`);
+        throw new Error(`No access token found. Please sign in with Google and grant Gmail permissions.`);
+      }
       
       // CLIENT-SIDE LOGGING: Also log to browser console via fetch
       try {
@@ -735,8 +767,18 @@ export async function executeNextBlock(
           
           if (originalSubject) {
             // Force subject to match original for threading
+            // Variables will be replaced later in the process
+            finalSubject = originalSubject;
+            // Also replace variables in the original subject
+            finalSubject = replaceBasicVariables(finalSubject, {
+              contactName,
+              companyName,
+              companyDescription,
+              companyWebsite,
+            });
             currentBlock.config = { ...currentBlock.config, subject: originalSubject };
             console.log(`[Workflow]   Subject locked to FIRST email's subject: "${originalSubject}"`);
+            console.log(`[Workflow]   Final subject (with variables): "${finalSubject}"`);
           } else {
             console.error(`[Workflow] ❌ WARNING: Could not find original subject for first email block ${firstBlockId}`);
           }
@@ -758,7 +800,7 @@ export async function executeNextBlock(
       try {
         console.log(`[Workflow] 📧 About to call sendEmail with threading info:`);
         console.log(`[Workflow]   To: ${companyEmail}`);
-        console.log(`[Workflow]   Subject: "${currentBlock.config?.subject || ''}"`);
+        console.log(`[Workflow]   Subject: "${finalSubject}"`);
         console.log(`[Workflow]   Thread ID: ${threadId || 'NEW THREAD'}`);
         console.log(`[Workflow]   Message-ID: ${messageId || 'NONE'}`);
         console.log(`[Workflow]   Current block ID: ${currentBlock.id}`);
@@ -772,17 +814,24 @@ export async function executeNextBlock(
           console.log(`[Workflow]   ✅ Creating NEW thread`);
         }
         
+        console.log(`[Workflow] 📧 CALLING sendEmail NOW...`);
+        console.log(`[Workflow] 📧 User ID: ${user.id}`);
+        console.log(`[Workflow] 📧 To: ${companyEmail}`);
+        console.log(`[Workflow] 📧 Subject: "${finalSubject}"`);
+        console.log(`[Workflow] 📧 Body length: ${finalBody.length} chars`);
+        
         const result = await sendEmail(user.id, {
           to: companyEmail,
-          subject: currentBlock.config?.subject || '',
-          body: currentBlock.config?.body || '',
+          subject: finalSubject,
+          body: finalBody,
           threadId,
           messageId,
         }, supabase);
 
-        console.log(`[Workflow] ✅ Email sent successfully.`);
+        console.log(`[Workflow] ✅✅✅ EMAIL SENT SUCCESSFULLY! ✅✅✅`);
         console.log(`[Workflow]   Returned Thread ID: ${result.threadId}`);
         console.log(`[Workflow]   Returned Message ID: ${result.messageId}`);
+        console.log(`[Workflow]   Gmail Message ID: ${result.gmailMessageId}`);
         
         // CLIENT-SIDE LOGGING
         try {
@@ -885,13 +934,17 @@ export async function executeNextBlock(
           console.log(`[Workflow] Email logged successfully`);
         }
       } catch (emailError: any) {
-        console.error(`[Workflow] ❌ ERROR SENDING EMAIL:`, emailError);
+        console.error(`[Workflow] ❌❌❌ CRITICAL ERROR SENDING EMAIL:`, emailError);
         console.error(`[Workflow] ❌ Error message:`, emailError.message);
         console.error(`[Workflow] ❌ Error stack:`, emailError.stack);
+        console.error(`[Workflow] ❌ Error name:`, emailError.name);
+        console.error(`[Workflow] ❌ Error code:`, emailError.code);
+        console.error(`[Workflow] ❌ Full error:`, JSON.stringify(emailError, Object.getOwnPropertyNames(emailError)));
         throw new Error(`Failed to send email: ${emailError.message || String(emailError)}`);
       }
 
       console.log(`[Workflow] 📧 EMAIL BLOCK COMPLETED SUCCESSFULLY`);
+      console.log(`[Workflow] 📧 About to determine next block...`);
       break;
     }
 
@@ -1008,23 +1061,23 @@ export async function executeNextBlock(
     threadInfoMap: Object.fromEntries(threadInfoMap),
     executedBlockIds: updatedExecutedBlockIds, // CRITICAL: Track execution order for all blocks
   };
-  
-  console.log(`[Workflow] 📝 Updated executedBlockIds (end of block):`, updatedExecutedBlockIds);
 
   // Determine next block based on current block type
   // Note: delay blocks already returned above
   let nextBlockId: string | null = null;
 
-  console.log(`[Workflow] 🔍 Determining next block after ${currentBlock.type} block (${currentBlock.id})`);
-  console.log(`[Workflow] 🔍 Current block connections:`, JSON.stringify(currentBlock.connections || []));
-
   if (currentBlock.type === 'trigger') {
-    // Follow first connection
-    console.log(`[Workflow] Trigger block found, checking connections...`);
-    console.log(`[Workflow] Trigger connections: ${JSON.stringify(currentBlock.connections || [])}`);
+    // Follow first connection that isn't the trigger itself
     if (currentBlock.connections && currentBlock.connections.length > 0) {
+      // Filter out connections that point to the trigger block itself
+      const validConnections = currentBlock.connections.filter(connId => connId !== currentBlock.id);
+      if (validConnections.length > 0) {
+        nextBlockId = validConnections[0];
+      } else {
+        // If all connections are self-references, try the first one anyway (shouldn't happen)
       nextBlockId = currentBlock.connections[0];
-      console.log(`[Workflow] ✅ Found next block after trigger: ${nextBlockId}`);
+        console.error(`[Workflow] ⚠️ Warning: All connections point to trigger itself`);
+      }
     } else {
       console.error(`[Workflow] ❌ Trigger block has no connections!`);
     }
@@ -1032,27 +1085,18 @@ export async function executeNextBlock(
     // Regular blocks (email, voicecall) follow their connection
     if (currentBlock.connections && currentBlock.connections.length > 0) {
       nextBlockId = currentBlock.connections[0];
-      console.log(`[Workflow] ✅ Found next block after ${currentBlock.type}: ${nextBlockId}`);
     } else {
       console.log(`[Workflow] ⚠️ ${currentBlock.type} block has no connections`);
     }
   }
 
   if (nextBlockId) {
-    console.log(`[Workflow] 🔄 Moving to next block: ${nextBlockId}`);
     const nextBlock = blocks.find(b => b.id === nextBlockId);
     
     if (!nextBlock) {
       console.error(`[Workflow] ❌ Next block ${nextBlockId} NOT FOUND in blocks array!`);
-      console.error(`[Workflow] Available blocks: ${blocks.map(b => b.id).join(', ')}`);
       throw new Error(`Next block ${nextBlockId} not found`);
     }
-    
-    console.log(`[Workflow] ✅ Found next block:`, {
-      id: nextBlock.id,
-      type: nextBlock.type,
-      title: nextBlock.title,
-    });
     
     await updateExecutionState(supabase, execution.id, {
       current_block_id: nextBlockId,
@@ -1060,17 +1104,11 @@ export async function executeNextBlock(
       metadata: updatedMetadata,
     });
     
-    console.log(`[Workflow] 📝 Updated execution state: current_block_id = ${nextBlockId}`);
-    
     // Recursively execute next block
     // CRITICAL: Delay blocks MUST be executed immediately so they can set scheduled_for
       const updatedExecution = await getExecution(supabase, execution.id);
       if (updatedExecution && updatedExecution.current_block_id === nextBlockId) {
-        console.log(`[Workflow] 🔄 Executing next block immediately (type: ${nextBlock.type}, id: ${nextBlock.id})`);
         await executeNextBlock(supabase, updatedExecution, blocks);
-      } else {
-        console.log(`[Workflow] ⚠️ Skipping recursive execution - current_block_id mismatch or execution not found`);
-        console.log(`[Workflow]   Expected: ${nextBlockId}, Got: ${updatedExecution?.current_block_id || 'null'}`);
     }
   } else {
     // No next block, mark as completed

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/services/gmail-direct';
+import { 
+  replaceBasicVariables, 
+  hasPersonalizationVariable, 
+  replacePersonalizationPlaceholder,
+  generatePersonalization,
+  VariableContext 
+} from '@/lib/utils/email-variables';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,11 +40,61 @@ export async function POST(request: NextRequest) {
     // Use user_id from request or authenticated user
     const senderUserId = user_id || user.id;
 
-    // Send email via Gmail API
+    // Process email body placeholders if company_id is provided
+    let processedBody = emailBody;
+    let processedSubject = subject;
+
+    if (company_id) {
+      // Fetch company details
+      const { data: company } = await supabase
+        .from('companies')
+        .select('name, description, website')
+        .eq('id', company_id)
+        .single();
+
+      // Fetch contact information by email address
+      // Use only first name for {name} placeholder
+      let contactName: string | undefined;
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('first_name, last_name')
+        .eq('email', toEmail)
+        .eq('company_id', company_id)
+        .maybeSingle();
+
+      if (contact?.first_name) {
+        contactName = contact.first_name;
+      }
+
+      // Build variable context
+      const variableContext: VariableContext = {
+        contactName,
+        companyName: company?.name,
+        companyDescription: company?.description,
+        companyWebsite: company?.website,
+      };
+
+      // Replace basic variables ({name}, {company}) in subject and body
+      processedSubject = replaceBasicVariables(subject, variableContext);
+      processedBody = replaceBasicVariables(emailBody, variableContext);
+
+      // Handle {personalization} placeholder if present
+      if (hasPersonalizationVariable(processedBody)) {
+        const personalization = await generatePersonalization(
+          processedBody,
+          company?.name,
+          company?.description,
+          company?.website
+        );
+        processedBody = replacePersonalizationPlaceholder(processedBody, personalization);
+      }
+    }
+
+    // Send email via Gmail API with processed body and subject
     const { messageId, threadId, gmailMessageId } = await sendEmail(senderUserId, {
       to: toEmail,
-      subject,
-      body: emailBody,
+      subject: processedSubject,
+      body: processedBody,
       threadId: thread_id,
       messageId: message_id,
     }, supabase);
@@ -50,8 +107,8 @@ export async function POST(request: NextRequest) {
           company_id,
           cadence_id: cadence_id || null,
           direction: 'sent',
-          subject,
-          body: emailBody,
+          subject: processedSubject,
+          body: processedBody,
           thread_id: threadId,
           message_id: messageId,
           from_email: user.email || '',

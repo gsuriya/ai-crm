@@ -6,11 +6,11 @@ import { supabase } from "@/lib/supabase";
 import type { Company, ActivityItem, Deal } from "@/lib/types/company";
 import { CompanyKeyMetrics } from "@/components/company/company-key-metrics";
 import { TimelineSnapshot } from "@/components/company/timeline-snapshot";
-import { ThesisFit } from "@/components/company/thesis-fit";
+import { ContactsSection } from "@/components/company/contacts-section";
 import { DealState } from "@/components/company/deal-state";
-import { NextBestActions } from "@/components/company/next-best-actions";
+import { RecentNews } from "@/components/company/recent-news";
+import { CompanyDetails } from "@/components/company/company-details";
 import { SimilarCompanies } from "@/components/company/similar-companies";
-import { RiskFlags } from "@/components/company/risk-flags";
 
 export const dynamic = 'force-dynamic';
 
@@ -39,21 +39,21 @@ export default function CompanyOverviewPage() {
       if (companyError) throw companyError;
       setCompany(companyData as Company);
 
-      // Fetch email logs
+      // Fetch email logs (both sent and received)
       const { data: emailLogs } = await supabase
         .from("email_logs")
         .select("*")
         .eq("company_id", companyId)
-        .order("sent_at", { ascending: false })
-        .limit(5);
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-      // Fetch call logs
+      // Fetch call logs with summaries
       const { data: callLogs } = await supabase
         .from("call_logs")
         .select("*")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(10);
 
       // Combine and format activities
       const allActivities: ActivityItem[] = [
@@ -61,19 +61,36 @@ export default function CompanyOverviewPage() {
           id: log.id,
           type: 'email' as const,
           date: log.sent_at || log.received_at || log.created_at,
-          summary: log.subject || 'Email',
-          body: log.body,
+          summary: log.direction === 'sent' 
+            ? `Sent: ${log.subject || 'Email'}` 
+            : `Received: ${log.subject || 'Email'}`,
+          body: log.body ? (log.body.length > 200 ? log.body.substring(0, 200) + '...' : log.body) : '',
           company_id: log.company_id,
           created_at: log.created_at,
+          metadata: {
+            direction: log.direction,
+            from_email: log.from_email,
+            to_email: log.to_email,
+          },
         })) || []),
         ...(callLogs?.map((call) => ({
           id: call.id,
-          type: call.call_type === 'voice_call' ? 'call' as const : 'call' as const,
+          type: 'call' as const,
           date: call.created_at,
-          summary: call.call_type === 'voice_call' ? 'Voice Call' : 'Voicemail',
-          body: call.transcription || call.notes,
+          summary: call.call_type === 'voice_call' 
+            ? 'Voice Call' 
+            : 'Voicemail',
+          body: call.notes || call.transcription 
+            ? (call.notes || call.transcription || '').substring(0, 200) + ((call.notes || call.transcription || '').length > 200 ? '...' : '')
+            : 'Call completed',
           company_id: call.company_id,
           created_at: call.created_at,
+          metadata: {
+            call_type: call.call_type,
+            duration: call.duration_seconds,
+            has_transcription: !!call.transcription,
+            has_summary: !!call.notes,
+          },
         })) || []),
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
@@ -111,6 +128,18 @@ export default function CompanyOverviewPage() {
     fetchCompanyData();
   }, [fetchCompanyData]);
 
+  // Listen for company updates from child components
+  useEffect(() => {
+    const handleCompanyUpdate = () => {
+      fetchCompanyData();
+    };
+
+    window.addEventListener('companyUpdated', handleCompanyUpdate);
+    return () => {
+      window.removeEventListener('companyUpdated', handleCompanyUpdate);
+    };
+  }, [fetchCompanyData]);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -139,8 +168,8 @@ export default function CompanyOverviewPage() {
             {/* Timeline Snapshot */}
             <TimelineSnapshot companyId={companyId} activities={activities} />
 
-            {/* Thesis Fit */}
-            <ThesisFit companyId={companyId} company={company} />
+            {/* Contacts */}
+            <ContactsSection companyId={companyId} company={company} />
 
             {/* Deal State */}
             {deal && <DealState deal={deal} />}
@@ -148,14 +177,14 @@ export default function CompanyOverviewPage() {
 
           {/* Right Column (col-span-4) */}
           <div className="col-span-12 lg:col-span-4 space-y-6">
-            {/* Next Best Actions */}
-            <NextBestActions companyId={companyId} />
+            {/* Company Details */}
+            <CompanyDetails companyId={companyId} />
+
+            {/* Recent News */}
+            <RecentNews companyId={companyId} />
 
             {/* Similar Companies */}
             <SimilarCompanies companyId={companyId} />
-
-            {/* Risk Flags */}
-            <RiskFlags companyId={companyId} />
           </div>
         </div>
       </div>

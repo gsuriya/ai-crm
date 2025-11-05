@@ -84,7 +84,7 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
 
   if (activities.length === 0) {
     return (
-      <Card className="rounded-2xl shadow-sm border border-border p-5">
+      <Card className="rounded-2xl shadow-sm border border-border p-4">
         <EmptyState
           icon={Calendar}
           title="No recent activity"
@@ -131,25 +131,43 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
                   }`}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-1">
                       <div className={`p-1.5 rounded ${getActivityColor(activity.type)}`}>
                         <Icon className="h-3 w-3" />
                       </div>
                       <Badge variant="outline" className="text-xs">
-                        {activity.type}
+                        {activity.type === 'email' && (activity as any).metadata?.direction === 'sent' 
+                          ? 'Sent Email' 
+                          : activity.type === 'email' && (activity as any).metadata?.direction === 'received'
+                          ? 'Received Email'
+                          : activity.type}
                       </Badge>
-                      <span className="text-sm font-medium text-foreground">
+                      <span className="text-sm font-medium text-foreground flex-1">
                         {activity.summary}
                       </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
                       {formatDate(activity.date)}
                     </span>
                   </div>
+                  {activity.type === 'email' && (activity as any).metadata?.from_email && (
+                    <div className="text-xs text-muted-foreground mb-1">
+                      {(activity as any).metadata.direction === 'sent' 
+                        ? `To: ${(activity as any).metadata.to_email}`
+                        : `From: ${(activity as any).metadata.from_email}`}
+                    </div>
+                  )}
+                  {activity.type === 'call' && (activity as any).metadata?.duration && (
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Duration: {Math.floor((activity as any).metadata.duration / 60)}m {((activity as any).metadata.duration % 60)}s
+                      {(activity as any).metadata.has_summary && ' • Summary available'}
+                    </div>
+                  )}
                   {activity.body && (
                     <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                      {activity.body.substring(0, 150)}
-                      {activity.body.length > 150 ? "..." : ""}
+                      {activity.type === 'call' && (activity as any).metadata?.has_summary
+                        ? activity.body // Show summary for calls
+                        : activity.body.substring(0, 150) + (activity.body.length > 150 ? "..." : "")}
                     </p>
                   )}
                   <div className="flex items-center gap-2 mt-2">

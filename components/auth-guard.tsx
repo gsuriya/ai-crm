@@ -17,33 +17,46 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let cancelled = false;
+
     const checkAuth = async () => {
       try {
         // Add a timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 5000)
+        const timeoutPromise = new Promise<null>((resolve) => 
+          setTimeout(() => {
+            if (!cancelled) {
+              console.warn('Auth check timeout, redirecting to sign in');
+              resolve(null);
+            }
+          }, 2000)
         );
         
-        const sessionPromise = getSession();
-        const session = await Promise.race([sessionPromise, timeoutPromise]).catch((err) => {
-          console.warn('Auth check timeout or error:', err);
-          return null;
-        }) as any;
+        const sessionPromise = getSession().catch(() => null);
+        const session = await Promise.race([sessionPromise, timeoutPromise]);
+        
+        if (cancelled) return;
         
         // Protect all other routes
         if (!session) {
+          console.log('No session found, redirecting to sign in');
           router.push('/auth/signin');
         } else {
+          console.log('Session found, allowing access');
           setIsChecking(false);
         }
       } catch (error) {
+        if (cancelled) return;
         console.error('Auth check error:', error);
-        setIsChecking(false);
+        // On error, redirect to sign in
         router.push('/auth/signin');
       }
     };
 
     checkAuth();
+    
+    return () => {
+      cancelled = true;
+    };
   }, [router, pathname, isAuthPage]);
 
   // Show loading state while checking auth (only for protected routes)

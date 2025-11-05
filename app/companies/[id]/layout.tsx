@@ -61,6 +61,18 @@ export default function CompanyLayout({
     fetchCompany();
   }, [fetchCompany]);
 
+  // Listen for company updates from child components
+  useEffect(() => {
+    const handleCompanyUpdate = () => {
+      fetchCompany();
+    };
+
+    window.addEventListener('companyUpdated', handleCompanyUpdate);
+    return () => {
+      window.removeEventListener('companyUpdated', handleCompanyUpdate);
+    };
+  }, [fetchCompany]);
+
   // Redirect /companies/[id] to /companies/[id]/overview
   useEffect(() => {
     if (pathname === `/companies/${companyId}`) {

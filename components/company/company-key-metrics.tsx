@@ -15,10 +15,15 @@ interface CompanyKeyMetricsProps {
 
 interface FinancialData {
   arr?: number;
+  gross_retention?: number;
+  net_retention?: number;
   growth?: number;
   burn?: number;
   runway?: number;
   headcount?: number;
+  month?: number;
+  year?: number;
+  isLive?: boolean; // True if data is from current month/year
   lastRound?: {
     size: number;
     date: string;
@@ -39,22 +44,44 @@ export function CompanyKeyMetrics({ companyId }: CompanyKeyMetricsProps) {
     try {
       setLoading(true);
 
-      // Fetch financials
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+
+      // Fetch financials - prioritize by month/year, then by year
       const { data: financials } = await supabase
         .from("company_financials")
         .select("*")
         .eq("company_id", companyId)
         .order("year", { ascending: false })
-        .limit(1);
+        .order("month", { ascending: false, nullsFirst: false });
 
       if (financials && financials.length > 0) {
+        // Find the most recent financial data (with month if available, otherwise yearly)
         const latest = financials[0];
+        const isLive = latest.year === currentYear && 
+          (latest.month === null || latest.month === currentMonth);
+
+        // Calculate growth from previous period if available
+        let growth: number | undefined = undefined;
+        if (financials.length > 1 && latest.arr) {
+          const previous = financials[1];
+          if (previous.arr && previous.arr > 0) {
+            growth = ((latest.arr - previous.arr) / previous.arr) * 100;
+          }
+        }
+
         setMetrics({
           arr: latest.arr,
-          growth: undefined, // Calculate from previous year
+          gross_retention: latest.gross_retention,
+          net_retention: latest.net_retention,
+          growth,
           burn: undefined,
           runway: undefined,
           headcount: undefined,
+          month: latest.month,
+          year: latest.year,
+          isLive,
           lastUpdated: latest.updated_at,
         });
       } else {
@@ -80,11 +107,11 @@ export function CompanyKeyMetrics({ companyId }: CompanyKeyMetricsProps) {
 
   if (!metrics || !metrics.arr) {
     return (
-      <Card className="rounded-2xl shadow-sm border border-border p-5">
+      <Card className="rounded-2xl shadow-sm border border-border p-4">
         <EmptyState
           icon={DollarSign}
           title="No metrics yet"
-          description="No metrics yet — add ARR, burn, or fundraise to unlock growth charts."
+          description="Add ARR, burn, or fundraise to unlock growth charts."
           actionLabel="Add Financials"
           onAction={() => {
             // TODO: Open financials modal
@@ -109,11 +136,28 @@ export function CompanyKeyMetrics({ companyId }: CompanyKeyMetricsProps) {
           <CardTitle className="text-lg font-semibold text-foreground">
             Key Metrics
           </CardTitle>
-          {metrics.lastUpdated && (
-            <Badge variant="outline" className="text-xs">
-              Updated {new Date(metrics.lastUpdated).toLocaleDateString()}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {metrics.isLive && (
+              <Badge variant="default" className="text-xs bg-green-500">
+                Live
+              </Badge>
+            )}
+            {metrics.month && metrics.year && (
+              <Badge variant="outline" className="text-xs">
+                {new Date(metrics.year, metrics.month - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              </Badge>
+            )}
+            {!metrics.month && metrics.year && (
+              <Badge variant="outline" className="text-xs">
+                {metrics.year}
+              </Badge>
+            )}
+            {metrics.lastUpdated && (
+              <Badge variant="outline" className="text-xs">
+                Updated {new Date(metrics.lastUpdated).toLocaleDateString()}
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -127,6 +171,28 @@ export function CompanyKeyMetrics({ companyId }: CompanyKeyMetricsProps) {
               {formatCurrency(metrics.arr)}
             </div>
           </div>
+          {metrics.gross_retention !== undefined && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <TrendingUp className="h-4 w-4" />
+                <span>Gross Retention</span>
+              </div>
+              <div className="text-xl font-semibold text-foreground">
+                {metrics.gross_retention.toFixed(1)}%
+              </div>
+            </div>
+          )}
+          {metrics.net_retention !== undefined && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <TrendingUp className="h-4 w-4" />
+                <span>Net Retention</span>
+              </div>
+              <div className="text-xl font-semibold text-foreground">
+                {metrics.net_retention.toFixed(1)}%
+              </div>
+            </div>
+          )}
           {metrics.growth !== undefined && (
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

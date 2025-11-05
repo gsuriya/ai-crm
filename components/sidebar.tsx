@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, Home, Users, Briefcase, Workflow, CheckSquare, BarChart3, Settings, LogOut } from "lucide-react";
+import { Building2, Home, Users, Briefcase, Workflow, CheckSquare, BarChart3, Settings, LogOut, LogIn } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { signOut } from "@/lib/auth";
+import { signOut, getSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
 const navigation = [
@@ -21,10 +22,24 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const session = await getSession();
+        setIsAuthenticated(!!session);
+      } catch (error) {
+        setIsAuthenticated(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      setIsAuthenticated(false);
       router.push("/auth/signin");
     } catch (error) {
       console.error("Sign out error:", error);
@@ -66,14 +81,28 @@ export function Sidebar() {
         })}
       </nav>
       <div className="border-t border-border p-4 flex-shrink-0">
-        <Button
-          variant="outline"
-          onClick={handleSignOut}
-          className="w-full justify-start"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
-        </Button>
+        {isAuthenticated === null ? (
+          <div className="text-xs text-muted-foreground text-center py-2">Checking...</div>
+        ) : isAuthenticated ? (
+          <Button
+            variant="outline"
+            onClick={handleSignOut}
+            className="w-full justify-start"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        ) : (
+          <Link href="/auth/signin">
+            <Button
+              variant="default"
+              className="w-full justify-start"
+            >
+              <LogIn className="mr-2 h-4 w-4" />
+              Sign In with Google
+            </Button>
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -11,7 +11,8 @@
     "seed:semantic": "tsx scripts/seed-semantic.ts",
     "backfill:names": "tsx scripts/backfill-name-embeddings.ts",
     "test:apis": "tsx scripts/test-all-apis.ts",
-    "test:real": "tsx scripts/test-real-apis.ts"
+    "test:real": "tsx scripts/test-real-apis.ts",
+    "migrate:add-position": "tsx scripts/add-position-column.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
@@ -25,6 +26,7 @@
     "@supabase/supabase-js": "^2.39.0",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
+    "@types/pg": "^8.15.6",
     "@vapi-ai/server-sdk": "^0.10.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.0",
@@ -36,6 +38,7 @@
     "openai": "^6.7.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "pg": "^8.16.3",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "recharts": "^3.3.0",

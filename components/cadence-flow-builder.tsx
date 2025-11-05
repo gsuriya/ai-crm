@@ -71,9 +71,10 @@ interface CadenceFlowBuilderProps {
   autoSave?: boolean; // Whether to auto-save to Supabase
   onChanges?: (hasChanges: boolean) => void; // Callback when changes are detected
   saveSuccess?: boolean; // Whether save was successful (to show message)
+  showStartButton?: boolean; // Whether to show "Start Cadence" button
 }
 
-export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName = '', cadenceDescription = '', companyId, onSave, onClose, autoSave = false, onChanges, saveSuccess = false }: CadenceFlowBuilderProps) {
+export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName = '', cadenceDescription = '', companyId, onSave, onClose, autoSave = false, onChanges, saveSuccess = false, showStartButton = false }: CadenceFlowBuilderProps) {
   // Normalize initial blocks: ensure exactly one trigger block
   const normalizeInitialBlocks = (blocks: FlowBlock[]): FlowBlock[] => {
     if (blocks.length === 0) {
@@ -118,6 +119,8 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   const [saved, setSaved] = useState(false);
   const [name, setName] = useState(cadenceName || '');
   const [description, setDescription] = useState(cadenceDescription || '');
+  const [companyCadences, setCompanyCadences] = useState<any[]>([]);
+  const [startingCadence, setStartingCadence] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
@@ -205,8 +208,8 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         .eq('id', companyId)
         .single();
 
-      // Use hardcoded email for testing: ethanzzheng@gmail.com
-      const companyEmail = 'ethanzzheng@gmail.com';
+      // Use company email from database (or fallback for testing)
+      const companyEmail = company?.email || 'pranavscontact@gmail.com';
       if (!companyEmail) {
         log('⚠️ Company email not found. Some blocks may fail.');
       }
@@ -488,6 +491,67 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     }
     setTimeout(() => setSaved(false), 2000);
   }, [blocks, autoSave, cadenceId, name, description, onSave]);
+
+  // Fetch company cadences when cadenceId is available
+  useEffect(() => {
+    if (showStartButton && cadenceId && companyId) {
+      const fetchCompanyCadences = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('company_cadences')
+            .select('*, contact:contacts(*)')
+            .eq('company_id', companyId)
+            .eq('cadence_id', cadenceId);
+
+          if (error) throw error;
+          setCompanyCadences(data || []);
+        } catch (error) {
+          console.error('Error fetching company cadences:', error);
+        }
+      };
+      fetchCompanyCadences();
+    }
+  }, [showStartButton, cadenceId, companyId]);
+
+  const handleStartCadence = async () => {
+    if (!cadenceId || !companyId) {
+      alert('Missing cadence or company information');
+      return;
+    }
+
+    // Find company_cadence_id for this company and cadence
+    const companyCadence = companyCadences.find(
+      (cc: any) => cc.company_id === companyId && cc.cadence_id === cadenceId
+    );
+
+    if (!companyCadence) {
+      alert('This company is not associated with this cadence. Please add a contact to the cadence first.');
+      return;
+    }
+
+    try {
+      setStartingCadence(companyCadence.id);
+      const response = await fetch('/api/cadence/start', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ company_cadence_id: companyCadence.id }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to start cadence');
+      }
+
+      const result = await response.json();
+      alert(`Cadence started!\n\nExecution ID: ${result.execution_id}\n\nCheck browser console (F12) for detailed status.`);
+    } catch (error: any) {
+      console.error('Error starting cadence:', error);
+      alert(`Error: ${error.message || 'Failed to start cadence. Check console for details.'}`);
+    } finally {
+      setStartingCadence(null);
+    }
+  };
 
   const handleBlockClick = (blockId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1450,6 +1514,17 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             />
           </div>
               <div className="flex items-end gap-2">
+                {showStartButton && cadenceId && companyId && companyCadences.length > 0 && (
+                  <Button
+                    onClick={handleStartCadence}
+                    disabled={!!startingCadence}
+                    variant="default"
+                    type="button"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    {startingCadence ? 'Starting...' : 'Start Cadence'}
+                  </Button>
+                )}
                 <Button
                   onClick={(e) => {
                     e.preventDefault();
@@ -1806,6 +1881,22 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
 
                       const data = await response.json();
                       setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+                      
+                      // If this is a build action, apply the generated blocks
+                      if (data.action === 'build' && data.blocks) {
+                        // Replace existing blocks (except trigger) with new blocks
+                        const triggerBlock = blocks.find(b => b.type === 'trigger');
+                        const newBlocks = data.blocks.map((block: any) => ({
+                          ...block,
+                          // Preserve trigger block if it exists
+                          ...(block.type === 'trigger' && triggerBlock ? triggerBlock : {}),
+                        }));
+                        
+                        setBlocks(newBlocks);
+                        if (onChanges) {
+                          onChanges(true);
+                        }
+                      }
                     } catch (error) {
                       console.error('Error sending chat message:', error);
                       setChatMessages(prev => [
@@ -1853,6 +1944,22 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                           })
                           .then(data => {
                             setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+                            
+                            // If this is a build action, apply the generated blocks
+                            if (data.action === 'build' && data.blocks) {
+                              // Replace existing blocks (except trigger) with new blocks
+                              const triggerBlock = blocks.find(b => b.type === 'trigger');
+                              const newBlocks = data.blocks.map((block: any) => ({
+                                ...block,
+                                // Preserve trigger block if it exists
+                                ...(block.type === 'trigger' && triggerBlock ? triggerBlock : {}),
+                              }));
+                              
+                              setBlocks(newBlocks);
+                              if (onChanges) {
+                                onChanges(true);
+                              }
+                            }
                           })
                           .catch(error => {
                             console.error('Error sending chat message:', error);

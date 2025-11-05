@@ -27,11 +27,11 @@ export async function PUT(request: NextRequest) {
     const supabase = await createServerSupabaseClient();
 
     // Check session first
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { session }, error: supabaseSessionError } = await supabase.auth.getSession();
     console.log('[Cadence Start] Session check:', { 
       hasSession: !!session,
       userId: session?.user?.id,
-      sessionError: sessionError?.message 
+      sessionError: supabaseSessionError?.message 
     });
 
     // Get current user
@@ -52,6 +52,28 @@ export async function PUT(request: NextRequest) {
         { status: 401 }
       );
     }
+    
+    // Check if user has Google OAuth session (required for sending emails)
+    const { data: userSession, error: userSessionError } = await supabase
+      .from('user_sessions')
+      .select('access_token, refresh_token, email')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (userSessionError || !userSession || !userSession.access_token) {
+      console.error('[Cadence Start] No Google OAuth session found:', userSessionError);
+      return NextResponse.json(
+        { 
+          error: 'No Google OAuth session found. Please sign in with Google and grant Gmail permissions.',
+          details: 'Go to /auth/signin and click "Sign in with Google", then grant Gmail permissions.',
+          hasSession: !!userSession,
+          hasAccessToken: !!userSession?.access_token,
+        },
+        { status: 403 }
+      );
+    }
+    
+    console.log('[Cadence Start] ✅ Google OAuth session found');
 
     // Get company_cadence association
     const { data: companyCadence, error: ccError } = await supabase
@@ -123,10 +145,9 @@ export async function PUT(request: NextRequest) {
       );
       console.log('[Cadence Start] ✅ Created execution:', executionId);
 
-      // Execute first block after trigger
+      // Execute first block after trigger in background
       const execution = await getExecution(supabase, executionId);
       if (execution) {
-        try {
           console.log('[Cadence Start] 🚀 About to execute first block...');
           console.log('[Cadence Start] Execution details:', {
             id: execution.id,
@@ -136,43 +157,35 @@ export async function PUT(request: NextRequest) {
           });
           console.log('[Cadence Start] Blocks in cadence:', blocks.map(b => ({ id: b.id, type: b.type, title: b.title })));
           
+        // Execute in background - don't wait
+        (async () => {
+          try {
+            console.log('[Cadence Start] ⚡ EXECUTING executeNextBlock NOW (restart)...');
           await executeNextBlock(supabase, execution, blocks);
-          console.log('[Cadence Start] ✅ Successfully executed first block');
-          return NextResponse.json({
-            success: true,
-            message: 'Cadence restarted',
-            execution_id: executionId,
-          });
-        } catch (restartError: any) {
-          console.error('[Cadence] ❌ Error restarting completed cadence:', restartError);
-          console.error('[Cadence] ❌ Error details:', {
-            message: restartError.message,
-            stack: restartError.stack,
-          });
+            console.log('[Cadence Start] ✅✅✅ Background execution completed successfully!');
+          } catch (error: any) {
+            console.error('[Cadence Start] ❌❌❌ CRITICAL ERROR:', error.message);
+            console.error('[Cadence Start] Error stack:', error.stack);
           await supabase
             .from('cadence_executions')
             .update({ 
               status: 'error',
               metadata: {
                 ...execution.metadata,
-                error: restartError.message,
-              }
-            })
-            .eq('id', executionId);
-          
-          const isScopeError = restartError.message?.includes('missing required scope') ||
-                              restartError.message?.includes('insufficient authentication scopes') ||
-                              restartError.message?.includes('OAuth token missing required scope') ||
-                              restartError.message?.includes('Token missing required scope') ||
-                              restartError.message?.includes('gmail.send');
-          
+                  error: error.message || String(error),
+                }
+              })
+              .eq('id', executionId)
+              .catch(console.error);
+          }
+        })();
+        
+        console.log('[Cadence Start] ✅ Started execution in background');
           return NextResponse.json({
-            success: false,
-            error: `Failed to restart cadence: ${restartError.message}`,
+          success: true,
+          message: 'Cadence restarted - running in background',
             execution_id: executionId,
-            isScopeError,
-          }, { status: isScopeError ? 403 : 500 });
-        }
+        });
       }
       return NextResponse.json({
         success: false,
@@ -216,54 +229,63 @@ export async function PUT(request: NextRequest) {
             })
             .eq('id', activeExecution.id);
           
-          // Get updated execution and execute
+          // Get updated execution and execute in background
           const updatedExecution = await getExecution(supabase, activeExecution.id);
           if (updatedExecution) {
-            await executeNextBlock(supabase, updatedExecution, blocks);
+            (async () => {
+              try {
+                console.log('[Cadence Start] ⚡ EXECUTING executeNextBlock NOW (reset)...');
+                await executeNextBlock(supabase, updatedExecution, blocks);
+                console.log('[Cadence Start] ✅✅✅ Background execution completed successfully!');
+              } catch (error: any) {
+                console.error('[Cadence Start] ❌❌❌ CRITICAL ERROR:', error.message);
+                await supabase
+                  .from('cadence_executions')
+                  .update({ 
+                    status: 'error',
+                    metadata: {
+                      ...updatedExecution.metadata,
+                      error: error.message || String(error),
+                    }
+                  })
+                  .eq('id', activeExecution.id)
+                  .catch(console.error);
+              }
+            })();
             return NextResponse.json({
               success: true,
-              message: 'Cadence restarted from beginning',
+              message: 'Cadence restarted from beginning - running in background',
               execution_id: activeExecution.id,
             });
           }
         }
         
-        // Resume existing execution
+        // Resume existing execution in background
+        (async () => {
         try {
+            console.log('[Cadence Start] ⚡ EXECUTING executeNextBlock NOW (resume)...');
           await executeNextBlock(supabase, activeExecution as any, blocks);
-          return NextResponse.json({
-            success: true,
-            message: 'Cadence execution resumed',
-            execution_id: activeExecution.id,
-          });
-        } catch (resumeError: any) {
-          console.error('[Cadence] Error resuming execution:', resumeError);
-          // Mark execution as error
+            console.log('[Cadence Start] ✅✅✅ Background execution completed successfully!');
+          } catch (error: any) {
+            console.error('[Cadence Start] ❌❌❌ CRITICAL ERROR:', error.message);
           await supabase
             .from('cadence_executions')
             .update({ 
               status: 'error',
               metadata: {
                 ...(activeExecution.metadata || {}),
-                error: resumeError.message,
-              }
-            })
-            .eq('id', activeExecution.id);
-          
-          // Check if it's a scope-related error
-          const isScopeError = resumeError.message?.includes('missing required scope') ||
-                              resumeError.message?.includes('insufficient authentication scopes') ||
-                              resumeError.message?.includes('OAuth token missing required scope') ||
-                              resumeError.message?.includes('Token missing required scope') ||
-                              resumeError.message?.includes('gmail.send');
-          
+                  error: error.message || String(error),
+                }
+              })
+              .eq('id', activeExecution.id)
+              .catch(console.error);
+          }
+        })();
           return NextResponse.json({
-            success: false,
-            error: `Failed to resume execution: ${resumeError.message}`,
+          success: true,
+          message: 'Cadence execution resumed - running in background',
             execution_id: activeExecution.id,
-            isScopeError, // Flag to help frontend detect scope errors
-          }, { status: isScopeError ? 403 : 500 });
-        }
+        });
       } else {
         // No active execution, start fresh
         const blocks = (cadence.nodes || []) as FlowBlock[];
@@ -275,40 +297,31 @@ export async function PUT(request: NextRequest) {
         );
         const execution = await getExecution(supabase, executionId);
         if (execution) {
-          try {
-            await executeNextBlock(supabase, execution, blocks);
-            return NextResponse.json({
-              success: true,
-              message: 'Cadence restarted',
-              execution_id: executionId,
-            });
-          } catch (restartError: any) {
-            console.error('[Cadence] Error restarting execution:', restartError);
-            await supabase
-              .from('cadence_executions')
-              .update({ 
-                status: 'error',
-                metadata: {
-                  ...execution.metadata,
-                  error: restartError.message,
-                }
-              })
-              .eq('id', executionId);
-            
-      // Check if it's a scope-related error
-      const isScopeError = restartError.message?.includes('missing required scope') ||
-                          restartError.message?.includes('insufficient authentication scopes') ||
-                          restartError.message?.includes('OAuth token missing required scope') ||
-                          restartError.message?.includes('Token missing required scope') ||
-                          restartError.message?.includes('gmail.send');
-      
+          (async () => {
+            try {
+              console.log('[Cadence Start] ⚡ EXECUTING executeNextBlock NOW (fresh start)...');
+              await executeNextBlock(supabase, execution, blocks);
+              console.log('[Cadence Start] ✅✅✅ Background execution completed successfully!');
+            } catch (error: any) {
+              console.error('[Cadence Start] ❌❌❌ CRITICAL ERROR:', error.message);
+              await supabase
+                .from('cadence_executions')
+                .update({ 
+                  status: 'error',
+                  metadata: {
+                    ...execution.metadata,
+                    error: error.message || String(error),
+                  }
+                })
+                .eq('id', executionId)
+                .catch(console.error);
+            }
+          })();
       return NextResponse.json({
-        success: false,
-        error: `Failed to restart execution: ${restartError.message}`,
+            success: true,
+            message: 'Cadence restarted - running in background',
         execution_id: executionId,
-        isScopeError, // Flag to help frontend detect scope errors
-      }, { status: isScopeError ? 403 : 500 });
-          }
+          });
         }
         return NextResponse.json({
           success: true,
@@ -350,43 +363,54 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Execute first block after trigger
-    try {
+    // Execute in background - don't wait for it to complete
+    // This prevents the API from hanging
+    console.log('[Cadence Start] 🚀 Starting execution in background...');
+    console.log('[Cadence Start] Execution ID:', executionId);
+    console.log('[Cadence Start] Current block ID:', execution.current_block_id);
+    console.log('[Cadence Start] Blocks count:', blocks.length);
+    console.log('[Cadence Start] Blocks:', blocks.map(b => ({ id: b.id, type: b.type, title: b.title })));
+    
+    // Wrap in async function to catch all errors
+    (async () => {
+      try {
+        console.log('[Cadence Start] ⚡ EXECUTING executeNextBlock NOW...');
       await executeNextBlock(supabase, execution, blocks);
-      console.log(`[Cadence] Successfully executed first block for cadence ${cadence.id}`);
-    } catch (execError: any) {
-      console.error('[Cadence] Error executing first block:', execError);
-      // Mark execution as error but don't fail the request
+        console.log('[Cadence Start] ✅✅✅ Background execution completed successfully!');
+      } catch (error: any) {
+        console.error('[Cadence Start] ❌❌❌ CRITICAL ERROR in background execution:');
+        console.error('[Cadence Start] Error message:', error.message);
+        console.error('[Cadence Start] Error stack:', error.stack);
+        console.error('[Cadence Start] Full error object:', error);
+        
+        // Mark as error if it fails
+        try {
       await supabase
         .from('cadence_executions')
         .update({ 
           status: 'error',
           metadata: {
             ...execution.metadata,
-            error: execError.message,
+                error: error.message || String(error),
+                errorStack: error.stack,
           }
         })
         .eq('id', executionId);
-      
-      // Check if it's a scope-related error
-      const isScopeError = execError.message?.includes('missing required scope') ||
-                          execError.message?.includes('insufficient authentication scopes') ||
-                          execError.message?.includes('OAuth token missing required scope') ||
-                          execError.message?.includes('Token missing required scope') ||
-                          execError.message?.includes('gmail.send');
-      
-      return NextResponse.json({
-        success: false,
-        error: `Failed to execute workflow: ${execError.message}`,
-        execution_id: executionId,
-        isScopeError, // Flag to help frontend detect scope errors
-      }, { status: isScopeError ? 403 : 500 });
-    }
+          console.log('[Cadence Start] ✅ Marked execution as error in database');
+        } catch (updateError: any) {
+          console.error('[Cadence Start] ❌ Failed to update execution status:', updateError);
+        }
+      }
+    })();
+    
+    // Return immediately - execution runs in background
+    console.log(`[Cadence] Started execution for cadence ${cadence.id} - running in background`);
 
     return NextResponse.json({
       success: true,
       company_cadence_id: companyCadenceId,
       execution_id: executionId,
+      message: 'Cadence started - execution is running in background',
     });
   } catch (error: any) {
     console.error('Error starting workflow:', error);
