@@ -1,84 +1,133 @@
-# Complete Setup Guide for Cadence Blocks
+# Quick Setup Guide for New Users
 
-## Step 1: Google Cloud Console Setup
+Follow these steps to get the AI CRM running on your machine.
 
-### 1.1 Enable APIs
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a project or select existing one
-3. Enable these APIs:
-   - **Gmail API** (for email sending)
-   - **Google Calendar API** (for calendar invites)
-   - **Google+ API** (for OAuth)
-
-### 1.2 Create OAuth 2.0 Credentials
-1. Go to **APIs & Services** → **Credentials**
-2. Click **Create Credentials** → **OAuth 2.0 Client ID**
-3. Configure consent screen if needed:
-   - User type: External
-   - App name: AI CRM
-   - User support email: your email
-   - Scopes: Add these manually:
-     - `https://www.googleapis.com/auth/gmail.send`
-     - `https://www.googleapis.com/auth/calendar.events`
-     - `https://www.googleapis.com/auth/userinfo.email`
-     - `https://www.googleapis.com/auth/userinfo.profile`
-   - Test users: Add your email
-4. Create OAuth client:
-   - Application type: **Web application**
-   - Name: AI CRM
-   - Authorized redirect URIs:
-     - `http://localhost:3000/auth/callback` (dev)
-     - `https://your-domain.com/auth/callback` (prod)
-   - Click **Create**
-5. Copy **Client ID** and **Client Secret**
-
-### 1.3 Configure Supabase OAuth
-1. Go to your Supabase Dashboard
-2. **Authentication** → **Providers** → **Google**
-3. Enable Google provider
-4. Add:
-   - **Client ID**: (from step 1.2)
-   - **Client Secret**: (from step 1.2)
-5. Save
-
-## Step 2: VAPI Setup (for Voicemail)
-
-1. Go to [VAPI.ai](https://vapi.ai)
-2. Sign up/login
-3. Get your API key from dashboard
-4. Add to environment variables (see Step 3)
-
-## Step 3: Environment Variables
-
-Create/update `.env.local`:
+## Step 1: Get the Latest Code
 
 ```bash
-# Supabase (you probably already have these)
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# If you already cloned the repo, pull latest changes
+git pull origin fix-cadence-delay-execution
 
-# Google OAuth (for Gmail & Calendar APIs)
-GOOGLE_CLIENT_ID=your_client_id_from_step_1.2
-GOOGLE_CLIENT_SECRET=your_client_secret_from_step_1.2
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_client_id_from_step_1.2
-
-# Optional: Site URL for production
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-
-# VAPI (for voicemail)
-VAPI_API_KEY=your_vapi_api_key
-VAPI_API_URL=https://api.vapi.ai/api/v1
+# Or if you need to check out the branch
+git checkout fix-cadence-delay-execution
 ```
 
-## Step 4: Update OAuth Flow to Store Tokens
+## Step 2: Install Dependencies
 
-The OAuth callback needs to be updated to store tokens in `user_sessions` table. This will be done next.
+```bash
+npm install
+```
 
-## Step 5: Test It
+## Step 3: Set Up Environment Variables
 
-1. Sign in with Google (grant Gmail/Calendar permissions)
-2. Create a cadence with email blocks
-3. Add a company with email address
-4. Click "Start Workflow"
-5. Check your Gmail - emails should be sent!
+1. Copy the example file:
+```bash
+cp .env.example .env.local
+```
 
+2. Open `.env.local` and fill in your credentials:
+
+### Required Credentials:
+
+**Supabase (Database):**
+- Go to https://supabase.com and create a free account
+- Create a new project
+- Go to Settings → API
+- Copy `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+- Copy `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Go to Settings → Database → Connection string (URI format)
+- Copy the password from the connection string → `SUPABASE_DB_PASSWORD`
+
+**OpenAI (AI Features):**
+- Go to https://platform.openai.com
+- Create an API key
+- Copy it → `OPENAI_API_KEY`
+
+**Google OAuth (Gmail/Calendar):**
+- Go to https://console.cloud.google.com
+- Create a new project (or use existing)
+- Enable Gmail API and Calendar API
+- Go to Credentials → Create Credentials → OAuth 2.0 Client ID
+- Set authorized redirect URI: `http://localhost:3000/auth/google-callback`
+- Copy Client ID → `GOOGLE_CLIENT_ID` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+- Copy Client Secret → `GOOGLE_CLIENT_SECRET`
+
+**VAPI (Optional - for voice calls):**
+- Go to https://vapi.ai
+- Sign up and get your API keys
+- Copy Private Key → `VAPI_PRIVATE_KEY`
+- Get Phone Number ID → `VAPI_PHONE_NUMBER_ID`
+- Get Assistant ID → `VAPI_ASSISTANT_ID`
+
+## Step 4: Set Up Database
+
+Run the database migration script:
+
+```bash
+npx tsx scripts/run-financials-migration.ts
+```
+
+This will:
+- Create the `company_financials` table
+- Create the `call_logs` table
+- Create the `email_logs` table
+- Add the `month` field for monthly tracking
+
+**OR** manually run SQL migrations in Supabase SQL Editor:
+1. Go to Supabase Dashboard → SQL Editor
+2. Run `lib/db/migrations/add_financials_and_docs.sql`
+3. Run `lib/db/migrations/add_month_to_financials.sql`
+
+## Step 5: Start the Development Server
+
+```bash
+npm run dev
+```
+
+## Step 6: Sign In
+
+1. Open http://localhost:3000
+2. Click "Sign in with Google"
+3. Authorize the app to access Gmail and Calendar
+4. You're ready to use the CRM!
+
+## Troubleshooting
+
+### "Missing Supabase credentials" error
+- Make sure `.env.local` exists and has all required variables
+- Check that variable names match exactly (case-sensitive)
+
+### "Table does not exist" error
+- Run the migration script: `npx tsx scripts/run-financials-migration.ts`
+- Or manually run SQL migrations in Supabase SQL Editor
+
+### "OpenAI API key not configured"
+- Make sure `OPENAI_API_KEY` is set in `.env.local`
+- Restart the dev server after adding it
+
+### Build errors
+- Make sure all dependencies are installed: `npm install`
+- Check Node.js version: `node --version` (should be 18+)
+
+## What's Included
+
+✅ Email workflows with placeholders (`{name}`, `{company}`, `{personalization}`)
+✅ VAPI call processing and financial extraction
+✅ Timeline snapshot with emails and calls
+✅ Financials tracking with monthly/yearly data
+✅ Company and contact management
+✅ AI-powered personalization
+
+## Next Steps
+
+1. Add companies: Go to Companies page and add your first company
+2. Create a cadence: Build email workflows in the Cadences page
+3. Add contacts: Add contacts to companies
+4. Send emails: Test email workflows
+5. Configure VAPI: Set up webhook for call processing (optional)
+
+## Need Help?
+
+- Check `README.md` for detailed documentation
+- See `VAPI_CALL_PROCESSING_SETUP.md` for VAPI configuration
+- Review `API_CONFIGURATION_STATUS.md` for API status
