@@ -284,6 +284,7 @@ export async function executeNextBlock(
   }
 
   // Get user - try auth first, but fall back to stored user_id if auth fails (after delays)
+  // Background processor runs without auth session, so we MUST use stored user_id
   let user: any = null;
   const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
   
@@ -291,34 +292,17 @@ export async function executeNextBlock(
     user = authUser;
     console.log(`[Workflow] ✅ Authenticated user: ${user.id} (${user.email})`);
   } else if (storedUserId) {
-    // Auth failed (e.g., after delay), but we have stored user_id - fetch user details
-    console.log(`[Workflow] ⚠️ Auth check failed, using stored user_id: ${storedUserId}`);
-    const { data: userData, error: fetchError } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('id', storedUserId)
-      .single();
-    
-    if (userData && !fetchError) {
-      user = { id: userData.id, email: userData.email };
-      console.log(`[Workflow] ✅ Using stored user: ${user.id} (${user.email})`);
-    } else {
-      // Try auth one more time - sometimes it's a transient issue
-      const { data: { user: retryUser } } = await supabase.auth.getUser();
-      if (retryUser) {
-        user = retryUser;
-        console.log(`[Workflow] ✅ Retry auth succeeded: ${user.id} (${user.email})`);
-      } else {
-        console.error('[Workflow] User auth error:', userError);
-        throw new Error(`User not authenticated: ${userError?.message || 'No user found'}. Stored user_id: ${storedUserId}`);
-      }
-    }
+    // Auth failed (background processor has no session), use stored user_id
+    // sendEmail only needs userId string, not full user object
+    console.log(`[Workflow] ⚠️ Auth check failed (background processor), using stored user_id: ${storedUserId}`);
+    user = { id: storedUserId }; // Minimal user object - just need id for sendEmail
+    console.log(`[Workflow] ✅ Using stored user_id: ${user.id}`);
   } else {
     console.error('[Workflow] User auth error:', userError);
-    throw new Error(`User not authenticated: ${userError?.message || 'No user found'}`);
+    throw new Error(`User not authenticated: ${userError?.message || 'No user found'}. Stored user_id: ${storedUserId || 'not set'}`);
   }
 
-  console.log(`[Workflow] Executing block for user: ${user.id} (${user.email})`);
+  console.log(`[Workflow] Executing block for user: ${user.id}`);
 
   // Get company email and phone
   const { data: company } = await supabase
@@ -327,7 +311,8 @@ export async function executeNextBlock(
     .eq('id', companyId)
     .single();
 
-  const companyEmail = company?.email || '';
+  // Use hardcoded email for testing: ethanzzheng@gmail.com
+  const companyEmail = 'ethanzzheng@gmail.com';
   const companyPhone = company?.phone_number || '';
 
   // Get thread info from metadata
@@ -504,69 +489,13 @@ export async function executeNextBlock(
 
     console.log(`[Workflow] ⏳ Scheduled next block (${nextBlockId}) for ${scheduledFor.toISOString()}`);
     console.log(`[Workflow] 💾 Preserved metadata with threadInfoMap size: ${Object.keys(capturedThreadInfoMap).length}`);
+    console.log(`[Workflow] ⏸️ Delay block complete - execution will resume when background processor picks up scheduled execution`);
     
-    // Wait inline (like sourcing does)
-    console.log(`[Workflow] ⏳ Waiting ${totalMs}ms...`);
-    await new Promise(resolve => setTimeout(resolve, totalMs));
-    console.log(`[Workflow] ✅ Delay completed, continuing execution...`);
-    
-    // After delay, restore captured metadata and continue
-    // CRITICAL: Use CAPTURED threadInfoMap (from before delay) - don't fetch from DB
-    const executionAfterDelay = await getExecution(supabase, execution.id);
-    if (!executionAfterDelay) {
-      console.error(`[Workflow] ❌ CRITICAL: Could not fetch execution after delay!`);
-      throw new Error(`Failed to fetch execution after delay`);
-    }
-    
-    // CRITICAL VALIDATION: Verify execution ID matches (prevents restoring to wrong execution)
-    if (executionAfterDelay.id !== execution.id) {
-      console.error(`[Workflow] ❌❌❌ CRITICAL: Execution ID mismatch after delay!`);
-      console.error(`[Workflow] ❌ Expected: ${execution.id}, Got: ${executionAfterDelay.id}`);
-      throw new Error(`Execution ID mismatch - cannot restore metadata`);
-    }
-    
-    // CRITICAL VALIDATION: Double-check captured entries are valid before restoring
-    const finalCapturedBlockIds = Object.keys(capturedThreadInfoMap);
-    const finalMissingTracking = finalCapturedBlockIds.filter(id => !capturedExecutedBlockIds.includes(id));
-    if (finalMissingTracking.length > 0) {
-      console.error(`[Workflow] ❌❌❌ CRITICAL: Found ${finalMissingTracking.length} STALE entries before restore!`);
-      console.error(`[Workflow] ❌ Removing stale entries:`, finalMissingTracking);
-      finalMissingTracking.forEach(id => delete capturedThreadInfoMap[id]);
-    }
-    
-    // Restore captured metadata (threadInfoMap from BEFORE delay)
-    const restoredMetadata = {
-      ...executionAfterDelay.metadata,
-      threadInfoMap: capturedThreadInfoMap, // USE CAPTURED (from before delay), not from DB
-      executedBlockIds: capturedExecutedBlockIds,
-    };
-    
-    console.log(`[Workflow] 💾 Restoring metadata after delay:`, {
-      threadInfoMapSize: Object.keys(capturedThreadInfoMap).length,
-      executedBlockIdsCount: capturedExecutedBlockIds.length,
-      executionId: execution.id,
-      executionCreatedAt: execution.created_at,
-    });
-    
-    await updateExecutionState(supabase, execution.id, {
-      scheduled_for: null,
-      metadata: restoredMetadata, // Restore CAPTURED metadata
-    });
-    
-    // Get fresh execution with restored metadata
-    const finalExecution = await getExecution(supabase, execution.id);
-    if (!finalExecution) {
-      throw new Error(`Failed to fetch final execution after delay`);
-    }
-    
-    console.log(`[Workflow] 🔄 Executing next block after delay: ${nextBlockId}`);
-    console.log(`[Workflow] 💾 Using CAPTURED threadInfoMap: ${Object.keys(capturedThreadInfoMap).length} entries`);
-    console.log(`[Workflow] 💾 Thread IDs in captured map:`, Object.values(capturedThreadInfoMap).map(t => t.threadId));
-    console.log(`[Workflow] 💾 Executed block IDs:`, capturedExecutedBlockIds);
-    
-    // Continue execution with restored metadata
-    await executeNextBlock(supabase, finalExecution, blocks);
-    return; // CRITICAL: Return here so delay block doesn't continue to connection following logic
+    // CRITICAL: Do NOT wait inline or recursively execute next block
+    // The background processor (/api/cadence/process) will pick up this execution
+    // when scheduled_for <= now and execute the next block
+    // This ensures delays are properly respected and not executed immediately
+    return; // Return immediately - background processor will handle continuation
   }
 
   // Handle end block
@@ -968,7 +897,7 @@ export async function executeNextBlock(
             body: currentBlock.config?.body || '',
             thread_id: result.threadId,
             message_id: result.messageId,
-            from_email: user.email || '',
+            from_email: user.email || '', // May be empty if using stored user_id
             to_email: companyEmail,
             sent_at: new Date().toISOString(),
           });
@@ -1206,9 +1135,11 @@ export async function executeNextBlock(
     
     console.log(`[Workflow] 📝 Updated execution state: current_block_id = ${nextBlockId}`);
     
-    // Recursively execute next block (but only if not a delay/conditional/end)
-    // CRITICAL: Check that current_block_id matches before executing to prevent double execution
-    if (nextBlock.type !== 'delay' && nextBlock.type !== 'conditional' && nextBlock.type !== 'end') {
+    // Recursively execute next block
+    // CRITICAL: Delay blocks MUST be executed immediately so they can set scheduled_for
+    // Conditional blocks are handled by API route, so skip those
+    // End blocks don't need execution
+    if (nextBlock.type !== 'conditional' && nextBlock.type !== 'end') {
       const updatedExecution = await getExecution(supabase, execution.id);
       if (updatedExecution && updatedExecution.current_block_id === nextBlockId) {
         console.log(`[Workflow] 🔄 Executing next block immediately (type: ${nextBlock.type}, id: ${nextBlock.id})`);

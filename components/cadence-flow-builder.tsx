@@ -233,7 +233,8 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         .eq('id', companyId)
         .single();
 
-      const companyEmail = company?.email || '';
+      // Use hardcoded email for testing: ethanzzheng@gmail.com
+      const companyEmail = 'ethanzzheng@gmail.com';
       if (!companyEmail) {
         log('⚠️ Company email not found. Some blocks may fail.');
       }

@@ -28,6 +28,36 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [commandBarOpen]);
 
+  // Global background processor for scheduled cadence executions
+  useEffect(() => {
+    if (isAuthPage) return; // Don't run on auth pages
+
+    const processScheduledExecutions = async () => {
+      try {
+        const response = await fetch('/api/cadence/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await response.json();
+        if (data.processed > 0) {
+          console.log(`[Background Processor] ✅ Processed ${data.processed} scheduled execution(s)`);
+        }
+      } catch (error) {
+        // Silently fail - don't spam console
+      }
+    };
+
+    // Process immediately on page load
+    processScheduledExecutions();
+
+    // Set up interval to check every 10 seconds
+    const interval = setInterval(() => {
+      processScheduledExecutions();
+    }, 10000); // Check every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [isAuthPage]);
+
   return (
     <AuthGuard>
       {isAuthPage ? (

@@ -24,6 +24,12 @@ export async function POST(request: NextRequest) {
 
     for (const execution of executions) {
       try {
+        // Clear scheduled_for to prevent double-processing
+        // The execution is being processed now, so clear the scheduled time
+        await updateExecutionState(supabase, execution.id, {
+          scheduled_for: null,
+        });
+
         // Get cadence to retrieve blocks
         const { data: companyCadence } = await supabase
           .from('company_cadences')
@@ -47,8 +53,14 @@ export async function POST(request: NextRequest) {
 
         const blocks = cadence.nodes as FlowBlock[];
 
+        // Get fresh execution with cleared scheduled_for
+        const freshExecution = await getExecution(supabase, execution.id);
+        if (!freshExecution) {
+          throw new Error('Failed to fetch execution after clearing scheduled_for');
+        }
+
         // Execute the next block
-        await executeNextBlock(supabase, execution, blocks);
+        await executeNextBlock(supabase, freshExecution, blocks);
 
         processed.push(execution.id);
       } catch (error: any) {
