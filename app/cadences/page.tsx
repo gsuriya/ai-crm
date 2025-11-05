@@ -274,7 +274,7 @@ export default function CadencesPage() {
       console.log('[Run Cadence] User found:', user.email);
 
       // Test email and phone
-      const testEmail = 'pranavscontact@gmail.com';
+      const testEmail = 'ethanzzheng@gmail.com';
       const testPhone = '+19255772134';
 
       // First, find or create a test company
@@ -757,9 +757,6 @@ export default function CadencesPage() {
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <h3 className="font-semibold text-lg">{cc.company?.name || 'Unknown Company'}</h3>
-                            {cc.company?.email && (
-                              <p className="text-sm text-muted-foreground mt-1">{cc.company.email}</p>
-                            )}
                             {cc.contact ? (
                               <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
                                 <p className="text-sm font-medium text-blue-900">

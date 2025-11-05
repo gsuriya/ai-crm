@@ -298,15 +298,26 @@ export async function executeNextBlock(
 
   console.log(`[Workflow] Executing block for user: ${user.id}`);
 
-  // Get company email and phone
+  // Get the first contact's email for this company (cadences email contacts directly)
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('email, first_name, last_name')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  // Use first contact's email, or fallback for testing
+  const contactEmail = contacts && contacts.length > 0 && contacts[0].email 
+    ? contacts[0].email 
+    : 'ethanzzheng@gmail.com';
+  
+  // Get company phone (still used for voice calls)
   const { data: company } = await supabase
     .from('companies')
-    .select('email, phone_number')
+    .select('phone_number')
     .eq('id', companyId)
     .single();
-
-  // Use company email from database (or fallback for testing)
-  const companyEmail = company?.email || 'pranavscontact@gmail.com';
+  
   const companyPhone = company?.phone_number || '';
 
   // Get thread info from metadata
@@ -454,9 +465,9 @@ export async function executeNextBlock(
         generatePersonalization
       } = await import('@/lib/utils/email-variables');
       
-      if (!companyEmail) {
-        console.error(`[Workflow] ❌ No email address found for company ${companyId}`);
-        throw new Error(`No email address found for company ${companyId}. Please set the company email address first.`);
+      if (!contactEmail) {
+        console.error(`[Workflow] ❌ No contact email found for company ${companyId}`);
+        throw new Error(`No contacts found for company ${companyId}. Please add at least one contact with an email address.`);
       }
 
       // Fetch company and contact data for variable replacement
@@ -467,13 +478,12 @@ export async function executeNextBlock(
         .eq('id', companyId)
         .single();
 
-      // Fetch contact by email address (more accurate than first contact)
-      // Use only first name for {name} placeholder
+      // Get contact info for the email recipient
       let contactName: string | undefined;
       const { data: contact } = await supabase
         .from('contacts')
         .select('first_name, last_name')
-        .eq('email', companyEmail)
+        .eq('email', contactEmail)
         .eq('company_id', companyId)
         .maybeSingle();
 
@@ -523,7 +533,7 @@ export async function executeNextBlock(
         console.log(`[Workflow] 📧 Personalization generated: "${personalization}"`);
       }
 
-      console.log(`[Workflow] 📧 Sending email to ${companyEmail}`);
+      console.log(`[Workflow] 📧 Sending email to ${contactEmail}`);
       console.log(`[Workflow] 📧 Subject: ${finalSubject || '(empty)'}`);
       console.log(`[Workflow] 📧 Body length: ${finalBody.length} characters`);
       
@@ -799,7 +809,7 @@ export async function executeNextBlock(
 
       try {
         console.log(`[Workflow] 📧 About to call sendEmail with threading info:`);
-        console.log(`[Workflow]   To: ${companyEmail}`);
+        console.log(`[Workflow]   To: ${contactEmail}`);
         console.log(`[Workflow]   Subject: "${finalSubject}"`);
         console.log(`[Workflow]   Thread ID: ${threadId || 'NEW THREAD'}`);
         console.log(`[Workflow]   Message-ID: ${messageId || 'NONE'}`);
@@ -816,12 +826,12 @@ export async function executeNextBlock(
         
         console.log(`[Workflow] 📧 CALLING sendEmail NOW...`);
         console.log(`[Workflow] 📧 User ID: ${user.id}`);
-        console.log(`[Workflow] 📧 To: ${companyEmail}`);
+        console.log(`[Workflow] 📧 To: ${contactEmail}`);
         console.log(`[Workflow] 📧 Subject: "${finalSubject}"`);
         console.log(`[Workflow] 📧 Body length: ${finalBody.length} chars`);
         
         const result = await sendEmail(user.id, {
-          to: companyEmail,
+          to: contactEmail,
           subject: finalSubject,
           body: finalBody,
           threadId,
@@ -924,7 +934,7 @@ export async function executeNextBlock(
             thread_id: result.threadId,
             message_id: result.messageId,
             from_email: user.email || '', // May be empty if using stored user_id
-            to_email: companyEmail,
+            to_email: contactEmail,
             sent_at: new Date().toISOString(),
           });
 
@@ -1098,17 +1108,21 @@ export async function executeNextBlock(
       throw new Error(`Next block ${nextBlockId} not found`);
     }
     
+    // CRITICAL: When advancing to next block, clear scheduled_for for non-delay blocks
+    // Delay blocks will set their own scheduled_for when they execute
+    // For delay blocks, we can clear it too since they'll set it themselves
     await updateExecutionState(supabase, execution.id, {
       current_block_id: nextBlockId,
-      scheduled_for: null, // Clear scheduled_for if set
+      scheduled_for: null, // Clear scheduled_for - delay blocks will set it, other blocks don't need it
       metadata: updatedMetadata,
     });
     
     // Recursively execute next block
     // CRITICAL: Delay blocks MUST be executed immediately so they can set scheduled_for
-      const updatedExecution = await getExecution(supabase, execution.id);
-      if (updatedExecution && updatedExecution.current_block_id === nextBlockId) {
-        await executeNextBlock(supabase, updatedExecution, blocks);
+    // Delay blocks return early after setting scheduled_for, so recursion will stop there
+    const updatedExecution = await getExecution(supabase, execution.id);
+    if (updatedExecution && updatedExecution.current_block_id === nextBlockId) {
+      await executeNextBlock(supabase, updatedExecution, blocks);
     }
   } else {
     // No next block, mark as completed

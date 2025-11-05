@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
-import { Search, Star, Clock, Sparkles, ArrowUp, Bot } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Star, Clock, Sparkles, ArrowUp, Bot, Play } from "lucide-react";
 import { motion } from "framer-motion";
 import { MatchIndicator } from "@/components/match-indicator";
 import { MatchSnippet } from "@/components/match-snippet";
@@ -23,12 +25,29 @@ interface Company {
   website?: string;
 }
 
+interface Contact {
+  id: string;
+  company_id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+interface Cadence {
+  id: string;
+  name: string;
+  user_id: string;
+}
+
 interface CompanyWithMatches extends Company {
   matches?: SearchMatch[];
 }
 
 export default function CompaniesPage() {
+  const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [contacts, setContacts] = useState<Map<string, Contact[]>>(new Map());
+  const [cadences, setCadences] = useState<Cadence[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -37,6 +56,7 @@ export default function CompaniesPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [agentMode, setAgentMode] = useState(false);
+  const [runningCadence, setRunningCadence] = useState<Map<string, boolean>>(new Map());
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -55,9 +75,129 @@ export default function CompaniesPage() {
     }
   }, []);
 
+  const fetchContacts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      
+      // Group contacts by company_id
+      const contactsMap = new Map<string, Contact[]>();
+      (data || []).forEach((contact) => {
+        const existing = contactsMap.get(contact.company_id) || [];
+        contactsMap.set(contact.company_id, [...existing, contact]);
+      });
+      
+      setContacts(contactsMap);
+    } catch (error) {
+      console.error("Error fetching contacts:", error);
+    }
+  }, []);
+
+  const fetchCadences = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('[Companies] No user found, cadences will be empty');
+        setCadences([]);
+        return;
+      }
+
+      // All cadences are shared company-wide - no user filter (same as cadences page)
+      const { data, error } = await supabase
+        .from("cadences")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error('[Companies] Error fetching cadences:', error);
+        throw error;
+      }
+      
+      console.log('[Companies] Fetched cadences:', data?.length || 0, data);
+      setCadences(data || []);
+    } catch (error) {
+      console.error("Error fetching cadences:", error);
+      setCadences([]);
+    }
+  }, []);
+
+  const handleRunCadence = async (companyId: string, cadenceId: string) => {
+    if (!companyId || !cadenceId) {
+      alert("Please select a cadence");
+      return;
+    }
+
+    setRunningCadence(prev => new Map(prev).set(companyId, true));
+
+    try {
+      // First, ensure company_cadence exists
+      const { data: companyCadence, error: ccError } = await supabase
+        .from('company_cadences')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('cadence_id', cadenceId)
+        .maybeSingle();
+
+      let companyCadenceId: string;
+
+      if (companyCadence) {
+        companyCadenceId = companyCadence.id;
+      } else {
+        // Create company_cadence association
+        const { data: newCC, error: createError } = await supabase
+          .from('company_cadences')
+          .insert({
+            company_id: companyId,
+            cadence_id: cadenceId,
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        companyCadenceId = newCC.id;
+      }
+
+      // Start the cadence
+      const response = await fetch('/api/cadence/start', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_cadence_id: companyCadenceId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to start cadence');
+      }
+
+      alert('Cadence started successfully!');
+      
+      // Wait a moment for execution to be created, then navigate to outreach page with refresh flag
+      setTimeout(() => {
+        router.push('/outreach?refresh=true');
+      }, 1000);
+    } catch (error: any) {
+      console.error('Error starting cadence:', error);
+      alert(`Error: ${error.message || 'Failed to start cadence'}`);
+    } finally {
+      setRunningCadence(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(companyId);
+        return newMap;
+      });
+    }
+  };
+
   useEffect(() => {
     fetchCompanies();
-  }, [fetchCompanies]);
+    fetchContacts();
+    fetchCadences();
+  }, [fetchCompanies, fetchContacts, fetchCadences]);
 
   // Perform search manually (triggered by Enter key or button click)
   const performSearch = useCallback(async () => {
@@ -320,7 +460,7 @@ export default function CompaniesPage() {
                     CREATED
                   </th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    EMAIL
+                    ACTION
                   </th>
                 </tr>
               </thead>
@@ -328,6 +468,18 @@ export default function CompaniesPage() {
                 {filteredCompanies.map((company, index) => {
                   const matches = searchMatches.get(company.id) || [];
                   const topMatch = matches[0];
+                  const companyContacts = contacts.get(company.id) || [];
+                  const firstContact = companyContacts.find(c => c.email && c.email.trim() !== '') || companyContacts[0];
+                  const hasContact = firstContact && firstContact.email && firstContact.email.trim() !== '';
+                  const isRunning = runningCadence.get(company.id) || false;
+                  
+                  // Debug logging
+                  if (hasContact) {
+                    console.log(`[Companies] Company ${company.name}: hasContact=${hasContact}, cadences=${cadences.length}, contactEmail=${firstContact?.email}`);
+                  }
+                  if (cadences.length === 0 && hasContact) {
+                    console.warn(`[Companies] No cadences found but company has contact: ${company.name}`);
+                  }
 
                   return (
                     <motion.tr
@@ -335,7 +487,7 @@ export default function CompaniesPage() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: index * 0.02 }}
-                      className="group hover:bg-accent/50 transition-colors cursor-pointer h-16"
+                      className="group hover:bg-accent/50 transition-colors"
                     >
                       <td className="px-4 py-4">
                         <input
@@ -368,7 +520,7 @@ export default function CompaniesPage() {
                                 {company.name}
                               </div>
                               <div className="text-sm text-muted-foreground truncate">
-                                {company.website || "No domain"}
+                                {hasContact ? firstContact.email : "No contact listed"}
                               </div>
                             </div>
                           </div>
@@ -415,12 +567,45 @@ export default function CompaniesPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <input
-                          type="text"
-                          placeholder="Add email"
-                          className="text-sm border border-border rounded-lg px-3 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-full max-w-xs"
-                          onClick={(e) => e.stopPropagation()}
-                        />
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            id={`cadence-select-${company.id}`}
+                            disabled={!hasContact || isRunning}
+                            className={`text-sm border border-border rounded-lg px-3 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed ${hasContact ? '' : 'bg-gray-100'}`}
+                            defaultValue=""
+                          >
+                            <option value="">Select cadence...</option>
+                            {cadences.length > 0 ? (
+                              cadences.map((cadence) => (
+                                <option key={cadence.id} value={cadence.id}>
+                                  {cadence.name}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="" disabled>No cadences available</option>
+                            )}
+                          </select>
+                          <Button
+                            size="sm"
+                            disabled={!hasContact || isRunning || cadences.length === 0}
+                            className={`${hasContact && cadences.length > 0 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'} text-white`}
+                            style={{
+                              backgroundColor: hasContact && cadences.length > 0 ? '#2563eb' : '#9ca3af',
+                              cursor: (!hasContact || isRunning || cadences.length === 0) ? 'not-allowed' : 'pointer'
+                            }}
+                            onClick={() => {
+                              const select = document.getElementById(`cadence-select-${company.id}`) as HTMLSelectElement;
+                              if (select && select.value) {
+                                handleRunCadence(company.id, select.value);
+                              } else {
+                                alert('Please select a cadence first');
+                              }
+                            }}
+                          >
+                            <Play className="h-3 w-3 mr-1" />
+                            {isRunning ? 'Running...' : 'Run Cadence'}
+                          </Button>
+                        </div>
                       </td>
                     </motion.tr>
                   );

@@ -201,17 +201,20 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
 
       log(`✅ Loaded ${blocksFromSupabase.length} blocks from Supabase`);
 
-      // Get company email for sending emails
-      const { data: company } = await supabase
-        .from('companies')
+      // Get the first contact's email for sending emails (cadences email contacts directly)
+      const { data: contacts } = await supabase
+        .from('contacts')
         .select('email')
-        .eq('id', companyId)
-        .single();
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true })
+        .limit(1);
 
-      // Use company email from database (or fallback for testing)
-      const companyEmail = company?.email || 'pranavscontact@gmail.com';
-      if (!companyEmail) {
-        log('⚠️ Company email not found. Some blocks may fail.');
+      // Use first contact's email, or fallback for testing
+      const contactEmail = contacts && contacts.length > 0 && contacts[0].email 
+        ? contacts[0].email 
+        : 'ethanzzheng@gmail.com';
+      if (!contactEmail) {
+        log('⚠️ No contacts found. Some blocks may fail.');
       }
 
       // Find trigger block
@@ -287,7 +290,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  to_email: companyEmail,
+                  to_email: contactEmail,
                   subject: block.config?.subject || '',
                   body: block.config?.body || '',
                   thread_id: threadId,

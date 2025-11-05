@@ -155,9 +155,7 @@ export default function CompanyDetailPage() {
   const [showAddCadenceModal, setShowAddCadenceModal] = useState(false);
   const [selectedCadenceId, setSelectedCadenceId] = useState<string>('');
   const [addingToCadence, setAddingToCadence] = useState(false);
-  const [editingEmail, setEditingEmail] = useState(false);
   const [editingPhone, setEditingPhone] = useState(false);
-  const [emailValue, setEmailValue] = useState('');
   const [phoneValue, setPhoneValue] = useState('');
   const [startingCadence, setStartingCadence] = useState<string | null>(null);
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
@@ -505,22 +503,6 @@ export default function CompanyDetailPage() {
       alert(`Error: ${error.message}`);
     } finally {
       setStartingCadence(null);
-    }
-  };
-
-  const handleSaveEmail = async () => {
-    if (!companyId) return;
-    try {
-      const { error } = await supabase
-        .from('companies')
-        .update({ email: emailValue || null })
-        .eq('id', companyId);
-
-      if (error) throw error;
-      setEditingEmail(false);
-      await fetchCompany();
-    } catch (error: any) {
-      alert(`Error saving email: ${error.message}`);
     }
   };
 

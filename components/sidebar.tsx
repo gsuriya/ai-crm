@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, Home, Users, Briefcase, Workflow, CheckSquare, BarChart3, Settings, LogOut, LogIn } from "lucide-react";
+import { Building2, Home, Users, Briefcase, Workflow, CheckSquare, BarChart3, Settings, LogOut, LogIn, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut, getSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ const navigation = [
   { name: "People", href: "/people", icon: Users },
   { name: "Pipeline", href: "/pipeline", icon: Briefcase },
   { name: "Cadences", href: "/cadences", icon: Workflow },
+  { name: "Current outreach", href: "/outreach", icon: Send },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
   { name: "Insights", href: "/insights", icon: BarChart3 },
   { name: "Settings", href: "/settings", icon: Settings },
