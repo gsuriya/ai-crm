@@ -109,6 +109,37 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
       }
 
+      // Also save notes to company_content table (for notes page and semantic search)
+      if (updates.notes) {
+        try {
+          const { error: contentError } = await supabase
+            .from('company_content')
+            .insert({
+              company_id: companyId,
+              content_type: 'note',
+              content: updates.notes,
+              source: 'vapi_call',
+              metadata: {
+                call_log_id: callLog.id,
+                vapi_call_id: callId,
+                call_type: callLog.call_type,
+                phone_number: callLog.phone_number,
+                created_at: new Date().toISOString(),
+              },
+            });
+
+          if (contentError) {
+            console.error('[VAPI Webhook] Error saving note to company_content:', contentError);
+            // Don't fail the webhook if this fails, just log it
+          } else {
+            console.log('[VAPI Webhook] Successfully saved note to company_content');
+          }
+        } catch (contentErr) {
+          console.error('[VAPI Webhook] Error saving note to company_content:', contentErr);
+          // Don't fail the webhook if this fails
+        }
+      }
+
       console.log('[VAPI Webhook] Successfully updated call log:', callLog.id);
       return NextResponse.json({ success: true, callLogId: callLog.id });
     }

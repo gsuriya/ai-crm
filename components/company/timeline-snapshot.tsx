@@ -3,11 +3,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, Calendar, FileText, Reply, PhoneCall, Plus } from "lucide-react";
+import { Mail, Phone, Calendar, FileText, Reply, PhoneCall, Plus, ChevronRight, ExternalLink } from "lucide-react";
 import { EmptyState } from "./empty-state";
 import type { ActivityItem } from "@/lib/types/company";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface TimelineSnapshotProps {
   companyId: string;
@@ -16,6 +24,9 @@ interface TimelineSnapshotProps {
 
 export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const router = useRouter();
 
   // Keyboard navigation: J/K
   useEffect(() => {
@@ -100,17 +111,24 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
   }
 
   return (
-    <Card className="rounded-2xl shadow-sm border-2 border-border p-5">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-foreground">
-            Timeline Snapshot
-          </CardTitle>
-          <span className="text-xs text-muted-foreground">
-            Last 5 activities
-          </span>
-        </div>
-      </CardHeader>
+    <>
+      <Card 
+        className="rounded-2xl shadow-sm border-2 border-border p-5 cursor-pointer hover:border-primary/50 transition-colors"
+        onClick={() => router.push(`/companies/${companyId}/activity`)}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg font-semibold text-foreground">
+                Call Logs
+              </CardTitle>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <span className="text-xs text-muted-foreground">
+              Last 5 activities
+            </span>
+          </div>
+        </CardHeader>
       <CardContent className="space-y-4">
         {Object.entries(groupedActivities).map(([date, dayActivities]) => (
           <div key={date} className="space-y-3">
@@ -126,9 +144,14 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
                   key={activity.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`p-3 rounded-lg border-2 border-border bg-background hover:bg-accent/50 transition-colors ${
+                  className={`p-3 rounded-lg border-2 border-border bg-background hover:bg-accent/50 transition-colors cursor-pointer ${
                     isSelected ? "ring-2 ring-primary" : ""
                   }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedActivity(activity);
+                    setIsDialogOpen(true);
+                  }}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 flex-1">
@@ -195,6 +218,88 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
         ))}
       </CardContent>
     </Card>
+
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {selectedActivity && (() => {
+              const Icon = getActivityIcon(selectedActivity.type);
+              return (
+                <>
+                  <div className={`p-2 rounded ${getActivityColor(selectedActivity.type)}`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <span>
+                    {selectedActivity.type === 'email' && (selectedActivity as any).metadata?.direction === 'sent' 
+                      ? 'Sent Email' 
+                      : selectedActivity.type === 'email' && (selectedActivity as any).metadata?.direction === 'received'
+                      ? 'Received Email'
+                      : selectedActivity.type === 'call'
+                      ? 'Voice Call'
+                      : selectedActivity.type}
+                  </span>
+                </>
+              );
+            })()}
+          </DialogTitle>
+          <DialogDescription>
+            {selectedActivity && formatDate(selectedActivity.date)}
+          </DialogDescription>
+        </DialogHeader>
+        {selectedActivity && (
+          <div className="space-y-4 mt-4">
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Summary</h3>
+              <p className="text-sm text-foreground">{selectedActivity.summary}</p>
+            </div>
+            {selectedActivity.type === 'email' && (selectedActivity as any).metadata && (
+              <div className="space-y-2">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">From</h3>
+                  <p className="text-sm text-foreground">{(selectedActivity as any).metadata.from_email}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">To</h3>
+                  <p className="text-sm text-foreground">{(selectedActivity as any).metadata.to_email}</p>
+                </div>
+              </div>
+            )}
+            {selectedActivity.type === 'call' && (selectedActivity as any).metadata && (
+              <div className="space-y-2">
+                {(selectedActivity as any).metadata.duration && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">Duration</h3>
+                    <p className="text-sm text-foreground">
+                      {Math.floor((selectedActivity as any).metadata.duration / 60)}m {((selectedActivity as any).metadata.duration % 60)}s
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            {selectedActivity.body && (
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  {selectedActivity.type === 'call' ? 'Notes' : 'Content'}
+                </h3>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{selectedActivity.body}</p>
+              </div>
+            )}
+            <div className="flex gap-2 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => router.push(`/companies/${companyId}/activity`)}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                View All Logs
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
