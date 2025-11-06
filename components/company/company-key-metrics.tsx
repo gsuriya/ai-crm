@@ -152,11 +152,11 @@ export function CompanyKeyMetrics({ companyId }: CompanyKeyMetricsProps) {
                 {metrics.year}
               </Badge>
             )}
-            {metrics.lastUpdated && (
-              <Badge variant="outline" className="text-xs">
-                Updated {new Date(metrics.lastUpdated).toLocaleDateString()}
-              </Badge>
-            )}
+          {metrics.lastUpdated && (
+            <Badge variant="outline" className="text-xs">
+              Updated {new Date(metrics.lastUpdated).toLocaleDateString()}
+            </Badge>
+          )}
           </div>
         </div>
       </CardHeader>

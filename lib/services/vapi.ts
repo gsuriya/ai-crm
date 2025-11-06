@@ -2,6 +2,44 @@ import { VapiClient } from '@vapi-ai/server-sdk';
 import { supabase } from '@/lib/supabase';
 
 /**
+ * Normalize phone number to E.164 format required by VAPI
+ * Converts formats like "630-853-9929" or "(630) 853-9929" to "+16308539929"
+ */
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return phone;
+  
+  // Remove all non-digit characters
+  const digitsOnly = phone.replace(/\D/g, '');
+  
+  // If it's a 10-digit US number, add +1 prefix
+  if (digitsOnly.length === 10) {
+    return `+1${digitsOnly}`;
+  }
+  
+  // If it already starts with 1 and has 11 digits, add + prefix
+  if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+    return `+${digitsOnly}`;
+  }
+  
+  // If it already starts with +1, return as is (remove any formatting)
+  if (phone.startsWith('+1') || phone.startsWith('+1 ')) {
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+${cleaned}`;
+    }
+    return phone; // Already formatted correctly
+  }
+  
+  // If it starts with +, assume it's already formatted
+  if (phone.startsWith('+')) {
+    return phone;
+  }
+  
+  console.warn(`[VAPI] Could not normalize phone number: ${phone}, using as-is`);
+  return phone;
+}
+
+/**
  * Send voicemail via VAPI
  */
 export interface SendVoicemailParams {
@@ -40,23 +78,31 @@ export async function sendVoicemail(
       token: privateKey,
     });
 
-    // Make the call using outbound phone call (matching surveilens implementation)
-    const call = await vapi.calls.create({
-      type: 'outboundPhoneCall',
-      phoneNumberId: phoneNumberId,
-      customer: {
-        number: params.phoneNumber,
-      },
-      assistantId: assistantId,
-      // Override assistant's default message with custom script
-      assistantOverrides: {
-        firstMessage: params.script,
-      },
-    });
+      // Normalize phone number to E.164 format
+      const normalizedPhoneNumber = normalizePhoneNumber(params.phoneNumber);
+      console.log(`[VAPI] Voicemail phone normalization: "${params.phoneNumber}" -> "${normalizedPhoneNumber}"`);
 
+      // Make the call using outbound phone call (matching surveilens implementation)
+      const call = await vapi.calls.create({
+        type: 'outboundPhoneCall',
+        phoneNumberId: phoneNumberId,
+        customer: {
+          number: normalizedPhoneNumber,
+        },
+        assistantId: assistantId,
+        // Override assistant's default message with custom script
+        assistantOverrides: {
+          firstMessage: params.script,
+        },
+      } as any);
+
+    // Handle both single call and batch responses
+    const callId = (call as any).id || (call as any).calls?.[0]?.id || '';
+    const status = (call as any).status || (call as any).calls?.[0]?.status || 'initiated';
+    
     return {
-      callId: call.id || '',
-      status: call.status || 'initiated',
+      callId,
+      status,
     };
   } catch (error: any) {
     console.error('VAPI call error:', error);
@@ -168,6 +214,16 @@ export async function sendVoiceCall(
 
   const assistantId = process.env.VAPI_ASSISTANT_ID || '11182291-6fa9-46d2-8127-5a8b4536e00e';
 
+  // Normalize phone number to E.164 format
+  const originalPhoneNumber = params.phoneNumber;
+  const normalizedPhoneNumber = normalizePhoneNumber(params.phoneNumber);
+  
+  console.log(`[VAPI] Phone number normalization: "${originalPhoneNumber}" -> "${normalizedPhoneNumber}"`);
+  
+  if (!normalizedPhoneNumber || !normalizedPhoneNumber.startsWith('+')) {
+    throw new Error(`Invalid phone number format: "${params.phoneNumber}". Phone numbers must be in E.164 format (e.g., +16308539929)`);
+  }
+
   // Build assistant overrides object - only include fields if we need to override
   const assistantOverrides: any = {};
 
@@ -198,26 +254,39 @@ export async function sendVoiceCall(
     });
 
     // Make the call using outbound phone call
-    // Only override assistant settings if we have any overrides
+    // phoneNumberId = Your caller ID number (630-853-9929) - set in VAPI dashboard and env var VAPI_PHONE_NUMBER_ID
+    // customer.number = The contact's phone number being called (from cadence)
     const callOptions: any = {
       type: 'outboundPhoneCall',
-      phoneNumberId: phoneNumberId,
+      phoneNumberId: phoneNumberId, // YOUR number (caller ID) - from env var
       customer: {
-        number: params.phoneNumber,
+        number: normalizedPhoneNumber, // CONTACT's number (being called) - from cadence contact
       },
       assistantId: assistantId,
     };
+    
+    console.log(`[VAPI] 📞 Call setup:`);
+    console.log(`[VAPI]   - From (caller ID): phoneNumberId ${phoneNumberId} (your number: 630-853-9929)`);
+    console.log(`[VAPI]   - To (being called): ${normalizedPhoneNumber} (contact's number)`);
+    console.log(`[VAPI]   - Assistant ID: ${assistantId}`);
 
     // Only add overrides if we have any
     if (Object.keys(assistantOverrides).length > 0) {
       callOptions.assistantOverrides = assistantOverrides;
     }
 
+    console.log(`[VAPI] Creating call with options:`, JSON.stringify(callOptions, null, 2));
     const call = await vapi.calls.create(callOptions);
 
+    // Handle both single call and batch responses
+    const callId = (call as any).id || (call as any).calls?.[0]?.id || '';
+    const status = (call as any).status || (call as any).calls?.[0]?.status || 'initiated';
+    
+    console.log(`[VAPI] ✅ Call created successfully. Call ID: ${callId}, Status: ${status}`);
+    
     return {
-      callId: call.id || '',
-      status: call.status || 'initiated',
+      callId,
+      status,
     };
   } catch (error: any) {
     console.error('VAPI voice call error:', error);

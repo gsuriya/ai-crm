@@ -638,12 +638,12 @@ export async function executeNextBlock(
         console.log(`[Workflow] 📧 Generating personalization...`);
         const personalization = await generatePersonalization(
           finalBody,
-          companyName,
-          companyDescription,
+              companyName,
+              companyDescription,
           companyWebsite
         );
-        finalBody = replacePersonalizationPlaceholder(finalBody, personalization);
-        console.log(`[Workflow] 📧 Personalization generated: "${personalization}"`);
+            finalBody = replacePersonalizationPlaceholder(finalBody, personalization);
+            console.log(`[Workflow] 📧 Personalization generated: "${personalization}"`);
       }
 
       console.log(`[Workflow] 📧 Sending email to ${contactEmail}`);
@@ -1123,10 +1123,56 @@ export async function executeNextBlock(
       console.log(`[Workflow] 📞 VOICE CALL BLOCK STARTING EXECUTION`);
       const { sendVoiceCall } = await import('@/lib/services/vapi');
       
-      // Use phone number from company record
-      const phoneNumber = companyPhone || '';
+      // Try to get contact's phone number from company_cadences first
+      let phoneNumber = '';
+      let contactName = '';
+      
+      // Get company_cadence to find associated contact
+      const { data: companyCadence, error: companyCadenceError } = await supabase
+        .from('company_cadences')
+        .select('contact_id')
+        .eq('company_id', companyId)
+        .eq('cadence_id', cadenceId)
+        .single();
+
+      if (companyCadenceError) {
+        console.error(`[Workflow] ❌ Error fetching company_cadence:`, companyCadenceError);
+        console.error(`[Workflow] Company ID: ${companyId}, Cadence ID: ${cadenceId}`);
+      }
+
+      if (companyCadence?.contact_id) {
+        console.log(`[Workflow] 📞 Found contact_id in company_cadence: ${companyCadence.contact_id}`);
+        
+        // Get contact's phone number
+        const { data: contact, error: contactError } = await supabase
+          .from('contacts')
+          .select('phone, first_name, last_name')
+          .eq('id', companyCadence.contact_id)
+          .single();
+
+        if (contactError) {
+          console.error(`[Workflow] ❌ Error fetching contact:`, contactError);
+          console.error(`[Workflow] Contact ID: ${companyCadence.contact_id}`);
+        }
+
+        if (contact?.phone) {
+          phoneNumber = contact.phone;
+          contactName = `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
+          console.log(`[Workflow] 📞 Using contact's phone number: ${phoneNumber} (${contactName})`);
+        } else {
+          console.warn(`[Workflow] ⚠️ Contact found but no phone number:`, contact);
+        }
+      } else {
+        console.log(`[Workflow] 📞 No contact_id found in company_cadence, will use company phone`);
+      }
+
+      // Fallback to company phone number if no contact phone found
       if (!phoneNumber) {
-        throw new Error('Company phone number not found. Please set it in company details.');
+        phoneNumber = companyPhone || '';
+        if (!phoneNumber) {
+          throw new Error('No phone number found. Please set a contact phone number in the cadence or company phone number in company details.');
+        }
+        console.log(`[Workflow] 📞 Using company phone number: ${phoneNumber}`);
       }
 
       // Get company name for personalized message
@@ -1138,8 +1184,10 @@ export async function executeNextBlock(
 
       const companyName = companyInfo?.name;
 
-      console.log(`[Workflow] 📞 Initiating voice call to ${phoneNumber}`);
-      console.log(`[Workflow] 📞 Company: ${companyName || '(unknown)'}`);
+      console.log(`[Workflow] 📞 Initiating voice call:`);
+      console.log(`[Workflow]   - From (caller ID): YOUR number (630-853-9929) via VAPI_PHONE_NUMBER_ID`);
+      console.log(`[Workflow]   - To (being called): ${phoneNumber} ${contactName ? `(${contactName})` : ''}`);
+      console.log(`[Workflow]   - Company: ${companyName || '(unknown)'}`);
 
       const result = await sendVoiceCall({
         phoneNumber,
@@ -1160,7 +1208,7 @@ export async function executeNextBlock(
           company_id: companyId,
           cadence_id: cadenceId,
           content_type: 'outreach_log',
-          content: `Voice call initiated: AI agent call to schedule meeting with ${companyName || 'company'}`,
+          content: `Voice call initiated: AI agent call to schedule meeting with ${contactName ? contactName + ' at ' : ''}${companyName || 'company'}`,
           source: 'CRM Cadence',
           metadata: {
             cadence_id: cadenceId,
@@ -1170,6 +1218,8 @@ export async function executeNextBlock(
             call_type: 'voice_call',
             company_name: companyName,
             custom_prompt_used: !!currentBlock.config?.customPrompt,
+            contact_name: contactName || null,
+            contact_id: companyCadence?.contact_id || null,
           },
         });
 
@@ -1194,6 +1244,8 @@ export async function executeNextBlock(
             cadence_id: cadenceId,
             company_name: companyName,
             custom_prompt_used: !!currentBlock.config?.customPrompt,
+            contact_name: contactName || null,
+            contact_id: companyCadence?.contact_id || null,
           },
         });
 

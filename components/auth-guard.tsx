@@ -48,7 +48,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         console.error('Auth check error:', error);
         // On error, redirect to sign in
-        router.push('/auth/signin');
+          router.push('/auth/signin');
       }
     };
 
