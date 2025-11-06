@@ -121,17 +121,21 @@ export default function SignInPage() {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
-            className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20"
+            className="mx-auto mb-6 flex h-24 w-24 items-center justify-center"
           >
-            <Building2 className="h-8 w-8 text-primary-foreground" />
+            <img 
+              src="/logo.png" 
+              alt="Cheddar CRM Logo" 
+              className="h-24 w-24"
+            />
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.4 }}
-            className="text-4xl font-bold text-foreground mb-2"
+            className="text-3xl font-bold text-foreground mb-2"
           >
-            AI CRM
+            Cheddar CRM
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 10 }}
@@ -148,7 +152,7 @@ export default function SignInPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.5 }}
-          className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-8 shadow-xl shadow-black/5"
+          className="rounded-2xl border-2 border-border bg-card/50 backdrop-blur-sm p-8 shadow-xl shadow-black/5"
         >
           <motion.div
             initial={{ opacity: 0 }}

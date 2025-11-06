@@ -325,7 +325,7 @@ export default function CompaniesPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="border-b border-border bg-background px-8 py-6">
+      <div className="border-b-2 border-border bg-background px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-foreground">Companies</h1>
@@ -336,7 +336,7 @@ export default function CompaniesPage() {
         </div>
         <div className="mt-6">
           <div className="relative max-w-2xl mx-auto">
-            <div className="relative flex items-center bg-background border border-border rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all">
+            <div className="relative flex items-center bg-background border-2 border-border rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all">
               <input
                 type="text"
                 placeholder={agentMode ? "Give agent commands (e.g., 'add SaaS companies to warm outreach cadence')..." : "Search companies..."}
@@ -426,7 +426,7 @@ export default function CompaniesPage() {
         ) : (
           <div className="h-full overflow-auto">
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 bg-background border-b border-border">
+              <thead className="sticky top-0 z-10 bg-background border-b-2 border-border">
                 <tr>
                   <th className="w-12 px-4 py-3 text-left">
                     <input
@@ -464,7 +464,7 @@ export default function CompaniesPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y-2 divide-border">
                 {filteredCompanies.map((company, index) => {
                   const matches = searchMatches.get(company.id) || [];
                   const topMatch = matches[0];
@@ -535,7 +535,7 @@ export default function CompaniesPage() {
                                 source={topMatch.source}
                               />
                               <div className="flex-1 min-w-0">
-                                <div className="text-xs text-foreground bg-accent/30 rounded px-2 py-1 border border-border truncate">
+                                <div className="text-xs text-foreground bg-accent/30 rounded px-2 py-1 border-2 border-border truncate">
                                   &quot;{highlightMatchText(topMatch.content_snippet.slice(0, 120), searchQuery)}{topMatch.content_snippet.length > 120 ? '...' : ''}&quot;
                                 </div>
                               </div>
@@ -551,7 +551,7 @@ export default function CompaniesPage() {
                         </td>
                       )}
                       <td className="px-6 py-4">
-                        <select className="text-sm border border-border rounded-lg px-3 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring" onClick={(e) => e.stopPropagation()}>
+                        <select className="text-sm border-2 border-border rounded-lg px-3 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring" onClick={(e) => e.stopPropagation()}>
                           <option>PLEASE SELECT</option>
                           <option>QUALIFIED</option>
                           <option>LEAD</option>
@@ -571,7 +571,7 @@ export default function CompaniesPage() {
                           <select
                             id={`cadence-select-${company.id}`}
                             disabled={!hasContact || isRunning}
-                            className={`text-sm border border-border rounded-lg px-3 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed ${hasContact ? '' : 'bg-gray-100'}`}
+                            className={`text-sm border-2 border-border rounded-lg px-3 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed ${hasContact ? '' : 'bg-gray-100'}`}
                             defaultValue=""
                           >
                             <option value="">Select cadence...</option>

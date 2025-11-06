@@ -1,0 +1,8 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Top shape with concave left edge and pointed top-right -->
+  <path d="M6 4 Q4 6 4 8 L4 12 Q4 14 6 14 L12 14 L22 8 L28 6 L28 4 Z" fill="#333333"/>
+  <!-- Bottom shape with straight angled left edge and concave right edge -->
+  <path d="M4 20 L12 24 L20 20 L28 24 Q30 24 30 26 L30 28 L16 32 L4 28 Z" fill="#333333"/>
+  <!-- Diagonal white line separator from bottom-left to top-right -->
+  <line x1="4" y1="28" x2="28" y2="4" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

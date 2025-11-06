@@ -256,8 +256,15 @@ export async function getScheduledExecutions(supabase: SupabaseClient): Promise<
 export async function executeNextBlock(
   supabase: SupabaseClient,
   execution: CadenceExecution,
-  blocks: FlowBlock[]
+  blocks: FlowBlock[],
+  options?: { skipRecursion?: boolean }
 ): Promise<void> {
+  // Safety check: Skip if execution is paused
+  if (execution.status === 'paused') {
+    console.log(`[Workflow] ⏸️ Skipping execution ${execution.id} - cadence is paused`);
+    return;
+  }
+
   const currentBlock = blocks.find(b => b.id === execution.current_block_id);
   if (!currentBlock) {
     console.error(`[Workflow] ❌ Block ${execution.current_block_id} not found in blocks array`);
@@ -374,6 +381,54 @@ export async function executeNextBlock(
     
     console.log(`[Workflow] ⏳ Delay block: ${days}d ${hours}h ${minutes}m ${seconds}s`);
     
+    // CRITICAL: Check for replies BEFORE scheduling next email
+    // This catches replies that happened during the delay period
+    try {
+      const { checkThreadForReply } = await import('@/lib/services/email-reply-detector');
+      const threadIds = Object.values(threadInfoMap).map((info: any) => info?.threadId).filter(Boolean);
+      
+      if (threadIds.length > 0) {
+        console.log(`[Workflow] 🔍 Checking for replies BEFORE delay block schedules next email...`);
+        let hasReply = false;
+        for (const threadId of threadIds) {
+          const replyFound = await checkThreadForReply(
+            user.id,
+            threadId,
+            contactEmail,
+            supabase
+          );
+          if (replyFound) {
+            hasReply = true;
+            console.log(`[Workflow] ⏸️✅ Reply found in thread ${threadId} BEFORE delay block`);
+            break;
+          }
+        }
+        
+        if (hasReply) {
+          console.log(`[Workflow] ⏸️ Pausing execution ${execution.id} due to reply found before delay`);
+          await updateExecutionState(supabase, execution.id, {
+            status: 'paused',
+            metadata: {
+              ...metadata,
+              paused_reason: 'email_reply_received',
+              paused_at: new Date().toISOString(),
+            },
+          });
+
+          await supabase
+            .from('company_cadences')
+            .update({ status: 'paused' })
+            .eq('id', execution.company_cadence_id);
+          
+          console.log(`[Workflow] ⏸️ Execution ${execution.id} paused, stopping delay block`);
+          return; // Stop processing - don't schedule next email
+        }
+      }
+    } catch (replyError) {
+      console.error('[Workflow] Error checking for replies before delay:', replyError);
+      // Continue even if reply check fails
+    }
+    
     // CRITICAL: Capture threadInfoMap and executedBlockIds BEFORE delay (like sourcing does with closures)
     // This ensures we have the thread info from emails sent BEFORE this delay
     // IMPORTANT: threadInfoMap has already been filtered above, so it only contains entries from THIS execution
@@ -456,6 +511,64 @@ export async function executeNextBlock(
       console.log(`[Workflow] 📧 EMAIL BLOCK STARTING EXECUTION`);
       console.log(`[Workflow] 📧 User ID: ${metadata.user_id}`);
       console.log(`[Workflow] 📧 Company ID: ${companyId}`);
+      
+      // CRITICAL: Check for replies BEFORE sending email (especially for scheduled follow-ups)
+      // This matches the sourcing directory pattern - check right before sending
+      try {
+        const { checkThreadForReply } = await import('@/lib/services/email-reply-detector');
+        console.log(`[Workflow] 🔍 Checking for replies BEFORE sending email for execution ${execution.id}...`);
+        
+        // Get all thread IDs from this execution's threadInfoMap
+        const threadIds = Object.values(threadInfoMap).map((info: any) => info?.threadId).filter(Boolean);
+        
+        if (threadIds.length > 0) {
+          console.log(`[Workflow] 🔍 Found ${threadIds.length} thread(s) to check:`, threadIds);
+          let hasReply = false;
+          for (const threadId of threadIds) {
+            console.log(`[Workflow] 🔍 Checking thread ${threadId} for replies...`);
+            const replyFound = await checkThreadForReply(
+              user.id,
+              threadId,
+              contactEmail,
+              supabase
+            );
+            if (replyFound) {
+              hasReply = true;
+              console.log(`[Workflow] ⏸️✅✅✅ REPLY DETECTED in thread ${threadId} BEFORE sending email ✅✅✅`);
+              break;
+            } else {
+              console.log(`[Workflow] ✅ No reply found in thread ${threadId}`);
+            }
+          }
+          
+          if (hasReply) {
+            console.log(`[Workflow] ⏸️⏸️⏸️ PAUSING execution ${execution.id} due to reply found before email send ⏸️⏸️⏸️`);
+            await updateExecutionState(supabase, execution.id, {
+              status: 'paused',
+              metadata: {
+                ...metadata,
+                paused_reason: 'email_reply_received',
+                paused_at: new Date().toISOString(),
+              },
+            });
+
+            await supabase
+              .from('company_cadences')
+              .update({ status: 'paused' })
+              .eq('id', execution.company_cadence_id);
+            
+            console.log(`[Workflow] ⏸️ Execution ${execution.id} PAUSED, stopping email send`);
+            return; // Stop processing - don't send email
+          } else {
+            console.log(`[Workflow] ✅ No replies found in any thread, proceeding with email send`);
+          }
+        } else {
+          console.log(`[Workflow] ⚠️ No thread IDs found in threadInfoMap - this is the first email`);
+        }
+      } catch (replyError) {
+        console.error('[Workflow] ❌ Error checking for replies before send:', replyError);
+        // Continue even if reply check fails - don't block email sending if check fails
+      }
       
       const { sendEmail } = await import('@/lib/services/gmail-direct');
       const { 
@@ -922,6 +1035,54 @@ export async function executeNextBlock(
           totalThreads: threadInfoMap.size
         });
 
+        // Check for replies after sending email (wait a bit for Gmail to sync)
+        // Note: Background processor will also check periodically
+        try {
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for Gmail to sync
+          const { checkThreadForReply } = await import('@/lib/services/email-reply-detector');
+          console.log(`[Workflow] 🔍 Checking for replies after email send in thread ${finalThreadId}...`);
+          
+          const hasReply = await checkThreadForReply(
+            user.id,
+            finalThreadId,
+            contactEmail,
+            supabase
+          );
+          
+          if (hasReply) {
+            console.log(`[Workflow] ⏸️✅✅✅ REPLY DETECTED in thread ${finalThreadId}, pausing execution ${execution.id} ✅✅✅`);
+            // Pause the cadence execution
+            await updateExecutionState(supabase, execution.id, {
+              status: 'paused',
+              metadata: {
+                ...updatedMetadata,
+                paused_reason: 'email_reply_received',
+                paused_at: new Date().toISOString(),
+              },
+            });
+
+            // Also update company_cadence status
+            const { error: ccUpdateError } = await supabase
+              .from('company_cadences')
+              .update({
+                status: 'paused',
+              })
+              .eq('id', execution.company_cadence_id);
+            
+            if (ccUpdateError) {
+              console.error(`[Workflow] Error updating company_cadence status:`, ccUpdateError);
+            }
+            
+            console.log(`[Workflow] ⏸️ Execution ${execution.id} paused due to email reply`);
+            return; // Stop processing this execution
+          } else {
+            console.log(`[Workflow] ✅ No reply found, continuing...`);
+          }
+        } catch (replyError) {
+          console.error('[Workflow] Error checking for replies after send:', replyError);
+          // Continue even if reply check fails
+        }
+
         // Log email
         const { error: logError } = await supabase
           .from('email_logs')
@@ -1116,6 +1277,13 @@ export async function executeNextBlock(
       scheduled_for: null, // Clear scheduled_for - delay blocks will set it, other blocks don't need it
       metadata: updatedMetadata,
     });
+    
+    // CRITICAL: Skip recursive execution if this was called from background processor
+    // This prevents double execution when background processor picks up scheduled executions
+    if (options?.skipRecursion) {
+      console.log(`[Workflow] Skipping recursive execution (called from background processor) to prevent double-processing`);
+      return;
+    }
     
     // Recursively execute next block
     // CRITICAL: Delay blocks MUST be executed immediately so they can set scheduled_for

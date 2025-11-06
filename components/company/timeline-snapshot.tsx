@@ -51,15 +51,15 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
   const getActivityColor = (type: string) => {
     switch (type) {
       case "email":
-        return "bg-blue-100 text-blue-800";
+        return "bg-indigo-500 text-white";
       case "call":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-500 text-white";
       case "meeting":
-        return "bg-green-100 text-green-800";
+        return "bg-emerald-500 text-white";
       case "note":
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-600 text-white";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-600 text-white";
     }
   };
 
@@ -84,7 +84,7 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
 
   if (activities.length === 0) {
     return (
-      <Card className="rounded-2xl shadow-sm border border-border p-4">
+      <Card className="rounded-2xl shadow-sm border-2 border-border p-4">
         <EmptyState
           icon={Calendar}
           title="No recent activity"
@@ -100,7 +100,7 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
   }
 
   return (
-    <Card className="rounded-2xl shadow-sm border border-border p-5">
+    <Card className="rounded-2xl shadow-sm border-2 border-border p-5">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-foreground">
@@ -126,7 +126,7 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
                   key={activity.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`p-3 rounded-lg border border-border bg-background hover:bg-accent/50 transition-colors ${
+                  className={`p-3 rounded-lg border-2 border-border bg-background hover:bg-accent/50 transition-colors ${
                     isSelected ? "ring-2 ring-primary" : ""
                   }`}
                 >

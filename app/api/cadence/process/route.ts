@@ -8,6 +8,18 @@ export async function POST(request: NextRequest) {
     // Create Supabase client with server-side auth
     const supabase = await createServerSupabaseClient();
     
+    // First, check for email replies and pause cadences that have received replies
+    try {
+      const { checkAndPauseCadencesWithReplies } = await import('@/lib/services/email-reply-detector');
+      const replyResult = await checkAndPauseCadencesWithReplies(supabase);
+      if (replyResult.paused > 0) {
+        console.log(`[Process] ⏸️ Paused ${replyResult.paused} cadence(s) due to email replies`);
+      }
+    } catch (replyError) {
+      console.error('[Process] Error checking for replies:', replyError);
+      // Continue processing even if reply check fails
+    }
+    
     // Get scheduled executions ready to process
     const executions = await getScheduledExecutions(supabase);
 
@@ -24,11 +36,40 @@ export async function POST(request: NextRequest) {
 
     for (const execution of executions) {
       try {
-        // Clear scheduled_for to prevent double-processing
-        // The execution is being processed now, so clear the scheduled time
-        await updateExecutionState(supabase, execution.id, {
-          scheduled_for: null,
-        });
+        // Check if execution is still active (might have been paused by reply check)
+        const freshExecution = await getExecution(supabase, execution.id);
+        if (!freshExecution || freshExecution.status !== 'active') {
+          console.log(`[Process] Skipping execution ${execution.id} - status is ${freshExecution?.status || 'not found'}`);
+          continue;
+        }
+
+        // CRITICAL: Atomic check-and-clear to prevent double-processing
+        // Only process if scheduled_for is still set (hasn't been cleared by another process)
+        if (!freshExecution.scheduled_for) {
+          console.log(`[Process] Skipping execution ${execution.id} - scheduled_for already cleared (likely being processed by another process)`);
+          continue;
+        }
+
+        // Clear scheduled_for atomically to prevent double-processing
+        // Use a direct update with a WHERE clause to ensure we only clear if it's still set
+        const { data: updateResult, error: updateError } = await supabase
+          .from('cadence_executions')
+          .update({ scheduled_for: null })
+          .eq('id', execution.id)
+          .eq('status', 'active')
+          .not('scheduled_for', 'is', null)
+          .select();
+
+        // If no rows were updated, another process already cleared it
+        if (!updateResult || updateResult.length === 0) {
+          console.log(`[Process] Skipping execution ${execution.id} - scheduled_for already cleared by another process`);
+          continue;
+        }
+
+        if (updateError) {
+          console.error(`[Process] Error clearing scheduled_for for execution ${execution.id}:`, updateError);
+          continue;
+        }
 
         // Get cadence to retrieve blocks
         const { data: companyCadence } = await supabase
@@ -53,14 +94,16 @@ export async function POST(request: NextRequest) {
 
         const blocks = cadence.nodes as FlowBlock[];
 
-        // Get fresh execution with cleared scheduled_for
-        const freshExecution = await getExecution(supabase, execution.id);
-        if (!freshExecution) {
+        // Get execution again with cleared scheduled_for (reuse the variable we already have)
+        const executionAfterClear = await getExecution(supabase, execution.id);
+        if (!executionAfterClear) {
           throw new Error('Failed to fetch execution after clearing scheduled_for');
         }
 
         // Execute the next block
-        await executeNextBlock(supabase, freshExecution, blocks);
+        // CRITICAL: Pass skipRecursion flag to prevent double execution
+        // Background processor will handle subsequent scheduled executions
+        await executeNextBlock(supabase, executionAfterClear, blocks, { skipRecursion: true });
 
         processed.push(execution.id);
       } catch (error: any) {

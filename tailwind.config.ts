@@ -11,26 +11,30 @@ const config: Config = {
     extend: {
       colors: {
         background: "hsl(0, 0%, 100%)",
-        foreground: "hsl(0, 0%, 10%)",
+        foreground: "hsl(222, 47%, 11%)",
         primary: {
-          DEFAULT: "hsl(217, 91%, 35%)",
+          DEFAULT: "hsl(230, 85%, 55%)",
           foreground: "hsl(0, 0%, 100%)",
         },
         secondary: {
-          DEFAULT: "hsl(0, 0%, 96%)",
-          foreground: "hsl(0, 0%, 10%)",
+          DEFAULT: "hsl(222, 47%, 11%)",
+          foreground: "hsl(0, 0%, 100%)",
         },
         muted: {
-          DEFAULT: "hsl(0, 0%, 96%)",
-          foreground: "hsl(0, 0%, 45%)",
+          DEFAULT: "hsl(220, 14%, 96%)",
+          foreground: "hsl(222, 12%, 40%)",
         },
         accent: {
-          DEFAULT: "hsl(217, 91%, 95%)",
-          foreground: "hsl(217, 91%, 35%)",
+          DEFAULT: "hsl(230, 85%, 55%)",
+          foreground: "hsl(0, 0%, 100%)",
         },
-        border: "hsl(0, 0%, 90%)",
-        input: "hsl(0, 0%, 90%)",
-        ring: "hsl(217, 91%, 35%)",
+        border: "hsl(220, 13%, 60%)",
+        input: "hsl(220, 13%, 60%)",
+        ring: "hsl(230, 85%, 55%)",
+        destructive: {
+          DEFAULT: "hsl(0, 84%, 60%)",
+          foreground: "hsl(0, 0%, 100%)",
+        },
       },
       borderRadius: {
         lg: "0.75rem",

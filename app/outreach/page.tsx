@@ -145,6 +145,7 @@ export default function OutreachPage() {
     }
     
     // Background processor for scheduled executions (runs every 10 seconds)
+    // This also checks for email replies and pauses cadences
     const processScheduledExecutions = async () => {
       try {
         const response = await fetch('/api/cadence/process', {
@@ -154,15 +155,16 @@ export default function OutreachPage() {
         const data = await response.json();
         if (data.processed > 0) {
           console.log(`[Outreach Page] ✅ Processed ${data.processed} scheduled execution(s)`);
-          // Refresh the outreach list after processing
-          fetchOutreach(false);
         }
+        // Refresh the outreach list after processing (even if nothing was processed, 
+        // to catch any paused cadences from reply detection)
+        fetchOutreach(false);
       } catch (error) {
         // Silently fail - don't spam console
       }
     };
 
-    // Process immediately on page load
+    // Process immediately on page load (checks for replies and processes scheduled executions)
     processScheduledExecutions();
     
     // Set up background processor interval (every 10 seconds)
@@ -228,16 +230,16 @@ export default function OutreachPage() {
   const getStatusBadge = (execution: CadenceExecution) => {
     if (execution.status === 'completed') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-emerald-500 text-white shadow-sm">
           <CheckCircle className="h-3 w-3" />
-          Completed
+          Complete
         </span>
       );
     }
     
     if (execution.status === 'error') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-500 text-white shadow-sm">
           <AlertCircle className="h-3 w-3" />
           Error
         </span>
@@ -245,10 +247,15 @@ export default function OutreachPage() {
     }
 
     if (execution.status === 'paused') {
+      const pausedReason = execution.metadata?.paused_reason;
+      const pausedText = pausedReason === 'email_reply_received' 
+        ? 'Paused (Reply received)' 
+        : 'Paused';
+      
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-amber-500 text-white shadow-sm">
           <Pause className="h-3 w-3" />
-          Paused
+          {pausedText}
         </span>
       );
     }
@@ -267,9 +274,9 @@ export default function OutreachPage() {
           : `${diffHours}h`;
         
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-primary text-primary-foreground shadow-sm">
             <Clock className="h-3 w-3" />
-            Waiting ({timeText})
+            Wait ({timeText})
           </span>
         );
       }
@@ -282,16 +289,16 @@ export default function OutreachPage() {
       const lastExecutedBlock = blocks.find((b: any) => b.id === executedBlockIds[executedBlockIds.length - 1]);
       if (lastExecutedBlock?.type === 'email') {
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-500 text-white shadow-sm">
             <Mail className="h-3 w-3" />
-            Last email sent
+            Email sent
           </span>
         );
       }
     }
 
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-slate-600 text-white shadow-sm">
         <Play className="h-3 w-3" />
         Active
       </span>
@@ -326,49 +333,18 @@ export default function OutreachPage() {
     }
   };
 
-  const getProgressPercentage = (execution: CadenceExecution & { currentBlock?: any }) => {
-    const blocks = execution.metadata?.blocks || [];
-    if (blocks.length === 0) return 0;
-
-    // Filter out trigger and end blocks from progress calculation
-    const actionableBlocks = blocks.filter((b: any) => 
-      b.type !== 'trigger' && b.type !== 'end'
-    );
-    
-    if (actionableBlocks.length === 0) return 0;
-
-    const executedBlockIds = execution.metadata?.executedBlockIds || [];
-    
-    // Count executed actionable blocks (excluding trigger/end)
-    const executedActionable = executedBlockIds.filter((id: string) => {
-      const block = blocks.find((b: any) => b.id === id);
-      return block && block.type !== 'trigger' && block.type !== 'end';
-    });
-    
-    // Check if current block is actionable
-    const currentBlock = blocks.find((b: any) => b.id === execution.current_block_id);
-    const isCurrentActionable = currentBlock && currentBlock.type !== 'trigger' && currentBlock.type !== 'end';
-    
-    // Calculate progress: (executed actionable blocks / total actionable blocks) * 100
-    // Add 1 if current block is actionable and not yet executed
-    const executedCount = executedActionable.length;
-    const currentCount = isCurrentActionable && !executedActionable.includes(execution.current_block_id) ? 1 : 0;
-    const progress = ((executedCount + currentCount) / actionableBlocks.length) * 100;
-    return Math.min(Math.max(progress, 0), 100);
-  };
-
   const getBlockTypeIcon = (blockType: string) => {
     switch (blockType) {
       case 'email':
-        return <Mail className="h-4 w-4" />;
+        return <Mail className="h-4 w-4 text-indigo-600" />;
       case 'delay':
-        return <Clock className="h-4 w-4" />;
+        return <Clock className="h-4 w-4 text-primary" />;
       case 'calendar':
-        return <Clock className="h-4 w-4" />;
+        return <Clock className="h-4 w-4 text-emerald-600" />;
       case 'voice_call':
-        return <Play className="h-4 w-4" />;
+        return <Play className="h-4 w-4 text-purple-600" />;
       default:
-        return <Play className="h-4 w-4" />;
+        return <Play className="h-4 w-4 text-foreground/70" />;
     }
   };
 
@@ -382,7 +358,7 @@ export default function OutreachPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="border-b border-border bg-background px-8 py-6">
+      <div className="border-b-2 border-border bg-background px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-foreground">Current Outreach</h1>
@@ -403,7 +379,7 @@ export default function OutreachPage() {
         ) : (
           <div className="h-full overflow-auto p-8">
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 bg-background border-b border-border">
+              <thead className="sticky top-0 z-10 bg-background border-b-2 border-border">
                 <tr>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     COMPANY
@@ -413,9 +389,6 @@ export default function OutreachPage() {
                   </th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     CONTACT
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    PROGRESS
                   </th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     STATUS
@@ -428,12 +401,8 @@ export default function OutreachPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y-2 divide-border">
                 {executions.map((execution, index) => {
-                  const progress = getProgressPercentage(execution);
-                  const blocks = execution.metadata?.blocks || [];
-                  const executedBlockIds = execution.metadata?.executedBlockIds || [];
-                  
                   return (
                     <motion.tr
                       key={execution.id}
@@ -455,32 +424,6 @@ export default function OutreachPage() {
                       <td className="px-6 py-4">
                         <div className="text-sm text-muted-foreground">
                           {execution.contact?.email || 'No contact'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden max-w-xs">
-                            <div
-                              className="h-full bg-blue-600 transition-all duration-300"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {Math.round(progress)}%
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {(() => {
-                            const actionableBlocks = blocks.filter((b: any) => b.type !== 'trigger' && b.type !== 'end');
-                            const executedActionable = executedBlockIds.filter((id: string) => {
-                              const block = blocks.find((b: any) => b.id === id);
-                              return block && block.type !== 'trigger' && block.type !== 'end';
-                            });
-                            const currentBlock = blocks.find((b: any) => b.id === execution.current_block_id);
-                            const isCurrentActionable = currentBlock && currentBlock.type !== 'trigger' && currentBlock.type !== 'end';
-                            const currentCount = isCurrentActionable && !executedActionable.includes(execution.current_block_id) ? 1 : 0;
-                            return `${executedActionable.length + currentCount} of ${actionableBlocks.length} steps`;
-                          })()}
                         </div>
                       </td>
                       <td className="px-6 py-4">
