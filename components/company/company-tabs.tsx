@@ -10,8 +10,9 @@ import {
   FileUp,
   Sparkles,
   Workflow,
+  Bell,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface CompanyTabsProps {
   companyId: string;
@@ -21,6 +22,7 @@ interface CompanyTabsProps {
 export function CompanyTabs({ companyId, currentTab }: CompanyTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [unreadEventCount, setUnreadEventCount] = useState(0);
 
   const tabs = [
     { id: "overview", label: "Overview", icon: FileText, shortcut: "o" },
@@ -31,7 +33,30 @@ export function CompanyTabs({ companyId, currentTab }: CompanyTabsProps) {
     { id: "docs", label: "Docs", icon: FileUp, shortcut: "d" },
     { id: "ai-insights", label: "AI Insights", icon: Sparkles, shortcut: "i" },
     { id: "cadences", label: "Cadences", icon: Workflow, shortcut: "c" },
+    { id: "events", label: "Events", icon: Bell, shortcut: "e" },
   ];
+
+  // Fetch unread event count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await fetch(`/api/monitoring/unread-count?companyId=${companyId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setUnreadEventCount(data.count || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+      }
+    };
+
+    fetchUnreadCount();
+    
+    // Refresh count when tab changes (in case events were marked as read)
+    const interval = setInterval(fetchUnreadCount, 5000); // Poll every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, [companyId, currentTab]);
 
   const handleTabChange = (value: string) => {
     router.push(`/companies/${companyId}/${value}`);
@@ -74,17 +99,23 @@ export function CompanyTabs({ companyId, currentTab }: CompanyTabsProps) {
 
   return (
     <Tabs value={currentTab} onValueChange={handleTabChange}>
-      <TabsList className="grid w-full grid-cols-8">
+      <TabsList className="grid w-full grid-cols-9">
         {tabs.map((tab) => {
           const Icon = tab.icon;
+          const showBadge = tab.id === "events" && unreadEventCount > 0;
           return (
             <TabsTrigger
               key={tab.id}
               value={tab.id}
-              className="flex items-center gap-2 text-xs"
+              className="flex items-center gap-2 text-xs relative"
             >
               <Icon className="h-4 w-4" />
               <span>{tab.label}</span>
+              {showBadge && (
+                <span className="ml-1 flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                  {unreadEventCount > 99 ? '99+' : unreadEventCount}
+                </span>
+              )}
             </TabsTrigger>
           );
         })}

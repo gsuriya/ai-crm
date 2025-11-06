@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, MapPin, Calendar, DollarSign, Edit2, Save, X, FileText, Globe, Linkedin } from "lucide-react";
+import { Building2, Users, MapPin, Calendar, DollarSign, Edit2, Save, X, FileText, Globe, Linkedin, Bell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface CompanyDetailsProps {
@@ -13,15 +14,35 @@ interface CompanyDetailsProps {
 }
 
 export function CompanyDetails({ companyId }: CompanyDetailsProps) {
+  const router = useRouter();
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<any>({});
   const [saving, setSaving] = useState(false);
+  const [unreadEventCount, setUnreadEventCount] = useState(0);
 
   useEffect(() => {
     fetchCompanyDetails();
+    fetchUnreadEventCount();
+    
+    // Refresh count periodically
+    const interval = setInterval(fetchUnreadEventCount, 10000); // Poll every 10 seconds
+    
+    return () => clearInterval(interval);
   }, [companyId]);
+
+  const fetchUnreadEventCount = async () => {
+    try {
+      const response = await fetch(`/api/monitoring/unread-count?companyId=${companyId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadEventCount(data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
 
   const fetchCompanyDetails = async () => {
     try {
@@ -409,11 +430,26 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
   return (
     <Card className="rounded-2xl shadow-sm border border-border p-4">
       <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-primary" />
-          <CardTitle className="text-lg font-semibold text-foreground">
-            Company Details
-          </CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-primary" />
+            <CardTitle className="text-lg font-semibold text-foreground">
+              Company Details
+            </CardTitle>
+          </div>
+          {unreadEventCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/companies/${companyId}/events`)}
+              className="relative h-8 px-3"
+            >
+              <Bell className="h-4 w-4" />
+              <span className="ml-1.5 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                {unreadEventCount > 99 ? '99+' : unreadEventCount}
+              </span>
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

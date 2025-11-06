@@ -21,17 +21,21 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const checkAuth = async () => {
       try {
-        // Add a timeout to prevent hanging
+        // Add a shorter timeout to prevent hanging
         const timeoutPromise = new Promise<null>((resolve) => 
           setTimeout(() => {
             if (!cancelled) {
               console.warn('Auth check timeout, redirecting to sign in');
               resolve(null);
             }
-          }, 2000)
+          }, 1000) // Reduced to 1 second
         );
         
-        const sessionPromise = getSession().catch(() => null);
+        const sessionPromise = getSession().catch((err) => {
+          console.error('Session check error:', err);
+          return null;
+        });
+        
         const session = await Promise.race([sessionPromise, timeoutPromise]);
         
         if (cancelled) return;
@@ -39,6 +43,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         // Protect all other routes
         if (!session) {
           console.log('No session found, redirecting to sign in');
+          setIsChecking(false); // Set false before redirect to prevent flash
           router.push('/auth/signin');
         } else {
           console.log('Session found, allowing access');
@@ -48,6 +53,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         console.error('Auth check error:', error);
         // On error, redirect to sign in
+        setIsChecking(false); // Set false before redirect
         router.push('/auth/signin');
       }
     };
@@ -63,7 +69,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   if (isChecking && !isAuthPage) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
       </div>
     );
   }
