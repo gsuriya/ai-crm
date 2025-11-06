@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
       // Update call log with transcription and summary
       const updates: any = {
         status: status,
-        updated_at: new Date().toISOString(),
       };
 
       if (transcription) {

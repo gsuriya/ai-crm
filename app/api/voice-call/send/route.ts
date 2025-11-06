@@ -7,8 +7,20 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { phone_number, company_id, cadence_id, company_name, custom_prompt, voicemail_message, enable_voicemail_fallback } = body;
 
+    console.log('[API /voice-call/send] ====== REQUEST RECEIVED ======');
+    console.log('[API /voice-call/send] Phone number:', phone_number);
+    console.log('[API /voice-call/send] Phone number length:', phone_number?.length || 0);
+    console.log('[API /voice-call/send] Phone number type:', typeof phone_number);
+    console.log('[API /voice-call/send] Company ID:', company_id);
+    console.log('[API /voice-call/send] Cadence ID:', cadence_id);
+    console.log('[API /voice-call/send] ===============================');
+
     // Validate required fields
     if (!phone_number || !company_id) {
+      console.error('[API /voice-call/send] Missing required fields:', {
+        has_phone: !!phone_number,
+        has_company_id: !!company_id,
+      });
       return NextResponse.json(
         { error: 'phone_number and company_id are required' },
         { status: 400 }
@@ -39,9 +51,17 @@ export async function POST(request: NextRequest) {
       companyName = company?.name;
     }
 
-    // Send voice call via VAPI
+    // Trim and validate phone number
+    const cleanPhoneNumber = String(phone_number || '').trim();
+    console.log('[API /voice-call/send] ====== CALLING VAPI ======');
+    console.log('[API /voice-call/send] Clean phone number:', cleanPhoneNumber);
+    console.log('[API /voice-call/send] Digits only:', cleanPhoneNumber.replace(/\D/g, ''));
+    console.log('[API /voice-call/send] Length:', cleanPhoneNumber.length);
+
+    // Send voice call via VAPI with cleaned phone number
+    console.log('[API /voice-call/send] Sending to VAPI service...');
     const { callId, status } = await sendVoiceCall({
-      phoneNumber: phone_number,
+      phoneNumber: cleanPhoneNumber, // Use cleaned phone number
       companyId: company_id,
       cadenceId: cadence_id,
       companyName: companyName,
@@ -49,6 +69,12 @@ export async function POST(request: NextRequest) {
       voicemailMessage: voicemail_message,
       enableVoicemailFallback: enable_voicemail_fallback !== false, // Default to true
     });
+
+    console.log('[API /voice-call/send] ====== VAPI CALL SUCCESSFUL ======');
+    console.log('[API /voice-call/send] Call ID:', callId);
+    console.log('[API /voice-call/send] Status:', status);
+    console.log('[API /voice-call/send] Phone called:', cleanPhoneNumber);
+    console.log('[API /voice-call/send] ===================================');
 
     // Log voice call to company_content table (for backward compatibility)
     const { data: contentLog, error: logError } = await supabase
@@ -104,10 +130,18 @@ export async function POST(request: NextRequest) {
       contentLog,
     });
   } catch (error: any) {
-    console.error('Error sending voice call:', error);
+    console.error('[API /voice-call/send] ====== ERROR ======');
+    console.error('[API /voice-call/send] Error message:', error.message);
+    console.error('[API /voice-call/send] Error stack:', error.stack);
+    console.error('[API /voice-call/send] Full error:', error);
+    console.error('[API /voice-call/send] ===================');
+    
     const errorMessage = error.message || error.toString() || 'Failed to send voice call';
     return NextResponse.json(
-      { error: errorMessage },
+      { 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

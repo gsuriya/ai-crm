@@ -305,23 +305,98 @@ export async function executeNextBlock(
 
   console.log(`[Workflow] Executing block for user: ${user.id}`);
 
-  // Get the first contact's email and phone for this company (cadences email/call contacts directly)
-  const { data: contacts } = await supabase
-    .from('contacts')
-    .select('email, phone_number, first_name, last_name')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: true })
-    .limit(1);
+  // Get contact linked to this cadence via company_cadences
+  let contactEmail = '';
+  let contactPhone = '';
+  let contactName = '';
+  let linkedContactId: string | null = null;
 
-  // Use first contact's email, or fallback for testing
-  const contactEmail = contacts && contacts.length > 0 && contacts[0].email 
-    ? contacts[0].email 
-    : 'ethanzzheng@gmail.com';
-  
-  // Use first contact's phone number (not company phone)
-  const contactPhone = contacts && contacts.length > 0 && contacts[0].phone_number
-    ? contacts[0].phone_number
-    : '';
+  // Get company_cadence to find associated contact
+  const { data: companyCadence } = await supabase
+    .from('company_cadences')
+    .select('contact_id')
+    .eq('company_id', companyId)
+    .eq('cadence_id', cadenceId)
+    .single();
+
+  if (companyCadence?.contact_id) {
+    linkedContactId = companyCadence.contact_id;
+    console.log(`[Workflow] 📧 Found contact_id in company_cadence: ${companyCadence.contact_id}`);
+    
+    // Get contact's email and phone number
+    const { data: contact, error: contactError } = await supabase
+      .from('contacts')
+      .select('email, phone, first_name, last_name')
+      .eq('id', companyCadence.contact_id)
+      .single();
+
+    if (contactError) {
+      console.error(`[Workflow] ❌ Error fetching contact:`, contactError);
+    }
+
+    console.log(`[Workflow] 📋 Contact data retrieved:`, {
+      id: companyCadence.contact_id,
+      email: contact?.email || '(no email)',
+      phone: contact?.phone || '(no phone)',
+      first_name: contact?.first_name || '(no first name)',
+      last_name: contact?.last_name || '(no last name)',
+    });
+
+    if (contact) {
+      if (contact.email) {
+        contactEmail = contact.email;
+      }
+      if (contact.phone) {
+        contactPhone = contact.phone;
+        console.log(`[Workflow] ✅ Contact phone number found: ${contactPhone}`);
+      } else {
+        console.warn(`[Workflow] ⚠️ Contact has no phone number`);
+      }
+      contactName = `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
+      
+      if (contactEmail) {
+        console.log(`[Workflow] 📧 Using cadence contact: ${contactEmail} (${contactName})`);
+      }
+    } else {
+      console.warn(`[Workflow] ⚠️ Contact not found for contact_id: ${companyCadence.contact_id}`);
+    }
+  }
+
+  // Fallback: Get first contact for company if no cadence contact found
+  if (!contactEmail && !contactPhone) {
+    console.log(`[Workflow] 📧 No contact linked to cadence, using first company contact`);
+    const { data: contacts } = await supabase
+      .from('contacts')
+      .select('email, phone, first_name, last_name, id')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (contacts && contacts.length > 0) {
+      if (contacts[0].email) {
+        contactEmail = contacts[0].email;
+      }
+      if (contacts[0].phone) {
+        contactPhone = contacts[0].phone;
+        console.log(`[Workflow] ✅ First company contact phone found: ${contactPhone}`);
+      }
+      contactName = `${contacts[0].first_name || ''} ${contacts[0].last_name || ''}`.trim();
+      linkedContactId = contacts[0].id;
+      console.log(`[Workflow] 📧 Using first company contact: ${contactEmail || '(no email)'} (${contactName || 'no name'})`);
+      console.log(`[Workflow] 📞 First company contact phone: ${contactPhone || '(no phone)'}`);
+    }
+  }
+
+  // Final fallback: Use company email/phone
+  if (!contactEmail) {
+    contactEmail = companyEmail || '';
+    contactPhone = companyPhone || '';
+    console.log(`[Workflow] ⚠️ No contacts found, using company email: ${contactEmail}`);
+  }
+
+  if (!contactEmail) {
+    throw new Error('No email address found. Please add a contact to the company or link a contact to the cadence.');
+  }
 
   // Get thread info from metadata
   // CRITICAL: Always start with empty threadInfoMap for new executions
@@ -1117,13 +1192,68 @@ export async function executeNextBlock(
 
     case 'voicecall': {
       console.log(`[Workflow] 📞 VOICE CALL BLOCK STARTING EXECUTION`);
+      console.log(`[Workflow] 📞 Contact phone variable: "${contactPhone}"`);
+      console.log(`[Workflow] 📞 Linked contact ID: ${linkedContactId || 'none'}`);
       const { sendVoiceCall } = await import('@/lib/services/vapi');
       
-      // Use phone number from contact record
-      const phoneNumber = contactPhone || '';
-      if (!phoneNumber) {
-        throw new Error('Contact phone number not found. Please add a phone number to the contact in the company profile.');
+      // Use phone number from contact record (set earlier in function)
+      let phoneNumber = contactPhone || '';
+      
+      console.log(`[Workflow] 📞 Initial phoneNumber from contactPhone: "${phoneNumber}"`);
+      
+      // If no phone from contact, try to get it fresh from database
+      if (!phoneNumber && linkedContactId) {
+        console.log(`[Workflow] 📞 Contact phone not set, fetching fresh from database for contact ${linkedContactId}...`);
+        const { data: contact, error: contactErr } = await supabase
+          .from('contacts')
+          .select('phone, first_name, last_name, email')
+          .eq('id', linkedContactId)
+          .single();
+        
+        console.log(`[Workflow] 📞 Database query result:`, {
+          contact: contact || 'not found',
+          error: contactErr?.message || 'none',
+        });
+        
+        if (contactErr) {
+          console.error(`[Workflow] ❌ Error fetching contact:`, contactErr);
+        }
+        
+        if (contact?.phone) {
+          phoneNumber = contact.phone.trim();
+          console.log(`[Workflow] 📞 Retrieved phone from database: "${phoneNumber}"`);
+        } else {
+          console.warn(`[Workflow] ⚠️ Phone field is null/empty in database for contact ${linkedContactId}`);
+          console.warn(`[Workflow] ⚠️ Contact data:`, JSON.stringify(contact, null, 2));
+        }
       }
+      
+      // Try fallback to first company contact if still no phone
+      if (!phoneNumber) {
+        console.log(`[Workflow] 📞 Still no phone, trying first company contact...`);
+        const { data: contacts } = await supabase
+          .from('contacts')
+          .select('phone, first_name, last_name')
+          .eq('company_id', companyId)
+          .not('phone', 'is', null)
+          .order('created_at', { ascending: true })
+          .limit(1);
+        
+        if (contacts && contacts.length > 0 && contacts[0].phone) {
+          phoneNumber = contacts[0].phone.trim();
+          console.log(`[Workflow] 📞 Using first company contact with phone: "${phoneNumber}"`);
+        }
+      }
+      
+      if (!phoneNumber) {
+        const errorMsg = `Contact phone number not found. Please add a phone number to the contact linked to this cadence. Contact ID: ${linkedContactId || 'none'}, Company ID: ${companyId}`;
+        console.error(`[Workflow] ❌ ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+      
+      console.log(`[Workflow] 📞 Final phone number to call: "${phoneNumber}"`);
+      console.log(`[Workflow] 📞 Phone number length: ${phoneNumber.length}`);
+      console.log(`[Workflow] 📞 Phone number type: ${typeof phoneNumber}`);
 
       // Get company name for personalized message
       const { data: companyInfo } = await supabase
@@ -1134,8 +1264,9 @@ export async function executeNextBlock(
 
       const companyName = companyInfo?.name;
 
-      console.log(`[Workflow] 📞 Initiating voice call to ${phoneNumber}`);
-      console.log(`[Workflow] 📞 Company: ${companyName || '(unknown)'}`);
+      console.log(`[Workflow] 📞 Initiating voice call:`);
+      console.log(`[Workflow]   - To (contact): ${phoneNumber} ${contactName ? `(${contactName})` : ''}`);
+      console.log(`[Workflow]   - Company: ${companyName || '(unknown)'}`);
 
       const result = await sendVoiceCall({
         phoneNumber,

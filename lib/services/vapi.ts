@@ -2,6 +2,55 @@ import { VapiClient } from '@vapi-ai/server-sdk';
 import { supabase } from '@/lib/supabase';
 
 /**
+ * Normalize phone number to E.164 format required by VAPI
+ * Converts formats like "630-853-9929" or "(630) 853-9929" to "+16308539929"
+ */
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) {
+    throw new Error('Phone number is empty');
+  }
+  
+  // Remove all non-digit characters (handles -630-853-9929, 630-853-9929, etc.)
+  const digitsOnly = phone.replace(/\D/g, '');
+  
+  if (digitsOnly.length === 0) {
+    throw new Error(`Phone number contains no digits: "${phone}"`);
+  }
+  
+  // If it's a 10-digit US number, add +1 prefix
+  if (digitsOnly.length === 10) {
+    return `+1${digitsOnly}`;
+  }
+  
+  // If it already starts with 1 and has 11 digits, add + prefix
+  if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+    return `+${digitsOnly}`;
+  }
+  
+  // If it already starts with +1, clean and return
+  if (phone.startsWith('+1') || phone.startsWith('+1 ')) {
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+${cleaned}`;
+    }
+    return `+1${cleaned.slice(1)}`; // Ensure +1 format
+  }
+  
+  // If it starts with +, check if valid
+  if (phone.startsWith('+')) {
+    return phone;
+  }
+  
+  // Last resort: try to make it work
+  if (digitsOnly.length >= 10) {
+    const last10 = digitsOnly.slice(-10);
+    return `+1${last10}`;
+  }
+  
+  throw new Error(`Invalid phone number format: "${phone}" (extracted digits: "${digitsOnly}")`);
+}
+
+/**
  * Send voicemail via VAPI
  */
 export interface SendVoicemailParams {
@@ -40,23 +89,31 @@ export async function sendVoicemail(
       token: privateKey,
     });
 
+    // Normalize phone number to E.164 format
+    const normalizedPhoneNumber = normalizePhoneNumber(params.phoneNumber);
+    console.log(`[VAPI] Voicemail phone normalization: "${params.phoneNumber}" -> "${normalizedPhoneNumber}"`);
+
     // Make the call using outbound phone call (matching surveilens implementation)
     const call = await vapi.calls.create({
       type: 'outboundPhoneCall',
       phoneNumberId: phoneNumberId,
       customer: {
-        number: params.phoneNumber,
+        number: normalizedPhoneNumber,
       },
       assistantId: assistantId,
       // Override assistant's default message with custom script
       assistantOverrides: {
         firstMessage: params.script,
       },
-    });
+    } as any);
 
+    // Handle both single call and batch responses
+    const callId = (call as any).id || (call as any).calls?.[0]?.id || '';
+    const status = (call as any).status || (call as any).calls?.[0]?.status || 'initiated';
+    
     return {
-      callId: call.id || '',
-      status: call.status || 'initiated',
+      callId,
+      status,
     };
   } catch (error: any) {
     console.error('VAPI call error:', error);
@@ -106,16 +163,6 @@ const VOICE_CALL_SYSTEM_PROMPT = `You are an AI Agent calling from Insight Partn
 
 IMPORTANT :
 
-IF  THEY AGREE TO A CALL, ask if there is any financial or non-financial information you'd like to include as context before the call?"
-
-- If they ask why you're asking, simply say: "Just asking in case it's helpful" and don't press further
-
-- If they seem annoyed or angry, immediately move on - don't press
-
-- Record any information they share (financial metrics, company updates, etc.) and make sure to include it in your notes/summary after the call
-
-- If they provide financial information (ARR, retention rates, margins, etc.), make sure to mention the specific numbers clearly in the conversation
-
 Your main introduction should be:
 
 "Hey, I'm an AI Agent calling from Insight Partners on behalf of Pranav Srigiriraju. He's been trying to get in contact with you because we're super excited about your company, and I'm wondering if you'd be open to a chat sometime in the next week or so."
@@ -124,23 +171,40 @@ Key guidelines:
 
 1. Try to set up a meeting whenever the founder might be free in the next week
 
-2. If they say no, politely accept and end the conversation - don't push or be aggressive
+2. Once they provide a specific date and time for the meeting, IMMEDIATELY:
+   - Confirm the meeting details (date and time)
+   - Then ask: "Before we wrap up, is there any financial or non-financial information you'd like to include as context before the call?"
+   - Record their response (if any)
+   - Then politely end the call: "Perfect! Pranav will be in touch. Thanks for your time!"
 
-3. If they press you for details about the firm or investment details, say: "I don't want to say incorrect things about the firm, and it'd be much easier to hop on a call with one of our investors like Pranav who would be more than happy to explain everything."
+3. CRITICAL: After you've gotten the meeting time/date AND asked the financial/non-financial question, END THE CALL IMMEDIATELY. Don't continue the conversation or ask additional questions.
 
-4. If they ask questions about financials, investment terms, or anything else you're not equipped to answer, say: "I'm not a financial expert or really here to answer any questions. My job is really just to set up a call since Insight Partners is very interested in your business, and my job is to get you in touch with us and provide the investor any helpful info."
+4. If they say no to meeting, politely accept and end the conversation - don't push or be aggressive
 
-5. Be professional, friendly, and concise
+5. If they press you for details about the firm or investment details, say: "I don't want to say incorrect things about the firm, and it'd be much easier to hop on a call with one of our investors like Pranav who would be more than happy to explain everything."
 
-6. Focus on scheduling a meeting - that's your primary objective
+6. If they ask questions about financials, investment terms, or anything else you're not equipped to answer, say: "I'm not a financial expert or really here to answer any questions. My job is really just to set up a call since Insight Partners is very interested in your business, and my job is to get you in touch with us and provide the investor any helpful info."
 
-7. If they ask questions you can't answer accurately, redirect them to scheduling a call with Pranav
+7. Be professional, friendly, and concise
 
-8. When recording information in your notes, be specific about numbers, dates, and metrics mentioned
+8. Focus on scheduling a meeting - that's your primary objective
 
-9. IF THEY SAY DON'T CONTACT ME OR I'M NOT INTERESTED, SAY SORRY FOR THE INCONVENIENCE AND END THE CALL
+9. If they ask questions you can't answer accurately, redirect them to scheduling a call with Pranav
 
-10. If they say "I'm busy now, call me later" or anything like that about delaying this, try to ask for a specific time that works better. If they give you one, say you'll relay the info and thanks for the time`;
+10. When recording information in your notes, be specific about numbers, dates, and metrics mentioned
+
+11. IF THEY SAY DON'T CONTACT ME OR I'M NOT INTERESTED, SAY SORRY FOR THE INCONVENIENCE AND END THE CALL
+
+12. If they say "I'm busy now, call me later" or anything like that about delaying this, try to ask for a specific time that works better. Once they provide a time, ask the financial/non-financial question, then end the call. If they are adamant they don't want to talk, just leave it and end the call
+
+13. Regarding the financial/non-financial question:
+    - Only ask this AFTER you have a confirmed meeting date/time
+    - If they ask why you're asking, simply say: "Just asking in case it's helpful" and don't press further
+    - If they seem annoyed or angry, immediately end the call - don't press
+    - Record any information they share (financial metrics, company updates, etc.) and make sure to include it in your notes/summary after the call
+    - If they provide financial information (ARR, retention rates, margins, etc.), make sure to mention the specific numbers clearly in the conversation
+
+14. Remember, you want to ask when they can meet, ask about the financial/non-financial question, then end the call politely in a way you think is best given the conversation that's it`;
 
 /**
  * Default voicemail message for when calls aren't answered
@@ -183,6 +247,24 @@ export async function sendVoiceCall(
 
   const assistantId = process.env.VAPI_ASSISTANT_ID || '11182291-6fa9-46d2-8127-5a8b4536e00e';
 
+  // Normalize phone number to E.164 format
+  const originalPhoneNumber = String(params.phoneNumber || '').trim();
+  
+  if (!originalPhoneNumber) {
+    throw new Error(`Phone number is empty or missing`);
+  }
+  
+  let normalizedPhoneNumber: string;
+  try {
+    normalizedPhoneNumber = normalizePhoneNumber(originalPhoneNumber);
+  } catch (normError: any) {
+    throw new Error(`Failed to normalize phone number "${originalPhoneNumber}": ${normError.message}`);
+  }
+  
+  if (!normalizedPhoneNumber || !normalizedPhoneNumber.startsWith('+')) {
+    throw new Error(`Invalid phone number format. Got: "${normalizedPhoneNumber}"`);
+  }
+
   // Build assistant overrides object - only include fields if we need to override
   const assistantOverrides: any = {};
 
@@ -213,12 +295,17 @@ export async function sendVoiceCall(
     });
 
     // Make the call using outbound phone call
+    // CRITICAL: Ensure phone number is properly formatted
+    if (!normalizedPhoneNumber.startsWith('+')) {
+      throw new Error(`Phone number must start with +. Got: "${normalizedPhoneNumber}"`);
+    }
+    
     // Only override assistant settings if we have any overrides
     const callOptions: any = {
       type: 'outboundPhoneCall',
       phoneNumberId: phoneNumberId,
       customer: {
-        number: params.phoneNumber,
+        number: normalizedPhoneNumber,
       },
       assistantId: assistantId,
     };
@@ -227,12 +314,26 @@ export async function sendVoiceCall(
     if (Object.keys(assistantOverrides).length > 0) {
       callOptions.assistantOverrides = assistantOverrides;
     }
-
-    const call = await vapi.calls.create(callOptions);
-
+    
+    // CRITICAL: Create the call and handle errors properly
+    let call: any;
+    try {
+      call = await vapi.calls.create(callOptions);
+    } catch (vapiError: any) {
+      // Re-throw with better error message
+      const errorDetails = vapiError.body || vapiError.message || JSON.stringify(vapiError);
+      throw new Error(`VAPI API call failed: ${errorDetails}. Phone: ${normalizedPhoneNumber}`);
+    }
+    
+    // Handle both single call and batch responses
+    const callId = (call as any).id || (call as any).calls?.[0]?.id || '';
+    const status = (call as any).status || (call as any).calls?.[0]?.status || 'initiated';
+    
+    console.log(`[VAPI] ✅ Call created successfully. Call ID: ${callId}, Status: ${status}`);
+    
     return {
-      callId: call.id || '',
-      status: call.status || 'initiated',
+      callId,
+      status,
     };
   } catch (error: any) {
     console.error('VAPI voice call error:', error);

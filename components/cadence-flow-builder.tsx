@@ -201,20 +201,67 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
 
       log(`✅ Loaded ${blocksFromSupabase.length} blocks from Supabase`);
 
-      // Get the first contact's email for sending emails (cadences email contacts directly)
-      const { data: contacts } = await supabase
-        .from('contacts')
-        .select('email')
+      // Get contact linked to this cadence via company_cadences
+      let contactEmail = '';
+      
+      // Get company_cadence to find associated contact
+      const { data: companyCadence } = await supabase
+        .from('company_cadences')
+        .select('contact_id')
         .eq('company_id', companyId)
-        .order('created_at', { ascending: true })
-        .limit(1);
+        .eq('cadence_id', cadenceId)
+        .single();
 
-      // Use first contact's email, or fallback for testing
-      const contactEmail = contacts && contacts.length > 0 && contacts[0].email 
-        ? contacts[0].email 
-        : 'ethanzzheng@gmail.com';
+      if (companyCadence?.contact_id) {
+        log(`📧 Found contact_id in company_cadence: ${companyCadence.contact_id}`);
+        
+        // Get contact's email
+        const { data: contact } = await supabase
+          .from('contacts')
+          .select('email, first_name, last_name')
+          .eq('id', companyCadence.contact_id)
+          .single();
+
+        if (contact?.email) {
+          contactEmail = contact.email;
+          log(`📧 Using cadence contact: ${contactEmail} (${contact.first_name || ''} ${contact.last_name || ''})`);
+        } else {
+          log(`⚠️ Contact found but no email`);
+        }
+      }
+
+      // Fallback: Get first contact for company if no cadence contact found
       if (!contactEmail) {
-        log('⚠️ No contacts found. Some blocks may fail.');
+        log(`📧 No contact linked to cadence, using first company contact`);
+        const { data: contacts } = await supabase
+          .from('contacts')
+          .select('email, first_name, last_name')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: true })
+          .limit(1);
+
+        if (contacts && contacts.length > 0 && contacts[0].email) {
+          contactEmail = contacts[0].email;
+          log(`📧 Using first company contact: ${contactEmail}`);
+        }
+      }
+
+      // Final fallback: Use company email
+      if (!contactEmail) {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('email')
+        .eq('id', companyId)
+        .single();
+        contactEmail = company?.email || '';
+        if (contactEmail) {
+          log(`⚠️ No contacts found, using company email: ${contactEmail}`);
+        }
+      }
+
+      if (!contactEmail) {
+        log('❌ No email address found. Please add a contact to the company or link a contact to the cadence.');
+        throw new Error('No email address found. Please add a contact to the company or link a contact to the cadence.');
       }
 
       // Find trigger block
@@ -254,6 +301,8 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               let threadId: string | undefined = undefined;
               let messageId: string | undefined = undefined;
               
+              let finalSubject = block.config?.subject || '';
+              
               if (threadSelection !== 'new') {
                 // Find the thread info from the selected block
                 const selectedBlockId = threadSelection === 'previous' 
@@ -272,26 +321,41 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                   log(`   Replying to thread from block ${selectedBlockId}`);
                   log(`   Thread ID: ${threadId}, Message ID: ${messageId}`);
                   
-                  // IMPORTANT: Use the original subject exactly as stored
-                  const originalSubject = blocksFromSupabase.find(b => b.id === selectedBlockId)?.config?.subject || '';
+                  // IMPORTANT: Use the original subject exactly as stored (from FIRST email in thread)
+                  // Find the first email block in this thread to get the original subject
+                  const firstEmailInThread = blocksFromSupabase.find(b => 
+                    b.type === 'email' && 
+                    threadInfoMap.has(b.id) && 
+                    threadInfoMap.get(b.id)?.threadId === threadId
+                  );
+                  
+                  const originalSubject = firstEmailInThread?.config?.subject || selectedBlockId 
+                    ? blocksFromSupabase.find(b => b.id === selectedBlockId)?.config?.subject || ''
+                    : '';
+                  
                   if (originalSubject) {
                     // Force subject to match original for threading
+                    finalSubject = originalSubject;
                     block.config = { ...block.config, subject: originalSubject };
-                    log(`   Subject locked to: "${originalSubject}"`);
+                    log(`   Subject locked to original thread subject: "${originalSubject}"`);
+                  } else {
+                    log(`   ⚠️ Warning: Could not find original subject, using current: "${finalSubject}"`);
                   }
                 } else {
                   log(`   ⚠️ Warning: Selected thread block not found or hasn't sent yet. Creating new thread.`);
                 }
               } else {
-                log(`   Creating new thread`);
+                log(`   Creating new thread with subject: "${finalSubject}"`);
               }
+              
+              log(`   📧 Final email subject: "${finalSubject}"`);
               
               const emailResponse = await fetch('/api/email/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   to_email: contactEmail,
-                  subject: block.config?.subject || '',
+                  subject: finalSubject,
                   body: block.config?.body || '',
                   thread_id: threadId,
                   message_id: messageId,
@@ -315,9 +379,37 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               });
               
               log(`   ✅ Email sent (Thread ID: ${emailData.threadId}, Message ID: ${emailData.messageId || 'N/A'})`);
+              
+              // Check for email replies after sending (non-blocking, don't stop workflow on errors)
+              try {
+                log(`   🔍 Checking for email replies in thread ${emailData.threadId}...`);
+                // Don't wait - check asynchronously without blocking
+                fetch('/api/email/check-reply', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    thread_id: emailData.threadId,
+                    recipient_email: contactEmail,
+                  }),
+                }).then(async (replyCheckResponse) => {
+                  if (replyCheckResponse.ok) {
+                    const replyData = await replyCheckResponse.json();
+                    if (replyData.hasReply) {
+                      log(`   ⏸️ REPLY DETECTED! (non-blocking check)`);
+                      log(`   ⚠️ Note: Email reply was detected but workflow already continued`);
+                    }
+                  }
+                }).catch(() => {
+                  // Silently ignore reply check errors - don't stop workflow
+                });
+              } catch (replyError: any) {
+                // Don't throw - continue workflow even if reply check fails
+                log(`   ⚠️ Reply check error (continuing): ${replyError.message}`);
+              }
             } catch (error: any) {
               log(`   ❌ Error sending email: ${error.message}`);
-              throw error;
+              log(`   ❌ Error details: ${JSON.stringify(error, null, 2)}`);
+              throw error; // Stop workflow if email fails
             }
             break;
 
@@ -326,22 +418,107 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             log(`   Making AI voice call to schedule meeting`);
             
             try {
-              // Get company phone number
+              // Get contact's phone number from cadence (same logic as email)
+              let phoneNumber = '';
+              
+              // Get company_cadence to find associated contact
+              const { data: companyCadence } = await supabase
+                .from('company_cadences')
+                .select('contact_id')
+                .eq('company_id', companyId)
+                .eq('cadence_id', cadenceId)
+                .single();
+
+              if (companyCadence?.contact_id) {
+                log(`   Found contact linked to cadence: ${companyCadence.contact_id}`);
+                
+                // Get contact's phone number
+                const { data: contact, error: contactError } = await supabase
+                  .from('contacts')
+                  .select('phone, first_name, last_name, id')
+                  .eq('id', companyCadence.contact_id)
+                  .single();
+
+                if (contactError) {
+                  log(`   ❌ Error fetching contact: ${contactError.message}`);
+                }
+
+                if (contact) {
+                  log(`   📋 Contact data:`, JSON.stringify(contact, null, 2));
+                  
+                  if (contact.phone) {
+                    phoneNumber = String(contact.phone).trim();
+                    log(`   ✅ Using contact's phone number: "${phoneNumber}"`);
+                    log(`   📞 Phone number length: ${phoneNumber.length}`);
+                    log(`   📞 Phone number type: ${typeof contact.phone}`);
+                  } else {
+                    log(`   ⚠️ Contact found but phone field is empty/null`);
+                    log(`   📋 Full contact:`, JSON.stringify(contact, null, 2));
+                  }
+                } else {
+                  log(`   ⚠️ Contact not found for ID: ${companyCadence.contact_id}`);
+                }
+              } else {
+                log(`   ⚠️ No contact_id found in company_cadence`);
+              }
+
+              // Fallback: Get first contact for company if no cadence contact found
+              if (!phoneNumber) {
+                log(`   No contact linked to cadence, using first company contact`);
+                const { data: contacts } = await supabase
+                  .from('contacts')
+                  .select('phone, first_name, last_name')
+                  .eq('company_id', companyId)
+                  .order('created_at', { ascending: true })
+                  .limit(1);
+
+                if (contacts && contacts.length > 0 && contacts[0].phone) {
+                  phoneNumber = String(contacts[0].phone).trim();
+                  log(`   Using first company contact phone: ${phoneNumber}`);
+                }
+              }
+
+              // Final fallback: Use company phone number
+              if (!phoneNumber) {
               const { data: companyMetadata } = await supabase
                 .from('companies')
                 .select('phone_number, name')
                 .eq('id', companyId)
                 .single();
 
-              const phoneNumber = companyMetadata?.phone_number || '';
-              if (!phoneNumber) {
-                throw new Error('Company phone number not found');
+                phoneNumber = String(companyMetadata?.phone_number || '').trim();
+                if (phoneNumber) {
+                  log(`   Using company phone number: ${phoneNumber}`);
+                }
               }
 
-              const voiceCallResponse = await fetch('/api/voice-call/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+              if (!phoneNumber) {
+                log(`   ❌ No phone number found after all fallbacks`);
+                throw new Error('No phone number found. Please add a phone number to the contact linked to this cadence or add a contact to the company.');
+              }
+
+              // Get company name
+              const { data: companyMetadata } = await supabase
+                .from('companies')
+                .select('name')
+                .eq('id', companyId)
+                .single();
+
+              // CRITICAL: Trim and validate phone number before sending
+              phoneNumber = String(phoneNumber || '').trim();
+              
+              log(`   📞 FINAL PHONE NUMBER TO CALL: "${phoneNumber}"`);
+              log(`   📞 Phone number details: length=${phoneNumber.length}, type=${typeof phoneNumber}`);
+              log(`   📞 Phone number raw value:`, phoneNumber);
+              
+              if (!phoneNumber || phoneNumber.length < 10) {
+                throw new Error(`Invalid phone number: "${phoneNumber}"`);
+              }
+
+              log(`   📤 Sending request to /api/voice-call/send`);
+              log(`   📤 Phone number being sent: "${phoneNumber}"`);
+              
+              const requestBody = {
                   phone_number: phoneNumber,
                   company_id: companyId,
                   cadence_id: cadenceId,
@@ -349,19 +526,55 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                   custom_prompt: block.config?.customPrompt,
                   voicemail_message: block.config?.voicemailMessage,
                   enable_voicemail_fallback: block.config?.enableVoicemailFallback !== false,
-                }),
+              };
+              
+              log(`   📤 Full request payload:`, JSON.stringify(requestBody, null, 2));
+              
+              const voiceCallResponse = await fetch('/api/voice-call/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
               });
 
-              if (!voiceCallResponse.ok) {
-                const error = await voiceCallResponse.json();
-                throw new Error(error.error || 'Failed to initiate voice call');
+              const responseText = await voiceCallResponse.text();
+              log(`   📥 Response status: ${voiceCallResponse.status} ${voiceCallResponse.statusText}`);
+              log(`   📥 Raw response:`, responseText);
+              
+              let responseData: any = {};
+              try {
+                responseData = JSON.parse(responseText);
+                log(`   📥 Parsed response:`, JSON.stringify(responseData, null, 2));
+              } catch (parseError) {
+                log(`   ❌ Failed to parse response as JSON:`, parseError);
+                throw new Error(`Invalid response from API: ${responseText.substring(0, 200)}`);
               }
 
-              const voiceCallData = await voiceCallResponse.json();
-              log(`   ✅ Voice call initiated (Call ID: ${voiceCallData.callId})`);
+              if (!voiceCallResponse.ok) {
+                const errorMsg = responseData.error || responseText || 'Failed to initiate voice call';
+                log(`   ❌ API error: ${errorMsg}`);
+                log(`   ❌ Full error response:`, responseText);
+                throw new Error(errorMsg);
+              }
+
+              if (!responseData.callId) {
+                log(`   ⚠️ Warning: Response OK but no callId returned`);
+                log(`   ⚠️ Full response:`, responseData);
+              }
+
+              log(`   ✅✅✅ VOICE CALL INITIATED SUCCESSFULLY! ✅✅✅`);
+              log(`   ✅ Call ID: ${responseData.callId || 'N/A'}`);
+              log(`   ✅ Status: ${responseData.status || 'N/A'}`);
+              log(`   ✅ Phone called: ${phoneNumber}`);
             } catch (error: any) {
-              log(`   ❌ Error initiating voice call: ${error.message}`);
-              throw error;
+              const errorMsg = error.message || error.toString() || 'Unknown error';
+              log(`   ❌❌❌ VOICE CALL FAILED ❌❌❌`);
+              log(`   ❌ Error: ${errorMsg}`);
+              log(`   ❌ Full error:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+              console.error('[Workflow Voice Call] Error:', error);
+              
+              // Show error in alert so user sees it
+              alert(`Voice Call Failed: ${errorMsg}`);
+              throw error; // Stop workflow if call fails
             }
             break;
 
@@ -387,30 +600,47 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             log(`⚠️ Unknown block type: ${block.type}`);
         }
 
-        // Follow connections
+        // Follow connections - SEQUENTIALLY follow the first connection only
         if (block.connections && block.connections.length > 0) {
-          // For trigger blocks, execute all connections
-          if (block.type === 'trigger') {
-            for (const nextId of block.connections) {
-              await executeBlock(nextId);
+          log(`   🔗 Block has ${block.connections.length} connection(s), following first one`);
+          // For ALL blocks, follow first connection SEQUENTIALLY
+          const nextBlockId = block.connections[0];
+          const nextBlock = blocksFromSupabase.find(b => b.id === nextBlockId);
+          log(`   🔗 Following connection to next block: ${nextBlockId} (${nextBlock?.type || 'not found'})`);
+          if (nextBlock) {
+            // Execute next block immediately - this ensures sequential execution
+            await executeBlock(nextBlockId);
+          } else {
+            log(`   ⚠️ Next block ${nextBlockId} not found in blocks array!`);
+            throw new Error(`Next block ${nextBlockId} not found in workflow`);
             }
           } else {
-            // For other blocks, follow first connection
-            await executeBlock(block.connections[0]);
-          }
+          log(`   ⚠️ Block ${block.id} (${block.type}) has no connections - end of workflow`);
         }
       };
 
-      // Start execution from trigger's connections
+      // Start execution from trigger's connections - EXECUTE SEQUENTIALLY
       if (triggerBlock.connections && triggerBlock.connections.length > 0) {
-        for (const nextId of triggerBlock.connections) {
-          await executeBlock(nextId);
-        }
+        log(`🚀 Starting workflow execution from trigger`);
+        log(`📋 Trigger has ${triggerBlock.connections.length} connected block(s)`);
+        
+        // Execute ONLY the first connected block - it will follow its own connections sequentially
+        log(`📋 Starting with first connected block: ${triggerBlock.connections[0]}`);
+        await executeBlock(triggerBlock.connections[0]);
+      } else {
+        log(`⚠️ Trigger block has no connections! Workflow cannot start.`);
       }
 
       log(`✅ Workflow execution completed`);
     } catch (error: any) {
-      log(`❌ Error executing workflow: ${error.message || error}`);
+      const errorMsg = error.message || error.toString() || 'Unknown error';
+      log(`❌❌❌ WORKFLOW ERROR ❌❌❌`);
+      log(`❌ Error: ${errorMsg}`);
+      log(`❌ Stack: ${error.stack || 'No stack trace'}`);
+      console.error('[Workflow] Full error:', error);
+      
+      // Show error to user
+      alert(`Workflow Error: ${errorMsg}`);
     } finally {
       setIsExecuting(false);
     }
