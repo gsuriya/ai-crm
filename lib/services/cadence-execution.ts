@@ -305,10 +305,10 @@ export async function executeNextBlock(
 
   console.log(`[Workflow] Executing block for user: ${user.id}`);
 
-  // Get the first contact's email for this company (cadences email contacts directly)
+  // Get the first contact's email and phone for this company (cadences email/call contacts directly)
   const { data: contacts } = await supabase
     .from('contacts')
-    .select('email, first_name, last_name')
+    .select('email, phone_number, first_name, last_name')
     .eq('company_id', companyId)
     .order('created_at', { ascending: true })
     .limit(1);
@@ -318,14 +318,10 @@ export async function executeNextBlock(
     ? contacts[0].email 
     : 'ethanzzheng@gmail.com';
   
-  // Get company phone (still used for voice calls)
-  const { data: company } = await supabase
-    .from('companies')
-    .select('phone_number')
-    .eq('id', companyId)
-    .single();
-  
-  const companyPhone = company?.phone_number || '';
+  // Use first contact's phone number (not company phone)
+  const contactPhone = contacts && contacts.length > 0 && contacts[0].phone_number
+    ? contacts[0].phone_number
+    : '';
 
   // Get thread info from metadata
   // CRITICAL: Always start with empty threadInfoMap for new executions
@@ -1123,10 +1119,10 @@ export async function executeNextBlock(
       console.log(`[Workflow] 📞 VOICE CALL BLOCK STARTING EXECUTION`);
       const { sendVoiceCall } = await import('@/lib/services/vapi');
       
-      // Use phone number from company record
-      const phoneNumber = companyPhone || '';
+      // Use phone number from contact record
+      const phoneNumber = contactPhone || '';
       if (!phoneNumber) {
-        throw new Error('Company phone number not found. Please set it in company details.');
+        throw new Error('Contact phone number not found. Please add a phone number to the contact in the company profile.');
       }
 
       // Get company name for personalized message
