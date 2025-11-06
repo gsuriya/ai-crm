@@ -323,17 +323,54 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             log(`   Making AI voice call to schedule meeting`);
             
             try {
-              // Get company phone number
-              const { data: companyMetadata } = await supabase
-                .from('companies')
-                .select('phone_number, name')
-                .eq('id', companyId)
+              // Try to get contact's phone number from company_cadences first
+              let phoneNumber = '';
+              let contactName = '';
+              
+              // Get company_cadence to find associated contact
+              const { data: companyCadence } = await supabase
+                .from('company_cadences')
+                .select('contact_id')
+                .eq('company_id', companyId)
+                .eq('cadence_id', cadenceId)
                 .single();
 
-              const phoneNumber = companyMetadata?.phone_number || '';
-              if (!phoneNumber) {
-                throw new Error('Company phone number not found');
+              if (companyCadence?.contact_id) {
+                // Get contact's phone number
+                const { data: contact } = await supabase
+                  .from('contacts')
+                  .select('phone, first_name, last_name')
+                  .eq('id', companyCadence.contact_id)
+                  .single();
+
+                if (contact?.phone) {
+                  phoneNumber = contact.phone;
+                  contactName = `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
+                  log(`   Using contact's phone number: ${phoneNumber} (${contactName})`);
+                }
               }
+
+              // Fallback to company phone number if no contact phone found
+              if (!phoneNumber) {
+                const { data: companyMetadata } = await supabase
+                  .from('companies')
+                  .select('phone_number, name')
+                  .eq('id', companyId)
+                  .single();
+
+                phoneNumber = companyMetadata?.phone_number || '';
+                if (!phoneNumber) {
+                  throw new Error('No phone number found. Please set a contact phone number in the cadence or company phone number in company details.');
+                }
+                log(`   Using company phone number: ${phoneNumber}`);
+              }
+
+              // Get company name for personalized message
+              const { data: companyMetadata } = await supabase
+                .from('companies')
+                .select('name')
+                .eq('id', companyId)
+                .single();
 
               const voiceCallResponse = await fetch('/api/voice-call/send', {
                 method: 'POST',
