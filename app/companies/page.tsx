@@ -6,7 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Star, Clock, Sparkles, ArrowUp, Bot } from "lucide-react";
+import { Search, Sparkles, ArrowUp, Bot } from "lucide-react";
 import { motion } from "framer-motion";
 import { MatchIndicator } from "@/components/match-indicator";
 import { MatchSnippet } from "@/components/match-snippet";
@@ -50,7 +50,6 @@ export default function CompaniesPage() {
   const [cadences, setCadences] = useState<Cadence[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [searchMatches, setSearchMatches] = useState<Map<string, SearchMatch[]>>(new Map());
   const [isSemanticSearch, setIsSemanticSearch] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -203,24 +202,6 @@ export default function CompaniesPage() {
     }
   }, [companies, searchQuery, isSemanticSearch, searchMatches, searchLoading]);
 
-  const toggleSelectCompany = (companyId: string) => {
-    const newSelected = new Set(selectedCompanies);
-    if (newSelected.has(companyId)) {
-      newSelected.delete(companyId);
-    } else {
-      newSelected.add(companyId);
-    }
-    setSelectedCompanies(newSelected);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedCompanies.size === filteredCompanies.length) {
-      setSelectedCompanies(new Set());
-    } else {
-      setSelectedCompanies(new Set(filteredCompanies.map(c => c.id)));
-    }
-  };
-
   // Highlight matching terms in text - handles partial matches like "food" in "FoodTech"
   const highlightMatchText = (text: string, query?: string) => {
     if (!query || query.length < 2) {
@@ -360,20 +341,6 @@ export default function CompaniesPage() {
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-10 bg-background border-b-2 border-border">
                 <tr>
-                  <th className="w-12 px-4 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedCompanies.size === filteredCompanies.length && filteredCompanies.length > 0}
-                      onChange={toggleSelectAll}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-ring"
-                    />
-                  </th>
-                  <th className="w-12 px-4 py-3 text-left">
-                    <Star className="h-4 w-4 text-muted-foreground" />
-                  </th>
-                  <th className="w-12 px-4 py-3 text-left">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  </th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     NAME
                   </th>
@@ -409,24 +376,6 @@ export default function CompaniesPage() {
                       transition={{ delay: index * 0.02 }}
                       className="group hover:bg-accent/50 transition-colors"
                     >
-                      <td className="px-4 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedCompanies.has(company.id)}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            toggleSelectCompany(company.id);
-                          }}
-                          className="h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-ring"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </td>
-                      <td className="px-4 py-4">
-                        <Star className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-primary" />
-                      </td>
-                      <td className="px-4 py-4">
-                        <Clock className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </td>
                       <td className="px-6 py-4">
                         <Link href={`/companies/${company.id}`} className="block">
                           <div className="flex items-center space-x-3">
