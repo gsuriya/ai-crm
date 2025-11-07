@@ -57,6 +57,7 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [position, setPosition] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
 
   const fetchContacts = useCallback(async () => {
     try {
@@ -116,6 +117,7 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
     setEmail("");
     setPhone("");
     setPosition("");
+    setLinkedinUrl("");
     setEditingContact(null);
   };
 
@@ -135,6 +137,7 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
           email: email,
           phone: phone || null,
           position: position || null,
+          linkedin_url: linkedinUrl || null,
         })
         .select()
         .single();
@@ -157,6 +160,7 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
     setEmail(contact.email);
     setPhone(contact.phone || "");
     setPosition(contact.position || "");
+    setLinkedinUrl((contact as any).linkedin_url || "");
     setShowAddContactModal(true);
   };
 
@@ -175,6 +179,7 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
           email: email,
           phone: phone || null,
           position: position || null,
+          linkedin_url: linkedinUrl || null,
         })
         .eq("id", editingContact.id);
 
@@ -502,6 +507,15 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
                 placeholder="CEO"
+              />
+            </div>
+            <div>
+              <Label htmlFor="linkedinUrl">LinkedIn Profile URL</Label>
+              <Input
+                id="linkedinUrl"
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                placeholder="https://linkedin.com/in/username"
               />
             </div>
           </div>

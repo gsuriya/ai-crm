@@ -28,6 +28,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# browser sessions and cookies (contains login data)
+.browser-sessions/
+
 # OAuth credentials (contains secrets!)
 client_secret*.json
 GOOGLE_OAUTH_CREDENTIALS.txt

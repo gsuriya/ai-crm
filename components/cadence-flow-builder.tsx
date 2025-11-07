@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, X, Mail, Phone, Clock, Play, Square, Settings, ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Check, X, Mail, Phone, Clock, Play, Square, Settings, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 
-export type BlockType = 'trigger' | 'email' | 'voicecall' | 'delay';
+export type BlockType = 'trigger' | 'email' | 'voicecall' | 'delay' | 'linkedinmessage';
 
 export interface FlowBlock {
   id: string;
@@ -29,6 +29,7 @@ export interface FlowBlock {
     delayHours?: number;
     delayMinutes?: number;
     delaySeconds?: number;
+    linkedinMessage?: string; // LinkedIn DM message content
   };
   connections?: string[]; // Array of connected block IDs
 }
@@ -56,6 +57,12 @@ const blockTypeConfig = {
     color: 'bg-yellow-500', 
     label: 'Wait', 
     icon: Clock,
+    canHaveMultipleOutputs: false,
+  },
+  linkedinmessage: { 
+    color: 'bg-indigo-500', 
+    label: 'LinkedIn Message', 
+    icon: MessageSquare,
     canHaveMultipleOutputs: false,
   },
 };
@@ -592,6 +599,86 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             log(`   ✅ Wait completed`);
             break;
 
+          case 'linkedinmessage':
+            log(`💬 Executing: ${block.title}`);
+            log(`   Message: ${block.config?.linkedinMessage || '(empty)'}`);
+            
+            try {
+              // Get contact's LinkedIn URL
+              let linkedinUrl = '';
+              
+              if (companyCadence?.contact_id) {
+                const { data: contact } = await supabase
+                  .from('contacts')
+                  .select('linkedin_url, first_name, last_name')
+                  .eq('id', companyCadence.contact_id)
+                  .single();
+                
+                if (contact?.linkedin_url) {
+                  linkedinUrl = contact.linkedin_url;
+                  log(`   LinkedIn URL: ${linkedinUrl}`);
+                } else {
+                  log(`   ⚠️ Contact has no LinkedIn URL`);
+                  throw new Error('Contact does not have a LinkedIn profile URL');
+                }
+              } else {
+                throw new Error('No contact linked to this cadence');
+              }
+              
+              if (!block.config?.linkedinMessage) {
+                throw new Error('LinkedIn message is empty');
+              }
+              
+              // Replace variables in message
+              let message = block.config.linkedinMessage;
+              const { data: companyData } = await supabase
+                .from('companies')
+                .select('name')
+                .eq('id', companyId)
+                .single();
+              
+              if (companyCadence?.contact_id) {
+                const { data: contact } = await supabase
+                  .from('contacts')
+                  .select('first_name, last_name')
+                  .eq('id', companyCadence.contact_id)
+                  .single();
+                
+                if (contact?.first_name) {
+                  message = message.replace(/\{\{firstName\}\}/g, contact.first_name);
+                }
+                if (contact?.last_name) {
+                  message = message.replace(/\{\{lastName\}\}/g, contact.last_name);
+                }
+              }
+              
+              if (companyData?.name) {
+                message = message.replace(/\{\{companyName\}\}/g, companyData.name);
+              }
+              
+              // Send LinkedIn message via Phantombuster
+              const response = await fetch('/api/phantombuster/linkedin-message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  linkedinProfileUrl: linkedinUrl,
+                  message: message,
+                }),
+              });
+              
+              if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to send LinkedIn message');
+              }
+              
+              const result = await response.json();
+              log(`   ✅ LinkedIn message sent successfully`);
+            } catch (error: any) {
+              log(`   ❌ Error: ${error.message}`);
+              throw error;
+            }
+            break;
+
           case 'trigger':
             log(`▶️ Trigger: ${block.title}`);
             break;
@@ -909,6 +996,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
       case 'email': return 'Send email';
       case 'voicecall': return 'Make voice call';
       case 'delay': return 'Wait';
+      case 'linkedinmessage': return 'LinkedIn Message';
       default: return 'Start';
     }
   };
@@ -921,6 +1009,8 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         return { customPrompt: '', voicemailMessage: '', enableVoicemailFallback: true }; // Optional - uses defaults if empty
       case 'delay':
         return { delayDays: 1, delayHours: 0 };
+      case 'linkedinmessage':
+        return { linkedinMessage: '' };
       default:
         return {};
     }
@@ -1567,6 +1657,23 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       </p>
                     </div>
                   )}
+                </>
+              )}
+
+              {block.type === 'linkedinmessage' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Message</label>
+                    <textarea
+                      value={block.config?.linkedinMessage || ''}
+                      onChange={(e) => updateBlockConfig(block.id, { linkedinMessage: e.target.value })}
+                      placeholder="Enter your LinkedIn message. Use {{firstName}} or {{companyName}} for personalization."
+                      className="w-full min-h-[100px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This message will be sent via LinkedIn DM. Make sure the contact has a LinkedIn profile URL set.
+                    </p>
+                  </div>
                 </>
               )}
 

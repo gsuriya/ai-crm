@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, MapPin, Calendar, DollarSign, Edit2, Save, X, FileText, Globe, Linkedin, Bell } from "lucide-react";
+import { Building2, Users, MapPin, Calendar, DollarSign, Edit2, Save, X, FileText, Globe, Linkedin, Bell, Twitter } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface CompanyDetailsProps {
@@ -61,6 +61,7 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
         description: data.description || "",
         website_url: data.website || "",
         linkedin_url: data.linkedin_url || "",
+        twitter_handle: data.twitter_handle || "",
         employee_count: data.employee_count?.toString() || "",
         location: data.headquarters || "",
         founding_date: data.founding_date ? new Date(data.founding_date).getFullYear().toString() : "",
@@ -88,6 +89,9 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
         break;
       case "linkedin_url":
         currentValue = company.linkedin_url || "";
+        break;
+      case "twitter_handle":
+        currentValue = (company as any).twitter_handle || "";
         break;
       case "employee_count":
         currentValue = company.employee_count?.toString() || "";
@@ -139,8 +143,8 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
       }
       
       // Check if column exists in company object (means it exists in DB)
-      // If field is description or linkedin_url and doesn't exist, skip update gracefully
-      if ((field === 'description' || field === 'linkedin_url') && !company.hasOwnProperty(columnName)) {
+      // If field is description, linkedin_url, or twitter_handle and doesn't exist, skip update gracefully
+      if ((field === 'description' || field === 'linkedin_url' || field === 'twitter_handle') && !company.hasOwnProperty(columnName)) {
         // Column doesn't exist - skip update but don't error
         setEditingField(null);
         alert(`The ${field.replace('_', ' ')} field is not available yet. Please add the column to your database first.\n\nRun this SQL in Supabase SQL Editor:\n\nALTER TABLE companies ADD COLUMN IF NOT EXISTS ${columnName} TEXT;\n\nThen refresh the page.`);
@@ -166,6 +170,11 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
         case "linkedin_url":
           if (currentValue !== (company.linkedin_url || "")) {
             updateData.linkedin_url = currentValue || null;
+          }
+          break;
+        case "twitter_handle":
+          if (currentValue !== ((company as any).twitter_handle || "")) {
+            updateData.twitter_handle = currentValue || null;
           }
           break;
         case "employee_count":
@@ -334,6 +343,8 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
         return company.website || "No website";
       case "linkedin_url":
         return company.linkedin_url || "No LinkedIn";
+      case "twitter_handle":
+        return (company as any).twitter_handle ? `@${(company as any).twitter_handle.replace('@', '')}` : "No Twitter";
       case "employee_count":
         return company.employee_count 
           ? `${company.employee_count.toLocaleString()} employees`
@@ -386,6 +397,14 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
       inputType: "text",
       placeholder: "https://linkedin.com/company/example",
       dbColumn: "linkedin_url",
+    },
+    {
+      key: "twitter_handle",
+      label: "Twitter Handle",
+      icon: Twitter,
+      inputType: "text",
+      placeholder: "@companyname or companyname",
+      dbColumn: "twitter_handle",
     },
   ];
 

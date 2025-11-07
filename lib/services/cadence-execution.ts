@@ -323,10 +323,10 @@ export async function executeNextBlock(
     linkedContactId = companyCadence.contact_id;
     console.log(`[Workflow] 📧 Found contact_id in company_cadence: ${companyCadence.contact_id}`);
     
-    // Get contact's email and phone number
+    // Get contact's email, phone, and LinkedIn URL
     const { data: contact, error: contactError } = await supabase
       .from('contacts')
-      .select('email, phone, first_name, last_name')
+      .select('email, phone, first_name, last_name, linkedin_url')
       .eq('id', companyCadence.contact_id)
       .single();
 
@@ -1333,6 +1333,84 @@ export async function executeNextBlock(
       break;
     }
 
+    case 'linkedinmessage': {
+      console.log(`[Workflow] 💬 LINKEDIN MESSAGE BLOCK STARTING EXECUTION`);
+      
+      if (!linkedContactId) {
+        throw new Error('No contact linked to this cadence');
+      }
+
+      // Get contact's LinkedIn URL
+      const { data: contact, error: contactError } = await supabase
+        .from('contacts')
+        .select('linkedin_url, first_name, last_name')
+        .eq('id', linkedContactId)
+        .single();
+
+      if (contactError) {
+        console.error(`[Workflow] ❌ Error fetching contact:`, contactError);
+        throw new Error(`Failed to fetch contact: ${contactError.message}`);
+      }
+
+      if (!contact?.linkedin_url) {
+        throw new Error('Contact does not have a LinkedIn profile URL set');
+      }
+
+      if (!currentBlock.config?.linkedinMessage) {
+        throw new Error('LinkedIn message is empty');
+      }
+
+      // Replace variables in message
+      let message = currentBlock.config.linkedinMessage;
+      
+      // Get company data for variable replacement
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', companyId)
+        .single();
+
+      if (contact.first_name) {
+        message = message.replace(/\{\{firstName\}\}/g, contact.first_name);
+      }
+      if (contact.last_name) {
+        message = message.replace(/\{\{lastName\}\}/g, contact.last_name);
+      }
+      if (companyData?.name) {
+        message = message.replace(/\{\{companyName\}\}/g, companyData.name);
+      }
+
+      console.log(`[Workflow] 💬 Sending LinkedIn message to: ${contact.linkedin_url}`);
+      console.log(`[Workflow] 💬 Message: ${message.substring(0, 100)}...`);
+
+      // Send LinkedIn message via Phantombuster API
+      const { sendLinkedInMessage } = await import('@/lib/services/phantombuster');
+      
+      const result = await sendLinkedInMessage({
+        linkedinProfileUrl: contact.linkedin_url,
+        message: message,
+        contactName: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send LinkedIn message');
+      }
+
+      console.log(`[Workflow] ✅ LinkedIn message sent successfully`);
+      console.log(`[Workflow] 💬 Container ID: ${result.containerId}`);
+      
+      // Store result in metadata (will be merged later)
+      metadata.linkedinMessages = metadata.linkedinMessages || [];
+      metadata.linkedinMessages.push({
+        blockId: currentBlock.id,
+        containerId: result.containerId,
+        sentAt: new Date().toISOString(),
+        linkedinUrl: contact.linkedin_url,
+      });
+
+      break;
+    }
+
     case 'trigger':
       // Trigger block just starts the flow - follow connections
       console.log(`[Workflow] Trigger block executed, following connections...`);
@@ -1380,7 +1458,7 @@ export async function executeNextBlock(
       console.error(`[Workflow] ❌ Trigger block has no connections!`);
     }
   } else {
-    // Regular blocks (email, voicecall) follow their connection
+    // Regular blocks (email, voicecall, linkedinmessage) follow their connection
     if (currentBlock.connections && currentBlock.connections.length > 0) {
       nextBlockId = currentBlock.connections[0];
     } else {

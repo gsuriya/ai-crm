@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       // Fetch specific company
       const { data, error } = await supabase
         .from('companies')
-        .select('id, name, website, linkedin_url')
+        .select('id, name, website, linkedin_url, twitter_handle')
         .eq('id', companyId)
         .single();
 
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       // Default to OpenRouter company (case-insensitive)
       const { data, error } = await supabase
         .from('companies')
-        .select('id, name, website, linkedin_url')
+        .select('id, name, website, linkedin_url, twitter_handle')
         .ilike('name', 'OpenRouter')
         .limit(1)
         .maybeSingle();
