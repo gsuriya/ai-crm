@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, Home, Users, Briefcase, Workflow, CheckSquare, BarChart3, LogOut, LogIn, Send, Settings, HelpCircle } from "lucide-react";
+import { Building2, Home, Users, Briefcase, Workflow, CheckSquare, BarChart3, LogOut, LogIn, Send, Settings, HelpCircle, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export function Sidebar() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userImage, setUserImage] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -107,6 +108,35 @@ export function Sidebar() {
     };
   }, []);
 
+  // Fetch notification count
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const fetchNotificationCount = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get total unread events across all companies
+        const { count, error } = await supabase
+          .from('company_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_new', true);
+
+        if (!error && count !== null) {
+          setNotificationCount(count);
+        }
+      } catch (error) {
+        console.error('Error fetching notification count:', error);
+      }
+    };
+
+    fetchNotificationCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchNotificationCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -120,20 +150,22 @@ export function Sidebar() {
   return (
     <div 
       data-sidebar 
-      className="flex w-64 flex-shrink-0 flex-col border-r-2 border-border bg-background h-screen" 
+      className="flex w-14 flex-shrink-0 flex-col border-r border-border bg-background h-screen" 
       style={{ zIndex: 10 }}
     >
-      <div className="flex h-16 items-center border-b-2 border-border px-6 flex-shrink-0">
-        <Link href="/" className="flex items-center space-x-2">
+      {/* Logo at top */}
+      <div className="flex h-12 items-center justify-center border-b border-border flex-shrink-0">
+        <Link href="/" className="flex items-center justify-center">
           <img 
             src="/logo.png" 
-            alt="Cheddar CRM Logo" 
-            className="h-12 w-12"
+            alt="Cheddar Logo" 
+            className="h-7 w-7"
           />
-          <span className="text-lg font-semibold text-foreground">Cheddar CRM</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+      
+      {/* Navigation - icons above text */}
+      <nav className="flex-1 space-y-0.5 px-0.5 py-2 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
           return (
@@ -141,110 +173,131 @@ export function Sidebar() {
               key={item.name}
               href={item.href}
               className={cn(
-                "group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                "group flex flex-col items-center justify-center rounded-md py-1 px-0 transition-all duration-200",
                 isActive
-                  ? "bg-blue-400 text-white shadow-sm"
-                  : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                  ? "bg-blue-400 text-white"
+                  : "text-foreground/70 hover:bg-muted/50 hover:text-foreground"
               )}
             >
               <item.icon className={cn(
-                "mr-3 h-5 w-5 transition-colors",
+                "h-4 w-4 mb-0.5 transition-colors",
                 isActive ? "text-white" : "text-foreground/60 group-hover:text-foreground"
               )} />
-              {item.name}
+              <span className={cn(
+                "text-[8px] font-medium text-center leading-tight",
+                isActive ? "text-white" : "text-foreground/70"
+              )}>
+                {item.name}
+              </span>
             </Link>
           );
         })}
       </nav>
-      <div className="border-t-2 border-border p-3 flex-shrink-0 relative">
+      {/* Bottom section with notifications and profile */}
+      <div className="border-t border-border py-1.5 flex-shrink-0 flex flex-col items-center gap-1.5 relative">
         {isAuthenticated === null ? (
-          <div className="text-xs text-muted-foreground text-center py-2">Checking...</div>
+          <div className="text-[8px] text-muted-foreground text-center py-0.5">...</div>
         ) : isAuthenticated ? (
-          <div className="relative">
+          <>
+            {/* Notification Bell */}
             <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="w-full flex items-center gap-3 rounded-lg p-2 hover:bg-muted transition-colors"
+              onClick={() => router.push('/companies')}
+              className="relative flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted/50 transition-colors"
             >
-              {userImage ? (
-                <img
-                  src={userImage}
-                  alt="Profile"
-                  className="h-8 w-8 rounded-full object-cover flex-shrink-0"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    console.error('Failed to load profile image:', userImage);
-                    setUserImage(null);
-                  }}
-                  onLoad={() => {
-                    console.log('Profile image loaded successfully:', userImage);
-                  }}
-                />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-medium text-primary">
-                    {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
-                  </span>
-                </div>
+              <Bell className="h-4 w-4 text-foreground/70" />
+              {notificationCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[8px] font-semibold">
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </span>
               )}
             </button>
-            
-            {showDropdown && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowDropdown(false)}
-                />
-                <div className="absolute bottom-full left-0 mb-2 w-64 bg-background border-2 border-border rounded-lg shadow-lg z-50">
-                  <div className="p-3 border-b border-border">
-                    <div className="text-xs text-muted-foreground mb-1">Signed in as</div>
-                    <div className="text-sm font-medium text-foreground truncate">
-                      {userEmail || 'User'}
+
+            {/* Profile Picture */}
+            <div className="relative">
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-muted/50 transition-colors p-0.5"
+              >
+                {userImage ? (
+                  <img
+                    src={userImage}
+                    alt="Profile"
+                    className="h-full w-full rounded-lg object-cover flex-shrink-0"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      console.error('Failed to load profile image:', userImage);
+                      setUserImage(null);
+                    }}
+                    onLoad={() => {
+                      console.log('Profile image loaded successfully:', userImage);
+                    }}
+                  />
+                ) : (
+                  <div className="h-full w-full rounded-lg bg-primary/10 flex items-center justify-center">
+                    <span className="text-xs font-medium text-primary">
+                      {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
+                    </span>
+                  </div>
+                )}
+              </button>
+              
+              {showDropdown && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowDropdown(false)}
+                  />
+                  <div className="absolute bottom-full left-full ml-2 mb-0 w-64 bg-background border-2 border-border rounded-lg shadow-lg z-50">
+                    <div className="p-3 border-b border-border">
+                      <div className="text-xs text-muted-foreground mb-1">Signed in as</div>
+                      <div className="text-sm font-medium text-foreground truncate">
+                        {userEmail || 'User'}
+                      </div>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setShowDropdown(false);
+                          router.push('/settings');
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Settings className="h-4 w-4" />
+                        Settings
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDropdown(false);
+                          window.location.href = 'mailto:support@example.com';
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                        Contact support
+                      </button>
+                      <div className="border-t border-border my-1" />
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign out
+                      </button>
                     </div>
                   </div>
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        setShowDropdown(false);
-                        // Navigate to settings if you have a settings page
-                        router.push('/settings');
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                    >
-                      <Settings className="h-4 w-4" />
-                      Settings
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowDropdown(false);
-                        // You can add a contact support page or mailto link
-                        window.location.href = 'mailto:support@example.com';
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                    >
-                      <HelpCircle className="h-4 w-4" />
-                      Contact support
-                    </button>
-                    <div className="border-t border-border my-1" />
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Sign out
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          </>
         ) : (
-          <Link href="/auth/signin">
+          <Link href="/auth/signin" className="w-full px-2">
             <Button
               variant="default"
-              className="w-full justify-start"
+              className="w-full flex flex-col items-center justify-center py-2 h-auto"
+              size="sm"
             >
-              <LogIn className="mr-2 h-4 w-4" />
-              Sign In with Google
+              <LogIn className="h-4 w-4 mb-1" />
+              <span className="text-[10px]">Sign In</span>
             </Button>
           </Link>
         )}
