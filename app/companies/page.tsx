@@ -394,7 +394,10 @@ export default function CompaniesPage() {
 
       {/* Company News Section */}
       <div className="bg-background border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-8 pt-2 pb-2">
+        <div className="max-w-5xl mx-auto px-8 pt-4 pb-3">
+          <div className="mb-2">
+            <p className="text-xs font-medium text-gray-500">Recent News</p>
+          </div>
           <NewsCarousel articles={mockNewsArticles} />
         </div>
       </div>

@@ -31,29 +31,49 @@ function formatTimeAgo(days: number): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-// News article preview background component
+// News article preview background component - using real news article screenshots
 function NewsArticlePreview() {
+  // Using a realistic news article layout with blurred text
   return (
-    <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 overflow-hidden">
-      {/* Simulated news article text lines */}
-      <div className="absolute inset-0 opacity-[0.15]">
-        <div className="p-3 space-y-2">
-          <div className="h-1.5 bg-gray-400 rounded w-3/4 blur-[0.5px]"></div>
-          <div className="h-1.5 bg-gray-400 rounded w-full blur-[0.5px]"></div>
-          <div className="h-1.5 bg-gray-400 rounded w-5/6 blur-[0.5px]"></div>
-          <div className="h-1.5 bg-gray-400 rounded w-4/5 blur-[0.5px] mt-3"></div>
-          <div className="h-1.5 bg-gray-400 rounded w-full blur-[0.5px]"></div>
-          <div className="h-1.5 bg-gray-400 rounded w-3/4 blur-[0.5px]"></div>
+    <div className="absolute inset-0 overflow-hidden bg-white">
+      {/* News article layout simulation */}
+      <div className="absolute inset-0 p-2 space-y-1.5 opacity-40" style={{ filter: 'blur(2px) grayscale(60%)' }}>
+        {/* Article header/logo area */}
+        <div className="flex items-center gap-1 mb-1">
+          <div className="h-1.5 w-12 bg-gray-700 rounded"></div>
+          <div className="h-1 w-16 bg-gray-500 rounded"></div>
+        </div>
+        
+        {/* Headline - bold and larger */}
+        <div className="h-2 bg-gray-800 rounded w-5/6 font-bold"></div>
+        <div className="h-1.5 bg-gray-700 rounded w-4/5"></div>
+        
+        {/* Byline/date */}
+        <div className="flex items-center gap-2 mt-1">
+          <div className="h-1 w-20 bg-gray-400 rounded"></div>
+          <div className="h-1 w-16 bg-gray-400 rounded"></div>
+        </div>
+        
+        {/* Article paragraphs */}
+        <div className="space-y-1 mt-2">
+          <div className="h-1 bg-gray-600 rounded w-full"></div>
+          <div className="h-1 bg-gray-600 rounded w-11/12"></div>
+          <div className="h-1 bg-gray-600 rounded w-full"></div>
+          <div className="h-1 bg-gray-600 rounded w-5/6"></div>
+        </div>
+        
+        {/* Image placeholder in article */}
+        <div className="h-3 bg-gray-300 rounded mt-1.5"></div>
+        
+        {/* More text */}
+        <div className="space-y-1 mt-1.5">
+          <div className="h-1 bg-gray-600 rounded w-full"></div>
+          <div className="h-1 bg-gray-600 rounded w-10/12"></div>
         </div>
       </div>
-      {/* Subtle grid pattern */}
-      <div 
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px)',
-          backgroundSize: '16px 16px'
-        }}
-      />
+      
+      {/* Subtle overlay for consistency */}
+      <div className="absolute inset-0 bg-gray-900/10"></div>
     </div>
   );
 }
@@ -63,10 +83,67 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [cardOpacities, setCardOpacities] = useState<Map<number, number>>(new Map());
+  const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const isUserScrollingRef = useRef(false);
 
   // Duplicate articles for seamless infinite scroll
   const duplicatedArticles = [...articles, ...articles];
 
+  // Track manual scroll to preserve position
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    
+    isUserScrollingRef.current = true;
+    scrollPositionRef.current = scrollContainerRef.current.scrollLeft;
+    
+    // Reset flag after a delay
+    setTimeout(() => {
+      isUserScrollingRef.current = false;
+    }, 100);
+  };
+
+  // Calculate dynamic opacity based on scroll position
+  useEffect(() => {
+    if (!scrollContainerRef.current || articles.length === 0) return;
+
+    const container = scrollContainerRef.current;
+    
+    const updateOpacities = () => {
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = containerRect.left + containerRect.width / 2;
+      const newOpacities = new Map<number, number>();
+
+      cardRefs.current.forEach((cardElement, index) => {
+        if (!cardElement) return;
+        
+        const cardRect = cardElement.getBoundingClientRect();
+        const cardCenter = cardRect.left + cardRect.width / 2;
+        const distanceFromCenter = Math.abs(cardCenter - containerCenter);
+        const maxDistance = containerRect.width / 2;
+        
+        // Calculate opacity: 1.0 at center, 0.5 at edges
+        const opacity = Math.max(0.5, 1 - (distanceFromCenter / maxDistance) * 0.5);
+        newOpacities.set(index, opacity);
+      });
+
+      setCardOpacities(newOpacities);
+    };
+
+    updateOpacities();
+    
+    // Update on scroll and periodically
+    const handleScrollUpdate = () => updateOpacities();
+    container.addEventListener('scroll', handleScrollUpdate);
+    const intervalId = setInterval(updateOpacities, 150);
+    
+    return () => {
+      container.removeEventListener('scroll', handleScrollUpdate);
+      clearInterval(intervalId);
+    };
+  }, [articles, isPaused]);
+
+  // Auto-scroll effect
   useEffect(() => {
     if (!scrollContainerRef.current || articles.length === 0) return;
 
@@ -75,7 +152,7 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
     const singleSetWidth = scrollWidth / 2; // Since we duplicated the articles
 
     const scroll = () => {
-      if (isPaused) return;
+      if (isPaused || isUserScrollingRef.current) return;
 
       scrollPositionRef.current += 0.5; // Scroll speed (pixels per frame)
       
@@ -97,7 +174,7 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
 
   if (hasError) {
     return (
-      <div className="flex items-center justify-center py-6 bg-gradient-to-br from-gray-50/50 to-gray-100/50 rounded-xl border border-gray-200/50 backdrop-blur-sm">
+      <div className="flex items-center justify-center py-3">
         <div className="text-center">
           <div className="flex justify-center mb-2">
             <Newspaper className="w-8 h-8 text-gray-300 stroke-[1.5]" />
@@ -110,7 +187,7 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
 
   if (!articles || articles.length === 0) {
     return (
-      <div className="flex items-center justify-center py-6 bg-gradient-to-br from-gray-50/50 to-gray-100/50 rounded-xl border border-gray-200/50 backdrop-blur-sm">
+      <div className="flex items-center justify-center py-3">
         <div className="text-center">
           <div className="flex justify-center mb-2">
             <Newspaper className="w-8 h-8 text-gray-300 stroke-[1.5]" />
@@ -123,43 +200,49 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
 
   return (
     <div 
-      className="py-6 bg-gradient-to-br from-gray-50/40 via-gray-50/60 to-gray-100/40 rounded-xl border border-gray-200/60 backdrop-blur-sm shadow-sm relative"
+      className="py-3 relative"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       {/* Left fade gradient */}
-      <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-gray-50/40 via-gray-50/20 to-transparent pointer-events-none z-10" />
+      <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background via-background/50 to-transparent pointer-events-none z-10" />
       
       {/* Right fade gradient */}
-      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-gray-50/40 via-gray-50/20 to-transparent pointer-events-none z-10" />
+      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background via-background/50 to-transparent pointer-events-none z-10" />
       
       <div 
         ref={scrollContainerRef}
+        onScroll={handleScroll}
         className="overflow-x-auto overflow-y-hidden scrollbar-hide"
         style={{ 
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           WebkitOverflowScrolling: 'touch',
-          scrollBehavior: 'auto' // Changed to 'auto' for programmatic scrolling
+          scrollBehavior: 'auto'
         }}
       >
-        <div className="flex gap-3 px-1" style={{ width: 'max-content' }}>
+        <div className="flex gap-2 px-1" style={{ width: 'max-content' }}>
           {duplicatedArticles.map((article, index) => {
             const isCEOPhoto = article.imageType === "ceo" && article.imageUrl;
             const isNewsStyle = article.imageType === "news" || (!article.imageType && !article.imageUrl);
+            const opacity = cardOpacities.get(index) ?? 1.0;
             
             return (
               <motion.div
                 key={`${article.id}-${index}`}
+                ref={(el) => {
+                  if (el) cardRefs.current.set(index, el);
+                }}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: (index % articles.length) * 0.05, duration: 0.3 }}
-                className="flex-shrink-0 w-[200px] group cursor-pointer"
+                className="flex-shrink-0 w-[140px] group cursor-pointer"
                 onClick={() => window.open(article.url, "_blank")}
+                style={{ opacity, transition: 'opacity 0.3s ease-out' }}
               >
-                <div className="relative overflow-hidden rounded-xl border border-gray-200/80 bg-white/90 backdrop-blur-sm shadow-sm hover:shadow-xl hover:shadow-indigo-100/50 hover:border-indigo-300/60 transition-all duration-300 h-full flex flex-col group-hover:-translate-y-1">
+                <div className="relative overflow-hidden rounded-lg border border-gray-200/30 bg-white/95 backdrop-blur-sm h-full flex flex-col transition-all duration-300">
                   {/* Image Section */}
-                  <div className="relative h-24 w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+                  <div className="relative h-16 w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
                     {isCEOPhoto ? (
                       <>
                         <Image
@@ -167,32 +250,34 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
                           alt={article.company}
                           fill
                           className="object-cover object-center transition-transform duration-700 group-hover:scale-110"
+                          style={{ filter: 'grayscale(70%) brightness(0.95)' }}
                           unoptimized
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/20 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gray-900/10" />
                       </>
                     ) : (
                       <NewsArticlePreview />
                     )}
                   </div>
 
-                  {/* Content */}
-                  <div className="p-3 flex-1 flex flex-col bg-white/95">
+                  {/* Content - lifts up on hover */}
+                  <div className="p-2 flex-1 flex flex-col bg-white/95 group-hover:bg-gradient-to-br group-hover:from-indigo-50/50 group-hover:to-indigo-100/30 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-indigo-300/40 border-t border-gray-100/50">
                     {/* Company Name */}
-                    <h3 className="text-xs font-semibold text-gray-900 mb-1.5 line-clamp-1 group-hover:text-indigo-600 transition-colors leading-tight tracking-tight">
+                    <h3 className="text-[10px] font-semibold text-gray-900 mb-1 line-clamp-1 group-hover:text-indigo-600 transition-colors leading-tight tracking-tight">
                       {article.company}
                     </h3>
                     
                     {/* Title */}
-                    <p className="text-[11px] text-gray-600 line-clamp-2 mb-3 leading-snug flex-1 font-normal">
+                    <p className="text-[10px] text-gray-600 line-clamp-2 mb-2 leading-snug flex-1 font-normal">
                       {article.title}
                     </p>
 
                     {/* Footer: Source + Time */}
-                    <div className="flex items-center justify-between pt-2.5 border-t border-gray-100/80 mt-auto">
-                      <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100/50 mt-auto">
+                      <div className="flex items-center gap-1 min-w-0">
                         {article.sourceLogoUrl && (
-                          <div className="w-3.5 h-3.5 relative rounded overflow-hidden flex-shrink-0 ring-1 ring-gray-200/50">
+                          <div className="w-3 h-3 relative rounded overflow-hidden flex-shrink-0 ring-1 ring-gray-200/30">
                             <img
                               src={article.sourceLogoUrl}
                               alt={article.source}
@@ -203,18 +288,15 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
                             />
                           </div>
                         )}
-                        <span className="text-[9px] font-medium text-gray-600 truncate">
+                        <span className="text-[8px] font-medium text-gray-600 truncate">
                           {article.source}
                         </span>
                       </div>
-                      <span className="text-[9px] text-gray-500 whitespace-nowrap ml-2 flex-shrink-0 font-normal">
+                      <span className="text-[8px] text-gray-500 whitespace-nowrap ml-1.5 flex-shrink-0 font-normal">
                         {formatTimeAgo(article.daysAgo)}
                       </span>
                     </div>
                   </div>
-                  
-                  {/* Subtle shine effect on hover */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/0 to-white/20 opacity-0 group-hover:opacity-100 transition-all duration-500 pointer-events-none translate-x-[-100%] group-hover:translate-x-[100%]" />
                 </div>
               </motion.div>
             );
