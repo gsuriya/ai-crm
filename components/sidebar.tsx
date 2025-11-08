@@ -159,7 +159,8 @@ export function Sidebar() {
           <img 
             src="/logo.png" 
             alt="Cheddar Logo" 
-            className="h-10 w-10"
+            className="h-10 w-10 object-contain filter drop-shadow-sm"
+            style={{ imageRendering: 'crisp-edges' }}
           />
         </Link>
       </div>
@@ -175,17 +176,17 @@ export function Sidebar() {
               className={cn(
                 "group flex flex-col items-center justify-center rounded-lg py-2 px-1 transition-all duration-200",
                 isActive
-                  ? "bg-blue-400 text-white"
+                  ? "bg-indigo-50 text-indigo-600"
                   : "text-foreground/70 hover:bg-muted/50 hover:text-foreground"
               )}
             >
               <item.icon className={cn(
                 "h-5 w-5 mb-1 transition-colors",
-                isActive ? "text-white" : "text-foreground/60 group-hover:text-foreground"
+                isActive ? "text-indigo-600" : "text-foreground/60 group-hover:text-foreground"
               )} />
               <span className={cn(
                 "text-[10px] font-medium text-center leading-tight",
-                isActive ? "text-white" : "text-foreground/70 group-hover:text-foreground"
+                isActive ? "text-indigo-600" : "text-foreground/70 group-hover:text-foreground"
               )}>
                 {item.name}
               </span>
@@ -233,8 +234,8 @@ export function Sidebar() {
                     }}
                   />
                 ) : (
-                  <div className="h-full w-full rounded-lg bg-blue-400/20 flex items-center justify-center">
-                    <span className="text-sm font-medium text-blue-600">
+                  <div className="h-full w-full rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <span className="text-sm font-medium text-indigo-600">
                       {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
                     </span>
                   </div>

@@ -245,9 +245,6 @@ export default function CompaniesPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-foreground">Companies</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage your company accounts ({filteredCompanies.length})
-            </p>
           </div>
         </div>
         <div className="mt-6">
