@@ -1820,7 +1820,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium"
+                  className="flex items-center gap-2 text-sm font-medium text-green-600"
                 >
                   <Check className="h-4 w-4" />
                   Changes saved
@@ -1877,6 +1877,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                   }}
                   disabled={!name.trim()}
                   type="button"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white"
                 >
                   Save Cadence
                 </Button>
@@ -2116,7 +2117,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                     <div
                       className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs shadow-sm ${
                         msg.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
+                          ? 'bg-indigo-600 text-white'
                           : 'bg-white text-foreground border border-border/20'
                       }`}
                     >
@@ -2247,7 +2248,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       setIsChatLoading(false);
                     }
                   }}
-                  className="relative flex items-center bg-background border border-border rounded-full px-3 py-2 shadow-sm focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all"
+                  className="relative flex items-center bg-background border-2 border-indigo-600 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-600 focus-within:border-indigo-600 transition-all"
                 >
                   <input
                     ref={chatInputRef}
@@ -2320,7 +2321,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                   <button
                     type="submit"
                     disabled={!chatInput.trim() || isChatLoading}
-                    className="ml-1.5 flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0"
+                    className="ml-1.5 flex items-center justify-center h-7 w-7 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0"
                   >
                     <ArrowUp className="h-3 w-3" />
                   </button>

@@ -2,35 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Building2,
-  Calendar,
-  CheckSquare,
-  TrendingUp,
-  AlertCircle,
-  Sparkles,
-  ArrowRight,
-  Clock,
-  Users,
-} from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { Sparkles, ArrowRight } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
 export default function HomePage() {
   const [metrics, setMetrics] = useState({
     pipeline: 0,
-    overdueSLAs: 0,
     dormant: 0,
     upcomingMeetings: 0,
     tasks: 0,
   });
   const [topSignals, setTopSignals] = useState<any[]>([]);
-  const [newLookalikes, setNewLookalikes] = useState<any[]>([]);
   const [reviveCompanies, setReviveCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,7 +35,6 @@ export default function HomePage() {
 
       // Calculate metrics
       const pipeline = companies?.filter((c) => c.status === "prospect" || c.status === "qualified").length || 0;
-      const overdueSLAs = 0; // TODO: Calculate from tasks/deals
       const dormant = companies?.filter((c) => {
         const daysSinceUpdate = Math.floor(
           (Date.now() - new Date(c.updated_at).getTime()) / (1000 * 60 * 60 * 24)
@@ -60,18 +44,12 @@ export default function HomePage() {
       const upcomingMeetings = 0; // TODO: Fetch from meetings
       const tasks = 0; // TODO: Fetch from tasks
 
-      setMetrics({ pipeline, overdueSLAs, dormant, upcomingMeetings, tasks });
+      setMetrics({ pipeline, dormant, upcomingMeetings, tasks });
 
       // Mock top signals
       setTopSignals([
         { id: "1", company: "Company A", signal: "ARR grew 50%", date: "2 days ago" },
         { id: "2", company: "Company B", signal: "New round announced", date: "3 days ago" },
-      ]);
-
-      // Mock new lookalikes
-      setNewLookalikes([
-        { id: "1", company: "Company C", similarity: 85, reason: "Similar GTM" },
-        { id: "2", company: "Company D", similarity: 78, reason: "Same sector" },
       ]);
 
       // Mock revive companies
@@ -88,98 +66,50 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-muted-foreground">Loading dashboard...</div>
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-600">Loading dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex flex-col bg-background min-h-screen" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
       {/* Header */}
-      <div className="bg-background px-8 py-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-semibold text-foreground">Home</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Overview of your pipeline, tasks, and key insights
-          </p>
+      <div className="bg-background">
+        <div className="max-w-7xl mx-auto px-8 pt-6 pb-2">
+          <div className="mb-8 pt-0">
+            <h1 className="text-2xl font-semibold text-gray-900 leading-6">Home</h1>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-12 gap-6">
-          {/* Left Column */}
-          <div className="col-span-12 lg:col-span-8 space-y-6">
-            {/* My Pipeline */}
-            <Card className="rounded-2xl shadow-sm p-5">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    My Pipeline
-                  </CardTitle>
-                  <Link href="/pipeline">
-                    <Button variant="ghost" size="sm">
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                      View All
-                    </Button>
+      <div className="flex-1">
+        <div className="max-w-7xl mx-auto px-8 pb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* My Pipeline */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">My Pipeline</h2>
+                  <Link href="/pipeline" className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                    View All
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground mb-2">{metrics.pipeline}</div>
-                <p className="text-sm text-muted-foreground">Companies in pipeline</p>
-              </CardContent>
-            </Card>
+                <div className="text-3xl font-bold text-gray-900 mb-1">{metrics.pipeline}</div>
+                <p className="text-sm text-gray-600">Companies in pipeline</p>
+              </div>
 
-            {/* Overdue SLAs */}
-            <Card className="rounded-2xl shadow-sm p-5">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    Overdue SLAs
-                  </CardTitle>
-                  <Badge variant="destructive" className="text-xs">
-                    {metrics.overdueSLAs} overdue
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {metrics.overdueSLAs > 0 ? (
-                  <div className="space-y-2">
-                    <div className="p-3 rounded-lg bg-red-50">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-foreground">
-                          Task overdue by 5 days
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs">
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground text-center py-4">
-                    No overdue SLAs
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Dormant Companies */}
-            <Card className="rounded-2xl shadow-sm p-5">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    Dormant Companies
-                  </CardTitle>
-                  <Badge variant="outline" className="text-xs">
+              {/* Dormant Companies */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Dormant Companies</h2>
+                  <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
                     {metrics.dormant} dormant
-                  </Badge>
+                  </span>
                 </div>
-              </CardHeader>
-              <CardContent>
                 {metrics.dormant > 0 ? (
                   <div className="space-y-2">
                     {reviveCompanies.map((company, index) => (
@@ -188,100 +118,80 @@ export default function HomePage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="p-3 rounded-lg bg-yellow-50"
+                        className="p-3 rounded-lg bg-yellow-50 border border-yellow-200"
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-sm font-medium text-foreground">
+                            <div className="text-sm font-medium text-gray-900">
                               {company.company}
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-gray-600">
                               {company.lastTouch} • {company.reason}
                             </div>
                           </div>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs">
+                          <button className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
                             Revive
-                          </Button>
+                          </button>
                         </div>
                       </motion.div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-muted-foreground text-center py-4">
+                  <div className="text-sm text-gray-600 text-center py-4">
                     No dormant companies
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </div>
 
-          {/* Right Column */}
-          <div className="col-span-12 lg:col-span-4 space-y-6">
-            {/* Upcoming Meetings */}
-            <Card className="rounded-2xl shadow-sm p-5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Upcoming Meetings
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Right Column - Sidebar */}
+            <div className="space-y-6">
+              {/* Upcoming Meetings */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Meetings</h2>
                 {metrics.upcomingMeetings > 0 ? (
                   <div className="space-y-2">
-                    <div className="p-3 rounded-lg bg-blue-50">
+                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-sm font-medium text-foreground">
+                          <div className="text-sm font-medium text-gray-900">
                             Meeting with Company A
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-gray-600">
                             Tomorrow at 2:00 PM
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs">
+                        <button className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
                           View
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-muted-foreground text-center py-4">
+                  <div className="text-sm text-gray-600 text-center py-4">
                     No upcoming meetings
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Tasks */}
-            <Card className="rounded-2xl shadow-sm p-5">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    Tasks
-                  </CardTitle>
-                  <Link href="/tasks">
-                    <Button variant="ghost" size="sm">
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
+              {/* Tasks */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
+                  <Link href="/tasks" className="text-indigo-600 hover:text-indigo-700">
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground mb-2">{metrics.tasks}</div>
-                <p className="text-sm text-muted-foreground">Active tasks</p>
-              </CardContent>
-            </Card>
+                <div className="text-3xl font-bold text-gray-900 mb-1">{metrics.tasks}</div>
+                <p className="text-sm text-gray-600">Active tasks</p>
+              </div>
 
-            {/* Top Signals */}
-            <Card className="rounded-2xl shadow-sm p-5">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    Top Signals
-                  </CardTitle>
+              {/* Top Signals */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="h-4 w-4 text-indigo-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">Top Signals</h2>
                 </div>
-              </CardHeader>
-              <CardContent>
                 {topSignals.length > 0 ? (
                   <div className="space-y-2">
                     {topSignals.map((signal, index) => (
@@ -290,68 +200,24 @@ export default function HomePage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="p-3 rounded-lg bg-accent/50"
+                        className="p-3 rounded-lg bg-indigo-50 border border-indigo-100"
                       >
-                        <div className="text-sm font-medium text-foreground mb-1">
+                        <div className="text-sm font-medium text-gray-900 mb-1">
                           {signal.company}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-gray-600">
                           {signal.signal} • {signal.date}
                         </div>
                       </motion.div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-muted-foreground text-center py-4">
+                  <div className="text-sm text-gray-600 text-center py-4">
                     No signals
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* New Lookalikes */}
-            <Card className="rounded-2xl shadow-sm p-5">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    New Lookalikes
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {newLookalikes.length > 0 ? (
-                  <div className="space-y-2">
-                    {newLookalikes.map((lookalike, index) => (
-                      <motion.div
-                        key={lookalike.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="p-3 rounded-lg bg-accent/50"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="text-sm font-medium text-foreground">
-                            {lookalike.company}
-                          </div>
-                          <Badge variant="outline" className="text-xs">
-                            {lookalike.similarity}% match
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {lookalike.reason}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground text-center py-4">
-                    No new lookalikes
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

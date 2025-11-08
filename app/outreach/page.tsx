@@ -336,125 +336,128 @@ export default function OutreachPage() {
   const getBlockTypeIcon = (blockType: string) => {
     switch (blockType) {
       case 'email':
-        return <Mail className="h-4 w-4 text-indigo-600" />;
+        return <Mail className="h-4 w-4 text-gray-600" />;
       case 'delay':
-        return <Clock className="h-4 w-4 text-primary" />;
+        return <Clock className="h-4 w-4 text-gray-600" />;
       case 'calendar':
-        return <Clock className="h-4 w-4 text-emerald-600" />;
+        return <Clock className="h-4 w-4 text-gray-600" />;
       case 'voice_call':
-        return <Play className="h-4 w-4 text-purple-600" />;
+        return <Play className="h-4 w-4 text-gray-600" />;
       default:
-        return <Play className="h-4 w-4 text-foreground/70" />;
+        return <Play className="h-4 w-4 text-gray-600" />;
     }
   };
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-muted-foreground">Loading outreach...</div>
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-600">Loading outreach...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="border-b-2 border-border bg-background px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-foreground">Current Outreach</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Cadence executions ({executions.length})
-            </p>
+    <div className="flex flex-col bg-background min-h-screen" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
+      {/* Header */}
+      <div className="bg-background">
+        <div className="max-w-7xl mx-auto px-8 pt-6 pb-2">
+          <div className="mb-8 pt-0">
+            <h1 className="text-2xl font-semibold text-gray-900 leading-6">Ongoing Outreach</h1>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        {executions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="text-muted-foreground">
-              No active outreach cadences. Start a cadence from the Companies page.
-            </div>
-          </div>
-        ) : (
-          <div className="h-full overflow-auto p-8">
+      {/* Main Content */}
+      <div className="flex-1">
+        <div className="max-w-7xl mx-auto px-8 pb-6">
+          <div>
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 bg-background border-b-2 border-border">
+              <thead className="bg-background">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    COMPANY
+                  <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
+                    Company
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    CADENCE
+                  <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
+                    Cadence
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    CONTACT
+                  <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
+                    Contact
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    STATUS
+                  <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
+                    Status
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    CURRENT STEP
+                  <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
+                    Current Step
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    ACTIONS
+                  <th className="px-7 py-4 text-right text-sm font-semibold text-gray-900 select-none">
+                    Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y-2 divide-border">
-                {executions.map((execution, index) => {
-                  return (
-                    <motion.tr
-                      key={execution.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: index * 0.02 }}
-                      className="group hover:bg-accent/50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-foreground">
-                          {execution.companyCadence?.company?.name || 'Unknown Company'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-foreground">
-                          {execution.companyCadence?.cadence?.name || 'Unknown Cadence'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-muted-foreground">
-                          {execution.contact?.email || 'No contact'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {getStatusBadge(execution)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {execution.currentBlock && getBlockTypeIcon(execution.currentBlock.type)}
-                          <span className="text-sm text-foreground">
-                            {getCurrentStep(execution)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Button
-                          onClick={() => deleteExecution(execution.id)}
-                          disabled={deletingId === execution.id}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
+              <tbody>
+                {executions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-7 py-12 text-center">
+                      <div className="text-gray-600">
+                        No active outreach cadences. Start a cadence from the Companies page.
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  executions.map((execution, index) => {
+                    return (
+                      <motion.tr
+                        key={execution.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: index * 0.02 }}
+                        className="group hover:bg-indigo-50/50 transition-colors border-b border-gray-100"
+                      >
+                        <td className="px-7 py-5 text-sm">
+                          <div className="text-base font-medium text-gray-900 truncate leading-6">
+                            {execution.companyCadence?.company?.name || 'Unknown Company'}
+                          </div>
+                        </td>
+                        <td className="px-7 py-5 text-sm">
+                          <div className="text-sm text-gray-900 leading-5">
+                            {execution.companyCadence?.cadence?.name || 'Unknown Cadence'}
+                          </div>
+                        </td>
+                        <td className="px-7 py-5 text-sm">
+                          <div className="text-sm text-gray-600 leading-5">
+                            {execution.contact?.email || 'No contact'}
+                          </div>
+                        </td>
+                        <td className="px-7 py-5 text-sm">
+                          {getStatusBadge(execution)}
+                        </td>
+                        <td className="px-7 py-5 text-sm">
+                          <div className="flex items-center gap-2">
+                            {execution.currentBlock && getBlockTypeIcon(execution.currentBlock.type)}
+                            <span className="text-sm text-gray-900 leading-5">
+                              {getCurrentStep(execution)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-7 py-5 text-sm text-right">
+                          <Button
+                            onClick={() => deleteExecution(execution.id)}
+                            disabled={deletingId === execution.id}
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-red-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </motion.tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

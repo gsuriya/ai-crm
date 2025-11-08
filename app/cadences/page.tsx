@@ -3,11 +3,10 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Edit, Trash2, Clock, Play, User } from "lucide-react";
+import { Plus, Edit, Trash2, Play, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CadenceFlowBuilder, FlowBlock } from "@/components/cadence-flow-builder";
 import { supabase } from "@/lib/supabase";
-import { X } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
@@ -108,10 +107,20 @@ export default function CadencesPage() {
           console.error(`Error fetching companies for cadence ${cadence.id}:`, ccError);
         }
         
+        // Transform companyCadences to match CompanyCadenceInfo type
+        const transformedCompanies = (companyCadences || []).map((cc: any) => ({
+          id: cc.id,
+          company_id: cc.company_id,
+          contact_id: cc.contact_id,
+          status: cc.status,
+          company: Array.isArray(cc.company) ? cc.company[0] : cc.company,
+          contact: Array.isArray(cc.contact) ? cc.contact[0] : cc.contact,
+        })) as CompanyCadenceInfo[];
+        
         return {
           ...cadence,
           blocks: validBlocks,
-          companies: (companyCadences || []) as CompanyCadenceInfo[],
+          companies: transformedCompanies,
         };
       }));
 
@@ -189,12 +198,20 @@ export default function CadencesPage() {
         return;
       }
 
-      if (editingCadence) {
+      if (!name || !name.trim()) {
+        alert('Please enter a cadence name');
+        return;
+      }
+
+      const cadenceName = name.trim();
+
+      // Check if we're editing an existing cadence
+      if (editingCadence && editingCadence.id) {
         // Update existing cadence in Supabase (all cadences are shared)
         const { error } = await supabase
           .from('cadences')
           .update({
-            name: name || editingCadence.name,
+            name: cadenceName,
             description: description?.trim() || null,
             nodes: blocks,
             updated_at: new Date().toISOString(),
@@ -208,8 +225,8 @@ export default function CadencesPage() {
           c.id === editingCadence.id
             ? { 
                 ...c, 
-                name: name || c.name,
-                description: description?.trim() || null,
+                name: cadenceName,
+                description: description?.trim() || undefined,
                 blocks, 
                 nodes: blocks, 
                 updated_at: new Date().toISOString() 
@@ -217,32 +234,62 @@ export default function CadencesPage() {
             : c
         ));
       } else {
-        // Create new cadence in Supabase
-        if (!name || !name.trim()) {
-          alert('Please enter a cadence name');
-          return;
-        }
-
-        const { data, error } = await supabase
+        // Check if a cadence with this name already exists
+        const { data: existingCadences } = await supabase
           .from('cadences')
-          .insert({
-            user_id: user.id,
-            name: name.trim(),
-            description: description?.trim() || null,
-            nodes: blocks,
-            connections: [],
-            is_active: true,
-          })
-          .select()
-          .single();
+          .select('id, name')
+          .eq('name', cadenceName)
+          .limit(1);
 
-        if (error) throw error;
+        if (existingCadences && existingCadences.length > 0) {
+          // Update existing cadence instead of creating duplicate
+          const existingCadence = existingCadences[0];
+          const { error } = await supabase
+            .from('cadences')
+            .update({
+              description: description?.trim() || null,
+              nodes: blocks,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingCadence.id);
 
-        // Update local state
-        setCadences(prev => [...prev, {
-          ...data,
-          blocks: data.nodes || [],
-        }]);
+          if (error) throw error;
+
+          // Update local state
+          setCadences(prev => prev.map(c =>
+            c.id === existingCadence.id
+              ? { 
+                  ...c, 
+                  description: description?.trim() || undefined,
+                  blocks, 
+                  nodes: blocks, 
+                  updated_at: new Date().toISOString() 
+                }
+              : c
+          ));
+        } else {
+          // Create new cadence in Supabase
+          const { data, error } = await supabase
+            .from('cadences')
+            .insert({
+              user_id: user.id,
+              name: cadenceName,
+              description: description?.trim() || null,
+              nodes: blocks,
+              connections: [],
+              is_active: true,
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          // Update local state
+          setCadences(prev => [...prev, {
+            ...data,
+            blocks: data.nodes || [],
+          }]);
+        }
       }
       
       // Mark as saved and clear unsaved changes
@@ -531,159 +578,121 @@ export default function CadencesPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-muted-foreground">Loading cadences...</div>
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-600">Loading cadences...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="border-b border-border bg-background px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-foreground">Cadences</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage your outreach sequences ({cadences.length})
-            </p>
+    <div className="flex flex-col bg-background min-h-screen" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
+      {/* Header */}
+      <div className="bg-background">
+        <div className="max-w-7xl mx-auto px-8 pt-6 pb-2">
+          <div className="mb-8 pt-0 flex items-center justify-between">
+            <h1 className="text-2xl font-semibold text-gray-900 leading-6">Cadences</h1>
+            <Button
+              onClick={handleCreateCadence}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white"
+            >
+              <Plus className="h-4 w-4" />
+              Create Cadence
+            </Button>
           </div>
-          <Button
-            onClick={handleCreateCadence}
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Create Cadence
-          </Button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {cadences.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-8">
-            <div className="text-muted-foreground mb-4">
-              No cadences yet. Create your first cadence to get started.
-            </div>
-          </div>
-        ) : (
-          <div className="w-full">
-            <table className="w-full">
-              <thead className="bg-muted/50 border-b border-border">
+      {/* Main Content */}
+      <div className="flex-1">
+        <div className="max-w-7xl mx-auto px-8 pb-6">
+          <div>
+            <table className="w-full border-collapse">
+              <thead className="bg-background">
                 <tr>
-                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
                     Name
                   </th>
-                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
                     Description
                   </th>
-                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Companies & Contacts
-                  </th>
-                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
                     Updated
                   </th>
-                  <th className="px-8 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Blocks
-                  </th>
-                  <th className="px-8 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th className="px-7 py-4 text-right text-sm font-semibold text-gray-900 select-none">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
-                {cadences.map((cadence) => (
-                  <motion.tr
-                    key={cadence.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-8 py-4 whitespace-nowrap">
-                      <div className="font-medium text-foreground">{cadence.name}</div>
-                    </td>
-                    <td className="px-8 py-4">
-                      <div className="text-sm text-muted-foreground max-w-md truncate">
-                        {cadence.description || '-'}
+              <tbody>
+                {cadences.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-7 py-12 text-center">
+                      <div className="text-gray-600">
+                        No cadences yet. Create your first cadence to get started.
                       </div>
                     </td>
-                    <td className="px-8 py-4">
-                      <div className="space-y-2 max-w-md">
-                        {cadence.companies && cadence.companies.length > 0 ? (
-                          cadence.companies.slice(0, 3).map((cc: CompanyCadenceInfo) => (
-                            <div key={cc.id} className="text-sm">
-                              <div className="font-medium text-foreground">
-                                {cc.company?.name || 'Unknown Company'}
-                              </div>
-                              {cc.contact ? (
-                                <div className="text-xs text-muted-foreground mt-0.5">
-                                  👤 {cc.contact.first_name} {cc.contact.last_name}
-                                  {cc.contact.position && ` • ${cc.contact.position}`}
-                                </div>
-                              ) : (
-                                <div className="text-xs text-muted-foreground mt-0.5 italic">
-                                  No contact assigned
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-sm text-muted-foreground italic">
-                            No companies yet
-                          </div>
-                        )}
-                        {cadence.companies && cadence.companies.length > 3 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{cadence.companies.length - 3} more...
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-8 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {new Date(cadence.updated_at).toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td className="px-8 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">
-                        {cadence.blocks?.length || 0}
-                      </div>
-                    </td>
-                    <td className="px-8 py-4 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewCompanies(cadence.id)}
-                          className="h-8"
-                        >
-                          <User className="h-3.5 w-3.5 mr-1.5" />
-                          View Companies {cadence.companies && cadence.companies.length > 0 && `(${cadence.companies.length})`}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditCadence(cadence)}
-                          className="h-8"
-                        >
-                          <Edit className="h-3.5 w-3.5 mr-1.5" />
-                          Edit
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDeleteCadence(cadence.id)}
-                          className="h-8"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
+                  </tr>
+                ) : (
+                  cadences.map((cadence, index) => (
+                    <motion.tr
+                      key={cadence.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: index * 0.02 }}
+                      className="group hover:bg-indigo-50/50 transition-colors border-b border-gray-100"
+                    >
+                      <td className="px-7 py-5 text-sm">
+                        <div className="text-base font-medium text-gray-900 truncate leading-6">
+                          {cadence.name}
+                        </div>
+                      </td>
+                      <td className="px-7 py-5 text-sm">
+                        <div className="text-sm text-gray-600 max-w-md truncate leading-5">
+                          {cadence.description || '-'}
+                        </div>
+                      </td>
+                      <td className="px-7 py-5 text-sm">
+                        <div className="text-sm text-gray-600 leading-5">
+                          {new Date(cadence.updated_at).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-7 py-5 text-sm text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewCompanies(cadence.id)}
+                            className="h-8 text-xs border-gray-200 hover:bg-gray-50"
+                          >
+                            <User className="h-3.5 w-3.5 mr-1.5" />
+                            View Companies
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditCadence(cadence)}
+                            className="h-8 text-xs border-gray-200 hover:bg-gray-50"
+                          >
+                            <Edit className="h-3.5 w-3.5 mr-1.5" />
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeleteCadence(cadence.id)}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Flow Builder Modal */}
@@ -694,7 +703,7 @@ export default function CadencesPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-            onClick={handleCloseFlowBuilder}
+            onClick={() => handleCloseFlowBuilder()}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
