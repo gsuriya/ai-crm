@@ -194,7 +194,7 @@ export async function scrapeCrunchbase(
     // Search for company on Crunchbase
     const searchUrl = `https://www.crunchbase.com/discover/organization.companies/${encodeURIComponent(companyName)}`;
     await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: 30000 });
-    await page.waitForTimeout(500);
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Try to find company link in search results
     const companyLink = await page.evaluate(() => {
@@ -212,7 +212,7 @@ export async function scrapeCrunchbase(
 
     // Navigate to company page
     await page.goto(companyLink, { waitUntil: 'networkidle0', timeout: 30000 });
-    await page.waitForTimeout(1000);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Extract company data
     const data = await page.evaluate(() => {
@@ -396,7 +396,7 @@ export async function scrapeLinkedIn(
     }
 
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-    await page.waitForTimeout(1000);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Check if login required
     const needsLogin = await page.evaluate(() => {
@@ -417,7 +417,7 @@ export async function scrapeLinkedIn(
         await page.type('#username', email);
         await page.type('#password', password);
         await page.click('button[type="submit"]');
-        await page.waitForTimeout(3000);
+        await new Promise(resolve => setTimeout(resolve, 3000));
         await page.goto(url, { waitUntil: 'networkidle0' });
       } else {
         return null;
@@ -520,7 +520,7 @@ export async function scrapeLinkedIn(
     try {
       const peopleUrl = url.replace(/\/$/, '') + '/people';
       await page.goto(peopleUrl, { waitUntil: 'networkidle0', timeout: 15000 });
-      await page.waitForTimeout(1000);
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       const morePeople = await page.evaluate(() => {
         const contacts: any[] = [];
@@ -602,7 +602,7 @@ export async function scrapeCompanyWebsite(
 
     // Scrape main page
     await page.goto(website, { waitUntil: 'networkidle0', timeout: 30000 });
-    await page.waitForTimeout(500);
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const mainPageData = await page.evaluate(() => {
       const result: any = {};
@@ -626,7 +626,7 @@ export async function scrapeCompanyWebsite(
     for (const aboutUrl of aboutUrls) {
       try {
         await page.goto(aboutUrl, { waitUntil: 'networkidle0', timeout: 10000 });
-        await page.waitForTimeout(500);
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         aboutData = await page.evaluate(() => {
           const result: any = {};

@@ -15,17 +15,17 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { createClient } from "@supabase/supabase-js";
-import { scrapeCompany, ScrapedCompanyData, ScrapedContact } from "../lib/services/company-scraper";
+import { enrichCompanyWithAI, EnrichedCompanyData, EnrichedContact } from "../lib/services/company-ai-enrichment";
 
 // Load environment variables
 dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error("❌ Missing Supabase credentials");
-  console.error("   Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
+  console.error("   Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY)");
   process.exit(1);
 }
 
@@ -37,11 +37,11 @@ interface ScrapingOptions {
 }
 
 /**
- * Update company table with scraped overview data
+ * Update company table with enriched overview data
  */
 async function updateCompanyData(
   companyId: string,
-  data: ScrapedCompanyData
+  data: EnrichedCompanyData
 ): Promise<void> {
   const updateData: any = {};
 
@@ -69,11 +69,11 @@ async function updateCompanyData(
 }
 
 /**
- * Update contacts table with scraped people data
+ * Update contacts table with enriched people data
  */
 async function updateContacts(
   companyId: string,
-  contacts: ScrapedContact[]
+  contacts: EnrichedContact[]
 ): Promise<void> {
   if (!contacts || contacts.length === 0) return;
 
@@ -121,11 +121,11 @@ async function updateContacts(
 }
 
 /**
- * Update financials table with scraped financial data
+ * Update financials table with enriched financial data
  */
 async function updateFinancials(
   companyId: string,
-  data: ScrapedCompanyData
+  data: EnrichedCompanyData
 ): Promise<void> {
   const currentYear = new Date().getFullYear();
 
@@ -173,11 +173,11 @@ async function updateFinancials(
 }
 
 /**
- * Store scraping metadata
+ * Store enrichment metadata
  */
 async function updateScrapingMetadata(
   companyId: string,
-  data: ScrapedCompanyData
+  data: EnrichedCompanyData
 ): Promise<void> {
   await supabase
     .from("company_metadata")
@@ -213,38 +213,41 @@ async function processCompany(company: any, index: number, total: number): Promi
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
 
-      // Scrape company data
-      console.log(`  🔍 Scraping from multiple sources...`);
-      const scrapedData = await scrapeCompany(
+      // Enrich company data using AI
+      console.log(`  🤖 Enriching with AI from multiple sources...`);
+      const enrichedData = await enrichCompanyWithAI(
         company.name,
         company.website,
         company.linkedin_url
       );
 
-      if (!scrapedData || (!scrapedData.website && !scrapedData.description && !scrapedData.contacts?.length)) {
+      if (!enrichedData || (!enrichedData.website && !enrichedData.description && !enrichedData.contacts?.length)) {
         console.log(`  ⚠️  No data found from any source`);
         return false;
       }
 
-      console.log(`  ✅ Scraped data from: ${scrapedData.sources?.join(", ") || "unknown"}`);
+      console.log(`  ✅ Enriched data from: ${enrichedData.sources?.join(", ") || "unknown"}`);
 
       // Update database with transaction-like error handling
       console.log(`  💾 Updating database...`);
 
       try {
-        await updateCompanyData(company.id, scrapedData);
+        await updateCompanyData(company.id, enrichedData);
         console.log(`    ✓ Company data updated`);
+        if (enrichedData.description) {
+          console.log(`    📝 Description: ${enrichedData.description.substring(0, 100)}...`);
+        }
       } catch (error: any) {
         console.error(`    ⚠️  Failed to update company data: ${error.message}`);
       }
 
       try {
-        if (scrapedData.contacts && scrapedData.contacts.length > 0) {
-          await updateContacts(company.id, scrapedData.contacts);
-          console.log(`    ✓ Added/updated ${scrapedData.contacts.length} contacts`);
+        if (enrichedData.contacts && enrichedData.contacts.length > 0) {
+          await updateContacts(company.id, enrichedData.contacts);
+          console.log(`    ✓ Added/updated ${enrichedData.contacts.length} contacts`);
           
           // Show founders
-          const founders = scrapedData.contacts.filter(c => c.is_founder);
+          const founders = enrichedData.contacts.filter(c => c.is_founder);
           if (founders.length > 0) {
             console.log(`    📌 Founders: ${founders.map(f => `${f.first_name} ${f.last_name}${f.email ? ` (${f.email})` : ""}`).join(", ")}`);
           }
@@ -254,14 +257,14 @@ async function processCompany(company: any, index: number, total: number): Promi
       }
 
       try {
-        if (scrapedData.funding_amount || scrapedData.funding_rounds) {
-          await updateFinancials(company.id, scrapedData);
+        if (enrichedData.funding_amount || enrichedData.funding_rounds) {
+          await updateFinancials(company.id, enrichedData);
           console.log(`    ✓ Financial data updated`);
-          if (scrapedData.funding_amount) {
-            console.log(`    💰 Total funding: $${(scrapedData.funding_amount / 1000000).toFixed(2)}M`);
+          if (enrichedData.funding_amount) {
+            console.log(`    💰 Total funding: $${(enrichedData.funding_amount / 1000000).toFixed(2)}M`);
           }
-          if (scrapedData.funding_rounds && scrapedData.funding_rounds.length > 0) {
-            console.log(`    📊 Funding rounds: ${scrapedData.funding_rounds.length}`);
+          if (enrichedData.funding_rounds && enrichedData.funding_rounds.length > 0) {
+            console.log(`    📊 Funding rounds: ${enrichedData.funding_rounds.length}`);
           }
         }
       } catch (error: any) {
@@ -269,7 +272,7 @@ async function processCompany(company: any, index: number, total: number): Promi
       }
 
       try {
-        await updateScrapingMetadata(company.id, scrapedData);
+        await updateScrapingMetadata(company.id, enrichedData);
         console.log(`    ✓ Metadata updated`);
       } catch (error: any) {
         console.error(`    ⚠️  Failed to update metadata: ${error.message}`);
@@ -296,7 +299,7 @@ async function processCompany(company: any, index: number, total: number): Promi
  * Main scraping function
  */
 async function scrapeAllCompanies(options: ScrapingOptions = {}) {
-  console.log("\n🚀 Starting batch company scraping...\n");
+  console.log("\n🚀 Starting batch company enrichment with AI...\n");
 
   // Fetch companies
   let query = supabase.from("companies").select("id, name, website, linkedin_url").order("created_at", { ascending: false });
@@ -321,7 +324,7 @@ async function scrapeAllCompanies(options: ScrapingOptions = {}) {
     return;
   }
 
-  console.log(`📊 Found ${companies.length} companies to scrape\n`);
+  console.log(`📊 Found ${companies.length} companies to enrich\n`);
 
   const results = {
     success: 0,
@@ -350,7 +353,7 @@ async function scrapeAllCompanies(options: ScrapingOptions = {}) {
       results.failed++;
       results.errors.push({
         company: company.name,
-        error: "Scraping failed or no data found",
+        error: "Enrichment failed or no data found",
       });
     }
 
@@ -364,8 +367,8 @@ async function scrapeAllCompanies(options: ScrapingOptions = {}) {
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
-  console.log("\n\n📊 Scraping Summary:");
-  console.log(`   ✅ Successfully scraped: ${results.success}`);
+  console.log("\n\n📊 Enrichment Summary:");
+  console.log(`   ✅ Successfully enriched: ${results.success}`);
   console.log(`   ❌ Failed: ${results.failed}`);
   console.log(`   ⏱️  Total time: ${duration}s`);
   console.log(`   📈 Average: ${(parseFloat(duration) / companies.length).toFixed(1)}s per company`);
