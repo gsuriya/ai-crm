@@ -8,9 +8,7 @@ import { ActivityFeed } from "@/components/company/activity-feed";
 import { ActivityFilters } from "@/components/company/activity-filters";
 import { Button } from "@/components/ui/button";
 import { Plus, Mail, Phone, Calendar, FileText } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const dynamic = 'force-dynamic';
 
 export default function CompanyActivityPage() {
   const params = useParams();
@@ -123,13 +121,13 @@ export default function CompanyActivityPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-5">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-12">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Activity</h2>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Activity</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {filteredActivities.length} activities • Unified timeline of emails, meetings, calls, notes, tasks, and file uploads
+              {filteredActivities.length} activities
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -143,20 +141,22 @@ export default function CompanyActivityPage() {
             </Button>
             <Button variant="outline" size="sm">
               <Calendar className="h-4 w-4 mr-2" />
-              New Event
+              Event
             </Button>
             <Button variant="outline" size="sm">
               <FileText className="h-4 w-4 mr-2" />
-              Add Note
+              Note
             </Button>
           </div>
         </div>
 
         {/* Filters */}
-        <ActivityFilters filters={filters} onFiltersChange={setFilters} />
+        <div className="mb-8">
+          <ActivityFilters filters={filters} onFiltersChange={setFilters} />
+        </div>
 
         {/* Activity Feed */}
-        <div className="mt-6">
+        <div>
           <ActivityFeed
             activities={filteredActivities}
             companyId={companyId}

@@ -90,19 +90,11 @@ export function SimilarCompanies({ companyId }: SimilarCompaniesProps) {
   }
 
   return (
-    <div className="py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="text-xl font-semibold text-foreground">
-              Similar Companies
-            </h2>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {companies.length} lookalikes
-          </p>
-        </div>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs text-muted-foreground">
+          {companies.length} lookalikes
+        </p>
         <Button
           variant="ghost"
           size="sm"
@@ -119,7 +111,7 @@ export function SimilarCompanies({ companyId }: SimilarCompaniesProps) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-border/50"
+            className="p-4 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200"
           >
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2 flex-1">

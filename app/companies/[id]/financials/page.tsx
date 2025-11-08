@@ -6,12 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { RoundsTimeline } from "@/components/company/rounds-timeline";
 import { MetricsEditor } from "@/components/company/metrics-editor";
 import { FinancialCharts } from "@/components/company/financial-charts";
-import { AnomalyChecks } from "@/components/company/anomaly-checks";
+import { CardSection } from "@/components/company/card-section";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, DollarSign, TrendingUp, Download } from "lucide-react";
+import { Plus, Download } from "lucide-react";
 
-export const dynamic = 'force-dynamic';
 
 interface FinancialData {
   id: string;
@@ -104,14 +102,11 @@ export default function CompanyFinancialsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-5">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-12">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Financials</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Funding & performance metrics with charts and benchmarks
-            </p>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Financials</h2>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleCopyToClipboard}>
@@ -119,7 +114,7 @@ export default function CompanyFinancialsPage() {
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              Export
             </Button>
             <Button
               size="sm"
@@ -134,76 +129,25 @@ export default function CompanyFinancialsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
-          {/* Left Column */}
-          <div className="col-span-12 lg:col-span-8 space-y-6">
-            {/* Rounds Timeline */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Funding Rounds
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Timeline of funding rounds with lead investors and participants
-                </p>
-              </CardHeader>
-              <CardContent>
-                <RoundsTimeline rounds={rounds} companyId={companyId} />
-              </CardContent>
-            </Card>
+        <div className="space-y-12">
+          {/* Funding Rounds */}
+          <CardSection title="Funding Rounds">
+            <RoundsTimeline rounds={rounds} companyId={companyId} />
+          </CardSection>
 
-            {/* Financial Charts */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Financial Charts
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  ARR growth, Burn vs Runway, NRR trends
-                </p>
-              </CardHeader>
-              <CardContent>
-                <FinancialCharts financials={financials} companyId={companyId} />
-              </CardContent>
-            </Card>
-          </div>
+          {/* Charts */}
+          <CardSection title="Charts">
+            <FinancialCharts financials={financials} companyId={companyId} />
+          </CardSection>
 
-          {/* Right Column */}
-          <div className="col-span-12 lg:col-span-4 space-y-6">
-            {/* Metrics Editor */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Operating Metrics
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Editable with provenance tracking
-                </p>
-              </CardHeader>
-              <CardContent>
-                <MetricsEditor
-                  financials={financials}
-                  companyId={companyId}
-                  onUpdate={fetchFinancials}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Anomaly Checks */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Anomaly Checks
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  AI-powered anomaly detection
-                </p>
-              </CardHeader>
-              <CardContent>
-                <AnomalyChecks financials={financials} companyId={companyId} />
-              </CardContent>
-            </Card>
-          </div>
+          {/* Metrics */}
+          <CardSection title="Metrics">
+            <MetricsEditor
+              financials={financials}
+              companyId={companyId}
+              onUpdate={fetchFinancials}
+            />
+          </CardSection>
         </div>
       </div>
     </div>

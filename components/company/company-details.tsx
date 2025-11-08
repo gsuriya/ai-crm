@@ -446,15 +446,9 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
   ];
 
   return (
-    <div className="py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-primary" />
-          <h2 className="text-xl font-semibold text-foreground">
-            Company Details
-          </h2>
-        </div>
-        {unreadEventCount > 0 && (
+    <div className="space-y-4">
+      {unreadEventCount > 0 && (
+        <div className="flex justify-end mb-2">
           <Button
             variant="ghost"
             size="sm"
@@ -466,14 +460,17 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
               {unreadEventCount > 99 ? '99+' : unreadEventCount}
             </span>
           </Button>
-        )}
-      </div>
-      <div className="space-y-4">
-        {details.map((detail) => {
+        </div>
+      )}
+      <div className="space-y-1">
+        {details.map((detail, index) => {
           const Icon = detail.icon;
           const isFieldEditing = editingField === detail.key;
           return (
-            <div key={detail.key} className="flex items-start gap-3 group pb-4 border-b border-border/50 last:border-0 last:pb-0">
+            <div key={detail.key} className="relative flex items-start gap-3 group py-3">
+              {index > 0 && (
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+              )}
               <div className="mt-0.5">
                 <Icon className="h-4 w-4 text-muted-foreground" />
               </div>

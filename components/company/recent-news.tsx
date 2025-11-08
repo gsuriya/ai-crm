@@ -126,26 +126,14 @@ export function RecentNews({ companyId }: RecentNewsProps) {
   }
 
   return (
-    <div className="py-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Newspaper className="h-4 w-4 text-primary" />
-          <h2 className="text-xl font-semibold text-foreground">
-            Recent News
-          </h2>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Latest updates & announcements
-        </p>
-      </div>
-      <div className="space-y-3">
+    <div className="space-y-3">
         {news.map((item, index) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-border/50"
+            className="p-4 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200"
           >
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1">
@@ -180,7 +168,6 @@ export function RecentNews({ companyId }: RecentNewsProps) {
             )}
           </motion.div>
         ))}
-      </div>
     </div>
   );
 }

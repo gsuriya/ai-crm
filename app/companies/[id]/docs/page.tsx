@@ -5,11 +5,10 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { DocsLibrary } from "@/components/company/docs-library";
 import { DocQA } from "@/components/company/doc-qa";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardSection } from "@/components/company/card-section";
 import { Button } from "@/components/ui/button";
-import { FileUp, Upload, Search } from "lucide-react";
+import { Upload } from "lucide-react";
 
-export const dynamic = 'force-dynamic';
 
 interface Doc {
   id: string;
@@ -124,13 +123,13 @@ export default function CompanyDocsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-5">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-12">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Documents</h2>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Documents</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Document library with inline preview, AI doc Q&A, and deck parser
+              {docs.length} documents
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -139,67 +138,44 @@ export default function CompanyDocsPage() {
             </Button>
             <Button size="sm" onClick={() => setShowUploadModal(true)}>
               <Upload className="h-4 w-4 mr-2" />
-              Upload Document
+              Upload
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid grid-cols-12 gap-12">
           {/* Docs Library */}
           <div className="col-span-12 lg:col-span-8">
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Document Library
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {docs.length} documents • Grid + list view with facets
-                </p>
-              </CardHeader>
-              <CardContent>
-                <DocsLibrary
-                  docs={docs}
-                  viewMode={viewMode}
-                  onSelectDoc={setSelectedDoc}
-                  selectedDoc={selectedDoc}
-                />
-              </CardContent>
-            </Card>
+            <CardSection title="Documents">
+              <DocsLibrary
+                docs={docs}
+                viewMode={viewMode}
+                onSelectDoc={setSelectedDoc}
+                selectedDoc={selectedDoc}
+              />
+            </CardSection>
           </div>
 
           {/* Doc Q&A */}
           <div className="col-span-12 lg:col-span-4">
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Search className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    AI Doc Q&A
-                  </CardTitle>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Ask questions about uploaded documents
-                </p>
-              </CardHeader>
-              <CardContent>
-                <DocQA
-                  docs={docs}
-                  companyId={companyId}
-                  selectedDoc={selectedDoc}
-                />
-              </CardContent>
-            </Card>
+            <CardSection title="AI Q&A">
+              <DocQA
+                docs={docs}
+                companyId={companyId}
+                selectedDoc={selectedDoc}
+              />
+            </CardSection>
           </div>
         </div>
 
         {/* Upload Modal */}
         {showUploadModal && (
           <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm"
             onClick={() => setShowUploadModal(false)}
           >
             <div
-              className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4"
+              className="bg-background border border-border/50 rounded-xl p-6 max-w-md w-full mx-4 shadow-lg transition-all duration-200"
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-lg font-semibold mb-4">Upload Document</h3>

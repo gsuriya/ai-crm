@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -183,21 +182,22 @@ export default function CompanyEventsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-5">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Company Events</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Company Events</h2>
+            <p className="text-sm text-muted-foreground mt-2">
               Monitor new content, job postings, news, and more
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {unreadCount > 0 && (
               <Button
                 variant="outline"
                 onClick={handleMarkAllAsRead}
                 disabled={markingRead}
+                className="transition-all duration-200"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 {markingRead ? 'Marking...' : `Mark All Read (${unreadCount})`}
@@ -206,6 +206,7 @@ export default function CompanyEventsPage() {
             <Button
               onClick={handleCheckNow}
               disabled={checking}
+              className="transition-all duration-200"
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
               {checking ? 'Checking...' : 'Check Now'}
@@ -214,9 +215,9 @@ export default function CompanyEventsPage() {
         </div>
 
         {/* Filters */}
-        <div className="mb-4 flex items-center gap-4">
+        <div className="mb-6 flex items-center gap-4">
           <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] transition-all duration-200">
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
@@ -236,79 +237,78 @@ export default function CompanyEventsPage() {
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-6">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </CardContent>
-              </Card>
+              <div key={i} className="animate-pulse rounded-xl bg-muted/20 p-6">
+                <div className="h-4 bg-muted/40 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-muted/40 rounded w-1/2"></div>
+              </div>
             ))}
           </div>
         ) : events.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No events found</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {filterType !== 'all'
-                  ? 'No events match your filter. Try selecting a different type.'
-                  : 'No events have been detected yet. Click "Check Now" to run a manual check.'}
-              </p>
-              {filterType === 'all' && (
-                <Button onClick={handleCheckNow} disabled={checking}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
-                  Check Now
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-muted/20 p-12 text-center transition-all duration-200">
+            <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No events found</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {filterType !== 'all'
+                ? 'No events match your filter. Try selecting a different type.'
+                : 'No events have been detected yet. Click "Check Now" to run a manual check.'}
+            </p>
+            {filterType === 'all' && (
+              <Button onClick={handleCheckNow} disabled={checking} className="transition-all duration-200">
+                <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+                Check Now
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="space-y-4">
             {events.map((event) => {
               const EventIcon = getEventIcon(event.event_type);
               return (
-                <Card key={event.id} className={event.is_new ? 'border-l-4 border-l-blue-500' : ''}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <EventIcon className="h-4 w-4 text-muted-foreground" />
-                          <Badge className={`${EVENT_TYPE_COLORS[event.event_type] || 'bg-gray-500'} text-white border-0`}>
-                            {EVENT_TYPE_LABELS[event.event_type] || event.event_type}
-                          </Badge>
-                          <Badge variant="outline" className={EVENT_CATEGORY_COLORS[event.event_category] || ''}>
-                            {EVENT_CATEGORY_LABELS[event.event_category] || event.event_category}
-                          </Badge>
-                          {event.is_new && (
-                            <Badge className="bg-blue-500 text-white border-0">New</Badge>
-                          )}
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground mb-1">
-                          {event.title}
-                        </h3>
-                        {event.description && (
-                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                            {event.description}
-                          </p>
+                <div
+                  key={event.id}
+                  className={`rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 p-6 ${
+                    event.is_new ? 'border-l-4 border-l-primary/50' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <EventIcon className="h-4 w-4 text-muted-foreground" />
+                        <Badge className={`${EVENT_TYPE_COLORS[event.event_type] || 'bg-gray-500'} text-white border-0`}>
+                          {EVENT_TYPE_LABELS[event.event_type] || event.event_type}
+                        </Badge>
+                        <Badge variant="outline" className={EVENT_CATEGORY_COLORS[event.event_category] || ''}>
+                          {EVENT_CATEGORY_LABELS[event.event_category] || event.event_category}
+                        </Badge>
+                        {event.is_new && (
+                          <Badge className="bg-primary text-white border-0">New</Badge>
                         )}
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span>{formatDate(event.detected_at)}</span>
-                          {event.source_url && (
-                            <a
-                              href={event.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 hover:text-primary"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              View Source
-                            </a>
-                          )}
-                        </div>
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground mb-1">
+                        {event.title}
+                      </h3>
+                      {event.description && (
+                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                          {event.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>{formatDate(event.detected_at)}</span>
+                        {event.source_url && (
+                          <a
+                            href={event.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 hover:text-primary transition-colors duration-200"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View Source
+                          </a>
+                        )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>

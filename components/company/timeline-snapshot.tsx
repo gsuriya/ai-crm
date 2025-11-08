@@ -94,7 +94,7 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
 
   if (activities.length === 0) {
     return (
-      <div className="py-8">
+      <div className="py-4">
         <EmptyState
           icon={Calendar}
           title="No recent activity"
@@ -111,21 +111,6 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
 
   return (
     <>
-      <div 
-        className="py-6 cursor-pointer"
-        onClick={() => router.push(`/companies/${companyId}/activity`)}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold text-foreground">
-              Recent Activity
-            </h2>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <span className="text-xs text-muted-foreground">
-            Last 5 activities
-          </span>
-        </div>
       <div className="space-y-4">
         {Object.entries(groupedActivities).map(([date, dayActivities]) => (
           <div key={date} className="space-y-3">
@@ -141,8 +126,8 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
                   key={activity.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer border border-border/50 ${
-                    isSelected ? "ring-2 ring-primary ring-offset-2" : ""
+                  className={`p-4 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 cursor-pointer ${
+                    isSelected ? "ring-2 ring-primary/50 ring-offset-1 bg-muted/40" : ""
                   }`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -214,9 +199,8 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
           </div>
         ))}
       </div>
-    </div>
 
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

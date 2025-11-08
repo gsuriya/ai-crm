@@ -13,7 +13,7 @@ const config: Config = {
         background: "hsl(0, 0%, 100%)",
         foreground: "hsl(222, 47%, 11%)",
         primary: {
-          DEFAULT: "hsl(230, 85%, 55%)",
+          DEFAULT: "hsl(222, 47%, 11%)",
           foreground: "hsl(0, 0%, 100%)",
         },
         secondary: {
@@ -25,12 +25,12 @@ const config: Config = {
           foreground: "hsl(222, 12%, 40%)",
         },
         accent: {
-          DEFAULT: "hsl(230, 85%, 55%)",
-          foreground: "hsl(0, 0%, 100%)",
+          DEFAULT: "hsl(220, 14%, 96%)",
+          foreground: "hsl(222, 47%, 11%)",
         },
         border: "hsl(220, 13%, 60%)",
         input: "hsl(220, 13%, 60%)",
-        ring: "hsl(230, 85%, 55%)",
+        ring: "hsl(222, 47%, 11%)",
         destructive: {
           DEFAULT: "hsl(0, 84%, 60%)",
           foreground: "hsl(0, 0%, 100%)",

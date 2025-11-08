@@ -12,6 +12,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface CompanyTabsProps {
   companyId: string;
@@ -96,29 +97,42 @@ export function CompanyTabs({ companyId, currentTab }: CompanyTabsProps) {
   }, [companyId, pathname, tabs]);
 
   return (
-    <Tabs value={currentTab} onValueChange={handleTabChange}>
-      <TabsList className="grid w-full grid-cols-8">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const showBadge = tab.id === "events" && unreadEventCount > 0;
-          return (
-            <TabsTrigger
-              key={tab.id}
-              value={tab.id}
-              className="flex items-center gap-2 text-xs relative"
-            >
-              <Icon className="h-4 w-4" />
-              <span>{tab.label}</span>
-              {showBadge && (
-                <span className="ml-1 flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
-                  {unreadEventCount > 99 ? '99+' : unreadEventCount}
-                </span>
-              )}
-            </TabsTrigger>
-          );
-        })}
-      </TabsList>
-    </Tabs>
+    <div className="sticky top-0 z-30 bg-background border-b border-border">
+      <div className="relative overflow-x-auto">
+        {/* Scroll shadows */}
+        <div className="pointer-events-none absolute left-0 top-0 h-full w-6 bg-gradient-to-r from-background to-transparent z-10" />
+        <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-background to-transparent z-10" />
+        
+        <Tabs value={currentTab} onValueChange={handleTabChange}>
+          <TabsList className="flex gap-2 px-4 py-2 min-h-[48px] w-full overflow-x-auto scrollbar-hide">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const showBadge = tab.id === "events" && unreadEventCount > 0;
+              return (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className={cn(
+                    "inline-flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-all",
+                    "text-muted-foreground border border-transparent",
+                    "data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:border-border",
+                    "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{tab.label}</span>
+                  {showBadge && (
+                    <span className="ml-1 flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                      {unreadEventCount > 99 ? '99+' : unreadEventCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
+      </div>
+    </div>
   );
 }
 

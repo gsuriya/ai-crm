@@ -1,18 +1,17 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { Company, ActivityItem, Deal } from "@/lib/types/company";
 import { CompanyKeyMetrics } from "@/components/company/company-key-metrics";
 import { TimelineSnapshot } from "@/components/company/timeline-snapshot";
 import { ContactsSection } from "@/components/company/contacts-section";
 import { DealState } from "@/components/company/deal-state";
-import { RecentNews } from "@/components/company/recent-news";
 import { CompanyDetails } from "@/components/company/company-details";
-import { SimilarCompanies } from "@/components/company/similar-companies";
-
-export const dynamic = 'force-dynamic';
+import { KpiStrip } from "@/components/company/kpi-strip";
+import { CardSection } from "@/components/company/card-section";
+import Link from "next/link";
 
 export default function CompanyOverviewPage() {
   const params = useParams();
@@ -22,6 +21,8 @@ export default function CompanyOverviewPage() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(true);
+  const [financials, setFinancials] = useState<any>(null);
+  const router = useRouter();
 
   const fetchCompanyData = useCallback(async () => {
     if (!companyId) return;
@@ -38,6 +39,20 @@ export default function CompanyOverviewPage() {
 
       if (companyError) throw companyError;
       setCompany(companyData as Company);
+
+      // Fetch latest financials for KPI strip
+      const { data: financialsData } = await supabase
+        .from("company_financials")
+        .select("*")
+        .eq("company_id", companyId)
+        .order("year", { ascending: false })
+        .order("month", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (financialsData) {
+        setFinancials(financialsData);
+      }
 
       // Fetch email logs (both sent and received)
       const { data: emailLogs } = await supabase
@@ -126,7 +141,8 @@ export default function CompanyOverviewPage() {
 
   useEffect(() => {
     fetchCompanyData();
-  }, [fetchCompanyData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
 
   // Listen for company updates from child components
   useEffect(() => {
@@ -138,7 +154,8 @@ export default function CompanyOverviewPage() {
     return () => {
       window.removeEventListener('companyUpdated', handleCompanyUpdate);
     };
-  }, [fetchCompanyData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
 
   if (loading) {
     return (
@@ -156,36 +173,122 @@ export default function CompanyOverviewPage() {
     );
   }
 
+  const formatCurrency = (value?: number | null) => {
+    if (!value) return "—";
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value.toFixed(0)}`;
+  };
+
+  const formatLastActivity = () => {
+    if (activities.length === 0) return "No activity";
+    const latest = activities[0];
+    const date = new Date(latest.date);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const kpiItems = [
+    {
+      label: "ARR",
+      value: financials?.arr ? formatCurrency(financials.arr) : "—",
+      onClick: () => router.push(`/companies/${companyId}/financials`),
+    },
+    {
+      label: "Burn Rate",
+      value: financials?.burn ? formatCurrency(financials.burn) : "—",
+      onClick: () => router.push(`/companies/${companyId}/financials`),
+    },
+    {
+      label: "Employees",
+      value: company?.employee_count ? company.employee_count.toLocaleString() : "—",
+    },
+    {
+      label: "Funding",
+      value: company?.funding_amount ? formatCurrency(company.funding_amount) : "—",
+    },
+    {
+      label: "Last Activity",
+      value: formatLastActivity(),
+      onClick: () => router.push(`/companies/${companyId}/activity`),
+    },
+  ];
+
   return (
     <div className="flex-1 overflow-y-auto bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-12 gap-8">
-          {/* Center Column (col-span-8) */}
-          <div className="col-span-12 lg:col-span-8 space-y-8">
-            {/* Key Metrics */}
-            <CompanyKeyMetrics companyId={companyId} />
+        {/* KPI Strip */}
+        <div className="mb-12">
+          <KpiStrip items={kpiItems} />
+        </div>
 
-            {/* Timeline Snapshot */}
-            <TimelineSnapshot companyId={companyId} activities={activities} />
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
+          {/* Main Content */}
+          <main className="lg:col-span-8 space-y-12">
+            {/* Activity Section */}
+            <CardSection
+              title="Activity"
+              action={
+                <Link
+                  href={`/companies/${companyId}/activity`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  View all
+                </Link>
+              }
+            >
+              <TimelineSnapshot companyId={companyId} activities={activities} />
+            </CardSection>
 
-            {/* Contacts */}
-            <ContactsSection companyId={companyId} company={company} />
+            {/* Contacts Section */}
+            <CardSection
+              title="People"
+              action={
+                <Link
+                  href={`/companies/${companyId}/people`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  View all
+                </Link>
+              }
+            >
+              <ContactsSection companyId={companyId} company={company} />
+            </CardSection>
+
+            {/* Financials Section */}
+            <CardSection
+              title="Financials"
+              action={
+                <Link
+                  href={`/companies/${companyId}/financials`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  View all
+                </Link>
+              }
+            >
+              <CompanyKeyMetrics companyId={companyId} />
+            </CardSection>
 
             {/* Deal State */}
-            {deal && <DealState deal={deal} />}
-          </div>
+            {deal && (
+              <CardSection title="Deal">
+                <DealState deal={deal} />
+              </CardSection>
+            )}
+          </main>
 
-          {/* Right Column (col-span-4) */}
-          <div className="col-span-12 lg:col-span-4 space-y-8">
+          {/* Sidebar */}
+          <aside className="lg:col-span-4 space-y-12">
             {/* Company Details */}
-            <CompanyDetails companyId={companyId} />
-
-            {/* Recent News */}
-            <RecentNews companyId={companyId} />
-
-            {/* Similar Companies */}
-            <SimilarCompanies companyId={companyId} />
-          </div>
+            <CardSection title="Details">
+              <CompanyDetails companyId={companyId} />
+            </CardSection>
+          </aside>
         </div>
       </div>
     </div>

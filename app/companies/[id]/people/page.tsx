@@ -6,12 +6,10 @@ import { supabase } from "@/lib/supabase";
 import type { Person } from "@/lib/types/company";
 import { CoverageTable } from "@/components/company/coverage-table";
 import { OrgGraph } from "@/components/company/org-graph";
-import { Gaps } from "@/components/company/gaps";
+import { CardSection } from "@/components/company/card-section";
 import { Button } from "@/components/ui/button";
-import { Plus, Upload, Users } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Upload } from "lucide-react";
 
-export const dynamic = 'force-dynamic';
 
 export default function CompanyPeoplePage() {
   const params = useParams();
@@ -78,13 +76,13 @@ export default function CompanyPeoplePage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-5">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-12">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">People</h2>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">People</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {people.length} contacts • Show coverage, relationship heat, and gaps
+              {people.length} contacts
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -99,65 +97,20 @@ export default function CompanyPeoplePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid grid-cols-12 gap-12">
           {/* Coverage Map */}
           <div className="col-span-12 lg:col-span-8">
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Coverage Map
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Table + mini heatmap showing relationship strength
-                </p>
-              </CardHeader>
-              <CardContent>
-                <CoverageTable people={people} companyId={companyId} />
-              </CardContent>
-            </Card>
+            <CardSection title="Coverage Map">
+              <CoverageTable people={people} companyId={companyId} />
+            </CardSection>
           </div>
 
           {/* Org Graph */}
           <div className="col-span-12 lg:col-span-4">
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Org Graph
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Compact, zoomable organization chart
-                </p>
-              </CardHeader>
-              <CardContent>
-                <OrgGraph people={people} companyId={companyId} />
-              </CardContent>
-            </Card>
+            <CardSection title="Org Graph">
+              <OrgGraph people={people} companyId={companyId} />
+            </CardSection>
           </div>
-        </div>
-
-        {/* Gaps */}
-        <div className="mt-6">
-          <Card className="rounded-2xl shadow-sm border border-border p-5">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    Coverage Gaps
-                  </CardTitle>
-                </div>
-                <Button variant="ghost" size="sm" className="text-xs">
-                  Auto-capture
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                AI-suggested contacts from email/calendar; de-dupe; map domains/aliases
-              </p>
-            </CardHeader>
-            <CardContent>
-              <Gaps companyId={companyId} people={people} />
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

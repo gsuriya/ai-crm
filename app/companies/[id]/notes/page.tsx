@@ -4,11 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { NotesEditor } from "@/components/company/notes-editor";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardSection } from "@/components/company/card-section";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, History, MessageSquare } from "lucide-react";
+import { FileText, Plus, History } from "lucide-react";
 
-export const dynamic = 'force-dynamic';
 
 interface Note {
   id: string;
@@ -102,19 +101,19 @@ export default function CompanyNotesPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-5">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-12">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Notes</h2>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Notes</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Notion-like, fast rich text editor with templates and AI actions
+              {notes.length} notes
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(!showVersionHistory)}>
               <History className="h-4 w-4 mr-2" />
-              Version History
+              History
             </Button>
             <Button size="sm" onClick={handleCreateNote}>
               <Plus className="h-4 w-4 mr-2" />
@@ -123,42 +122,35 @@ export default function CompanyNotesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid grid-cols-12 gap-12">
           {/* Notes List Sidebar */}
           <div className="col-span-12 lg:col-span-3">
-            <Card className="rounded-2xl shadow-sm border border-border p-4">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-foreground">
-                  Notes ({notes.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                  {notes.map((note) => (
-                    <div
-                      key={note.id}
-                      onClick={() => setSelectedNote(note)}
-                      className={`p-3 rounded-lg border border-border cursor-pointer hover:bg-accent/50 transition-colors ${
-                        selectedNote?.id === note.id ? "bg-accent border-primary" : "bg-background"
-                      }`}
-                    >
-                      <div className="text-xs font-medium text-foreground line-clamp-2 mb-1">
-                        {note.content.substring(0, 100) || "New Note"}
-                        {note.content.length > 100 ? "..." : ""}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(note.updated_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  ))}
-                  {notes.length === 0 && (
-                    <div className="text-center py-8 text-sm text-muted-foreground">
-                      No notes yet. Create one to get started.
-                    </div>
-                  )}
+            <div className="space-y-1">
+              {notes.map((note) => (
+                <div
+                  key={note.id}
+                  onClick={() => setSelectedNote(note)}
+                  className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                    selectedNote?.id === note.id 
+                      ? "bg-primary/10 text-foreground" 
+                      : "hover:bg-muted/40 text-muted-foreground"
+                  }`}
+                >
+                  <div className="text-sm font-medium line-clamp-2 mb-1">
+                    {note.content.substring(0, 80) || "New Note"}
+                    {note.content.length > 80 ? "..." : ""}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(note.updated_at).toLocaleDateString()}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              ))}
+              {notes.length === 0 && (
+                <div className="text-center py-12 text-sm text-muted-foreground">
+                  No notes yet
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Notes Editor */}
@@ -170,21 +162,19 @@ export default function CompanyNotesPage() {
                 onSave={fetchNotes}
               />
             ) : (
-              <Card className="rounded-2xl shadow-sm border border-border p-12">
-                <div className="text-center">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    No note selected
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Select a note from the sidebar or create a new one
-                  </p>
-                  <Button onClick={handleCreateNote}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Note
-                  </Button>
-                </div>
-              </Card>
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <FileText className="h-12 w-12 mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  No note selected
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Select a note or create a new one
+                </p>
+                <Button onClick={handleCreateNote}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Note
+                </Button>
+              </div>
             )}
           </div>
         </div>

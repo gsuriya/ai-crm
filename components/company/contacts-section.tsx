@@ -304,20 +304,14 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="text-sm text-gray-500">Loading contacts...</div>
-      </div>
+      <div className="text-sm text-muted-foreground">Loading contacts...</div>
     );
   }
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Contacts
-          </h2>
+      <div>
+        <div className="flex items-center justify-end mb-4">
           <Button
             size="sm"
             variant="outline"
@@ -333,7 +327,7 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
         </div>
 
         {contacts.length === 0 ? (
-          <p className="text-xs text-gray-500">No contacts yet</p>
+          <p className="text-xs text-muted-foreground">No contacts yet</p>
         ) : (
           <div className="space-y-3">
             {contacts.map((contact) => {
@@ -341,18 +335,18 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
               return (
                 <div
                   key={contact.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center justify-between p-4 bg-muted/20 rounded-xl hover:bg-muted/40 transition-all duration-200"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-foreground">
                         {contact.first_name} {contact.last_name}
                       </span>
                       {contact.position && (
-                        <span className="text-xs text-gray-500">• {contact.position}</span>
+                        <span className="text-xs text-muted-foreground">• {contact.position}</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-gray-600">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       {contact.email && (
                         <div className="flex items-center gap-1">
                           <Mail className="h-3 w-3" />
@@ -368,9 +362,9 @@ export function ContactsSection({ companyId, company }: { companyId: string; com
                     </div>
                     {cadence && (
                       <div className="flex items-center gap-2 mt-2">
-                        <Workflow className="h-3 w-3 text-blue-600" />
-                        <span className="text-xs text-blue-600 font-medium">{cadence.name}</span>
-                        <span className="text-xs text-gray-500">• Active</span>
+                        <Workflow className="h-3 w-3 text-primary" />
+                        <span className="text-xs text-primary font-medium">{cadence.name}</span>
+                        <span className="text-xs text-muted-foreground">• Active</span>
                       </div>
                     )}
                   </div>

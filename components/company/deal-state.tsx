@@ -1,6 +1,5 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "next/link";
@@ -32,23 +31,21 @@ export function DealState({ deal }: DealStateProps) {
   };
 
   return (
-    <Card className="rounded-2xl shadow-sm border border-border p-5">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-primary" />
-            <CardTitle className="text-lg font-semibold text-foreground">
-              Deal State
-            </CardTitle>
-          </div>
-          <Link href="/pipeline">
-            <Button variant="ghost" size="sm">
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
+    <div className="rounded-xl bg-muted/20 p-5 transition-all duration-200">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Briefcase className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Deal State
+          </h3>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        <Link href="/pipeline">
+          <Button variant="ghost" size="sm" className="transition-all duration-200">
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </Link>
+      </div>
+      <div className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Stage</span>
@@ -83,7 +80,7 @@ export function DealState({ deal }: DealStateProps) {
         </div>
 
         {deal.blockers && deal.blockers.length > 0 && (
-          <div className="pt-4 border-t border-border">
+          <div className="pt-4 border-t border-border/30">
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
               <div className="flex-1">
@@ -100,14 +97,14 @@ export function DealState({ deal }: DealStateProps) {
           </div>
         )}
 
-        <div className="pt-4 border-t border-border">
+        <div className="pt-4 border-t border-border/30">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
             <span>SLA: 14 days in current stage</span>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

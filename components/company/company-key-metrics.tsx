@@ -163,41 +163,28 @@ export function CompanyKeyMetrics({ companyId }: CompanyKeyMetricsProps) {
     : [];
 
   return (
-    <div 
-      className={`py-6 ${metrics && metrics.arr ? 'cursor-pointer' : ''}`}
-      onClick={() => metrics && metrics.arr && router.push(`/companies/${companyId}/financials`)}
-    >
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold text-foreground">
-            Financials
-          </h2>
-          {metrics && metrics.arr && (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {metrics && metrics.isLive && (
-            <Badge variant="default" className="text-xs bg-green-500">
-              Live
-            </Badge>
-          )}
-          {metrics && metrics.month && metrics.year && (
-            <Badge variant="outline" className="text-xs">
-              {new Date(metrics.year, metrics.month - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-            </Badge>
-          )}
-          {metrics && !metrics.month && metrics.year && (
-            <Badge variant="outline" className="text-xs">
-              {metrics.year}
-            </Badge>
-          )}
-          {metrics && metrics.lastUpdated && (
-            <Badge variant="outline" className="text-xs">
-              Updated {new Date(metrics.lastUpdated).toLocaleDateString()}
-            </Badge>
-          )}
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 flex-wrap transition-all duration-200">
+        {metrics && metrics.isLive && (
+          <Badge variant="default" className="text-xs bg-green-500">
+            Live
+          </Badge>
+        )}
+        {metrics && metrics.month && metrics.year && (
+          <Badge variant="outline" className="text-xs">
+            {new Date(metrics.year, metrics.month - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+          </Badge>
+        )}
+        {metrics && !metrics.month && metrics.year && (
+          <Badge variant="outline" className="text-xs">
+            {metrics.year}
+          </Badge>
+        )}
+        {metrics && metrics.lastUpdated && (
+          <Badge variant="outline" className="text-xs">
+            Updated {new Date(metrics.lastUpdated).toLocaleDateString()}
+          </Badge>
+        )}
       </div>
       <div className="space-y-6">
         {/* Show chart if we have multiple data points */}

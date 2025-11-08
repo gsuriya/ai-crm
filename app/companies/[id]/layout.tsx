@@ -5,22 +5,6 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  FileText,
-  Plus,
-  Mail,
-  Phone,
-  Calendar,
-  Settings,
-  Upload,
-  DollarSign,
-  FileUp,
-  Sparkles,
-  Workflow,
-  User,
-  History,
-} from "lucide-react";
 import type { Company } from "@/lib/types/company";
 import { CompanyTabs } from "@/components/company/company-tabs";
 
@@ -115,43 +99,29 @@ export default function CompanyLayout({
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Header Bar */}
-      <div className="border-b border-border bg-background px-6 py-5">
+      <div className="border-b border-border bg-background px-6 py-8">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div>
-                <h1 className="text-2xl font-semibold text-foreground">
-                  {company.name}
-                </h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {company.website || company.domain || "No website"}
-                </p>
-              </div>
-              {company.stage && (
-                <span className="px-2 py-1 rounded-md bg-accent text-accent-foreground text-xs font-medium">
-                  {company.stage}
-                </span>
-              )}
-              {company.sectors && company.sectors.length > 0 && (
-                <div className="flex gap-1">
-                  {company.sectors.slice(0, 3).map((sector, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-1 rounded-md bg-muted text-muted-foreground text-xs"
-                    >
-                      {sector}
-                    </span>
-                  ))}
-                </div>
-              )}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-foreground tracking-tight mb-3">
+              {company.name}
+            </h1>
+            <div className="flex items-center gap-6 flex-wrap">
+              {company.website || company.domain ? (
+                <a
+                  href={company.website || `https://${company.domain}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+                >
+                  <span>{company.website || company.domain}</span>
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              ) : null}
               {company.location && (
                 <span className="text-sm text-muted-foreground">
-                  📍 {company.location}
-                </span>
-              )}
-              {company.owner && (
-                <span className="text-sm text-muted-foreground">
-                  Owner: {company.owner}
+                  {company.location}
                 </span>
               )}
               {lastTouchDays !== null && (
@@ -159,12 +129,38 @@ export default function CompanyLayout({
                   Last touch: {lastTouchDays}d ago
                 </span>
               )}
-              {company.relationshipScore !== undefined && (
-                <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
-                  Score: {company.relationshipScore}/100
-                </span>
-              )}
             </div>
+          </div>
+          
+          {/* Badges Row */}
+          <div className="flex items-center gap-2 flex-wrap mb-6">
+            {company.stage && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                {company.stage}
+              </span>
+            )}
+            {company.sectors && company.sectors.length > 0 && (
+              <>
+                {company.sectors.slice(0, 3).map((sector, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/50"
+                  >
+                    {sector}
+                  </span>
+                ))}
+              </>
+            )}
+            {company.relationshipScore !== undefined && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                Score: {company.relationshipScore}/100
+              </span>
+            )}
+            {company.owner && (
+              <span className="text-xs text-muted-foreground">
+                Owner: {company.owner}
+              </span>
+            )}
           </div>
 
           {/* Tab Navigation */}
@@ -173,7 +169,7 @@ export default function CompanyLayout({
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto">{children}</div>
+      <div className="flex-1 overflow-y-auto bg-background">{children}</div>
     </div>
   );
 }

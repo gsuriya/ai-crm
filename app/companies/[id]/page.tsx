@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, FileText, Plus, Play, Mail, Phone, Edit, History, Upload, DollarSign, FileUp, BarChart3, X, User, MoreVertical, Settings } from "lucide-react";
+import { ArrowLeft, Calendar, FileText, Plus, Play, Mail, Phone, Edit, History, Upload, DollarSign, FileUp, BarChart3, X, User, MoreVertical, Settings, Sparkles, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
@@ -177,6 +177,7 @@ export default function CompanyDetailPage() {
   const [editingValue, setEditingValue] = useState('');
   const [contactCadences, setContactCadences] = useState<Record<string, string>>({});
   const [autoSwitchCadences, setAutoSwitchCadences] = useState<Record<string, boolean>>({});
+  const [enriching, setEnriching] = useState(false);
   
   // Financial form state
   const [financialForm, setFinancialForm] = useState({
@@ -340,7 +341,6 @@ export default function CompanyDetailPage() {
 
       if (companyResult.error) throw companyResult.error;
       setCompany(companyResult.data);
-      setEmailValue(companyResult.data?.email || '');
       setPhoneValue(companyResult.data?.phone_number || '');
 
       if (contentResult.data) {
@@ -638,6 +638,38 @@ export default function CompanyDetailPage() {
   };
 
   // Handler for editing company fields
+  const handleEnrichCompany = async () => {
+    if (!company) return;
+    
+    setEnriching(true);
+    try {
+      const response = await fetch(`/api/companies/${companyId}/enrich`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to enrich company");
+      }
+
+      // Refresh company data
+      await fetchCompany();
+      
+      // Show success message (you could add a toast here)
+      alert(`Company enriched successfully using ${data.data_source || "unknown"} data source!`);
+    } catch (error: any) {
+      console.error("Enrichment error:", error);
+      alert(`Failed to enrich company: ${error.message}`);
+    } finally {
+      setEnriching(false);
+    }
+  };
+
   const handleSaveField = async (field: string) => {
     if (!companyId) return;
     try {
@@ -812,6 +844,24 @@ export default function CompanyDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleEnrichCompany}
+              disabled={enriching}
+            >
+              {enriching ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Enriching...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Enrich Data
+                </>
+              )}
+            </Button>
             <Button variant="outline" size="sm">
               <Settings className="h-4 w-4 mr-2" />
               Settings

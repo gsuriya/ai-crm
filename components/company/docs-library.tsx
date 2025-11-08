@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, File, Download, Eye, MoreVertical, Grid, List } from "lucide-react";
+import { FileText, File, Download, Eye, MoreVertical, Grid, List, FileUp } from "lucide-react";
 import { EmptyState } from "./empty-state";
 import { motion } from "framer-motion";
 
