@@ -132,7 +132,7 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
     if (!innerContainer) return;
 
     let lastTime = performance.now();
-    const scrollSpeed = 40; // pixels per second - slowed down
+    const scrollSpeed = 80; // pixels per second - MUCH FASTER
     const cardWidth = 140;
     const gap = 8;
     const cardWithGap = cardWidth + gap;
@@ -346,17 +346,17 @@ function CardWithGradient({
     onHoverEnd(); // Resume carousel
   };
 
-  // Unified animation config for smooth coordinated animations
-  const unifiedTransition = {
-    duration: 0.25,
-    ease: [0.25, 0.1, 0.25, 1],
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: (index % articlesLength) * 0.05, duration: 0.3 }}
+      animate={{ 
+        opacity: 1, 
+        y: isHovered ? -12 : 0,
+      }}
+      transition={{ 
+        opacity: { delay: (index % articlesLength) * 0.05, duration: 0.3 },
+        y: { duration: 0.12, ease: [0.4, 0, 0.2, 1], delay: 0 },
+      }}
       className="flex-shrink-0 w-[140px] group cursor-pointer"
       onClick={() => window.open(article.url, "_blank")}
       onMouseEnter={handleMouseEnter}
@@ -364,10 +364,10 @@ function CardWithGradient({
       style={{ 
         opacity, 
         transition: 'opacity 0.3s ease-out',
-        willChange: 'auto',
+        willChange: 'transform',
       }}
     >
-                <div className="relative overflow-hidden border border-gray-200/30 bg-white flex flex-col" style={{ height: 'auto', maxHeight: '120px' }}>
+                <div className="relative overflow-hidden border border-gray-200/30 bg-white flex flex-col shadow-sm hover:shadow-md transition-shadow duration-150" style={{ height: 'auto', maxHeight: '120px' }}>
                   {/* Image Section */}
                   <div className="relative h-10 w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
                     {isCEOPhoto ? (
@@ -388,43 +388,27 @@ function CardWithGradient({
                     )}
                   </div>
 
-                  {/* Content - expands upward to cover image */}
-                  <motion.div 
-                    className="p-1.5 flex-1 flex flex-col bg-white border-t border-gray-100/50 relative overflow-hidden"
-                    initial={false}
-                    animate={{
-                      y: isHovered ? -16 : 0,
-                    }}
-                    transition={{
-                      duration: 0.25,
-                      ease: [0.25, 0.1, 0.25, 1],
-                    }}
-                  >
-                    {/* Gradient overlay on hover - animates from bottom up, slower than white section */}
+                  {/* Content section with gradient overlay */}
+                  <div className="p-1.5 flex-1 flex flex-col bg-white border-t border-gray-100/50 relative overflow-hidden">
+                    {/* Gradient overlay with smooth pulsing animation */}
                     <motion.div
                       className="absolute inset-0 pointer-events-none z-0"
-                      initial={false}
+                      initial={{ opacity: 0 }}
                       animate={{ 
-                        y: isHovered ? "0%" : "100%",
                         opacity: isHovered ? 1 : 0,
                       }}
-                      transition={{
-                        y: {
-                          duration: 0.4,
-                          ease: [0.25, 0.1, 0.25, 1],
-                        },
-                        opacity: {
-                          duration: 0.05,
-                        },
+                      transition={{ 
+                        duration: 0.12,
+                        ease: [0.4, 0, 0.2, 1],
+                        delay: 0,
                       }}
                       style={{
-                        background: "linear-gradient(to top, rgba(147, 197, 253, 0.4) 0%, rgba(196, 181, 253, 0.3) 30%, rgba(251, 207, 232, 0.2) 60%, rgba(251, 207, 232, 0.1) 80%, transparent 100%)",
-                        willChange: 'transform, opacity',
+                        background: "linear-gradient(to top, rgba(147, 197, 253, 0.5) 0%, rgba(196, 181, 253, 0.4) 30%, rgba(251, 207, 232, 0.3) 60%, rgba(251, 207, 232, 0.15) 80%, transparent 100%)",
                       }}
                     />
                     
                     {/* Content wrapper */}
-                    <div className="flex-1 flex flex-col relative z-10 pb-5">
+                    <div className="flex-1 flex flex-col relative z-10">
                       {/* Company Name */}
                       <h3 className="text-[10px] font-semibold text-gray-900 mb-0.5 line-clamp-1 leading-tight tracking-tight">
                         {article.company}
@@ -458,34 +442,8 @@ function CardWithGradient({
                           {formatTimeAgo(article.daysAgo)}
                         </span>
                       </div>
-
-                      {/* Explore button - appears on hover */}
-                      <motion.div
-                        className="absolute bottom-0 left-0 right-0 overflow-hidden"
-                        initial={false}
-                        animate={{
-                          opacity: isHovered ? 1 : 0,
-                          height: isHovered ? 20 : 0,
-                        }}
-                        transition={unifiedTransition}
-                        style={{
-                          pointerEvents: isHovered ? 'auto' : 'none',
-                        }}
-                      >
-                        <div className="pt-2 border-t border-gray-100/50 px-1.5">
-                          <a
-                            href={article.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[9px] font-medium text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            Explore <span>→</span>
-                          </a>
-                        </div>
-                      </motion.div>
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
     </motion.div>
   );
