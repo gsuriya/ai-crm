@@ -33,11 +33,11 @@ function formatTimeAgo(days: number): string {
 
 // News article preview background component - using real news article screenshots
 function NewsArticlePreview() {
-  // Using a realistic news article layout with blurred text
+  // Using a realistic news article layout with gradient blur (clear at top, blurred at bottom)
   return (
     <div className="absolute inset-0 overflow-hidden bg-white">
-      {/* News article layout simulation */}
-      <div className="absolute inset-0 p-2 space-y-1.5 opacity-40" style={{ filter: 'blur(2px) grayscale(60%)' }}>
+      {/* Base layer - all content */}
+      <div className="absolute inset-0 p-2 space-y-1.5 opacity-40">
         {/* Article header/logo area */}
         <div className="flex items-center gap-1 mb-1">
           <div className="h-1.5 w-12 bg-gray-700 rounded"></div>
@@ -72,6 +72,40 @@ function NewsArticlePreview() {
         </div>
       </div>
       
+      {/* Blurred overlay layer - gradient mask makes it fade in from top to bottom */}
+      <div 
+        className="absolute inset-0 p-2 space-y-1.5 opacity-40 grayscale(60%)"
+        style={{ 
+          filter: 'blur(3px)',
+          maskImage: 'linear-gradient(to bottom, transparent 0%, transparent 25%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.7) 60%, black 80%, black 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, transparent 25%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.7) 60%, black 80%, black 100%)',
+          pointerEvents: 'none'
+        }}
+      >
+        {/* Same content structure */}
+        <div className="flex items-center gap-1 mb-1">
+          <div className="h-1.5 w-12 bg-gray-700 rounded"></div>
+          <div className="h-1 w-16 bg-gray-500 rounded"></div>
+        </div>
+        <div className="h-2 bg-gray-800 rounded w-5/6 font-bold"></div>
+        <div className="h-1.5 bg-gray-700 rounded w-4/5"></div>
+        <div className="flex items-center gap-2 mt-1">
+          <div className="h-1 w-20 bg-gray-400 rounded"></div>
+          <div className="h-1 w-16 bg-gray-400 rounded"></div>
+        </div>
+        <div className="space-y-1 mt-2">
+          <div className="h-1 bg-gray-600 rounded w-full"></div>
+          <div className="h-1 bg-gray-600 rounded w-11/12"></div>
+          <div className="h-1 bg-gray-600 rounded w-full"></div>
+          <div className="h-1 bg-gray-600 rounded w-5/6"></div>
+        </div>
+        <div className="h-3 bg-gray-300 rounded mt-1.5"></div>
+        <div className="space-y-1 mt-1.5">
+          <div className="h-1 bg-gray-600 rounded w-full"></div>
+          <div className="h-1 bg-gray-600 rounded w-10/12"></div>
+        </div>
+      </div>
+      
       {/* Subtle overlay for consistency */}
       <div className="absolute inset-0 bg-gray-900/10"></div>
     </div>
@@ -87,15 +121,14 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
       align: "start",
       direction: "ltr",
       skipSnaps: true,
-      dragFree: true,
+      dragFree: false,
+      dragThreshold: 1000, // Effectively disable drag
     }
   );
 
   // Duplicate articles for seamless infinite scroll
   const duplicatedArticles = [...articles, ...articles];
 
-  // Calculate dynamic opacity based on scroll position
-  const [cardOpacities, setCardOpacities] = useState<Map<number, number>>(new Map());
   const scrollPositionRef = useRef(0);
   const innerContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -104,6 +137,12 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
   // Scroll state
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserScrollingRef = useRef(false);
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartPositionRef = useRef(0);
+  const hasDragStartedRef = useRef(false);
+  const dragMoveHandlerRef = useRef<((e: MouseEvent | TouchEvent) => void) | null>(null);
+  const dragEndHandlerRef = useRef<(() => void) | null>(null);
 
   // Synchronous pause handler that immediately locks position
   const handlePause = useCallback(() => {
@@ -184,49 +223,220 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
     }, 3000);
   }, [articles.length]);
 
-  // Add wheel event listener
+  // Drag handlers - work exactly like wheel scroll
+  const handleDragStart = useCallback((e: MouseEvent | TouchEvent) => {
+    const innerContainer = innerContainerRef.current;
+    if (!innerContainer) return;
+    
+    // Capture starting position
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    dragStartXRef.current = clientX;
+    dragStartPositionRef.current = scrollPositionRef.current;
+    hasDragStartedRef.current = true;
+    
+    // Attach global listeners for drag move and end
+    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+      // Only process if we've actually started a drag (mousedown happened)
+      if (!hasDragStartedRef.current) return;
+      
+      const innerContainer = innerContainerRef.current;
+      if (!innerContainer) return;
+      
+      const clientX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const deltaX = Math.abs(dragStartXRef.current - clientX);
+      
+      // Only start dragging if moved more than 5px (allows clicks to work)
+      if (!isDraggingRef.current && deltaX < 5) {
+        return;
+      }
+      
+      // Now we're actually dragging
+      if (!isDraggingRef.current) {
+        isDraggingRef.current = true;
+        isUserScrollingRef.current = true;
+        isPausedRef.current = true;
+        setIsPaused(true);
+        
+        if (pausedPositionRef.current === null) {
+          pausedPositionRef.current = scrollPositionRef.current;
+        }
+      }
+      
+      moveEvent.preventDefault();
+      
+      const currentDeltaX = dragStartXRef.current - clientX; // Inverted because we're dragging left/right
+      
+      const cardWidth = 140;
+      const gap = 8;
+      const cardWithGap = cardWidth + gap;
+      const maxScroll = articles.length * cardWithGap;
+      
+      let newPosition = dragStartPositionRef.current + currentDeltaX;
+      
+      // Handle wrapping
+      if (newPosition < 0) {
+        newPosition = maxScroll + (newPosition % maxScroll);
+      } else if (newPosition > maxScroll) {
+        newPosition = newPosition % maxScroll;
+      }
+      
+      scrollPositionRef.current = newPosition;
+      pausedPositionRef.current = newPosition;
+      innerContainer.style.transform = `translateX(-${newPosition}px)`;
+    };
+    
+    const handleEnd = () => {
+      // Only handle if we've started a drag
+      if (!hasDragStartedRef.current) return;
+      
+      hasDragStartedRef.current = false;
+      
+      // Only handle pause/resume if we were actually dragging
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        
+        // Clear existing timeout
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+        
+        // Resume auto-scroll after 3 seconds of inactivity
+        scrollTimeoutRef.current = setTimeout(() => {
+          isUserScrollingRef.current = false;
+          isPausedRef.current = false;
+          setIsPaused(false);
+        }, 3000);
+      }
+      
+      // Reset drag start position
+      dragStartXRef.current = 0;
+      dragStartPositionRef.current = 0;
+      
+      // Remove listeners after drag ends
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+    
+    dragMoveHandlerRef.current = handleMove;
+    dragEndHandlerRef.current = handleEnd;
+    
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+  }, [articles.length]);
+
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    // Only process if we've actually started a drag (mousedown happened)
+    if (!hasDragStartedRef.current) return;
+    
+    const innerContainer = innerContainerRef.current;
+    if (!innerContainer) return;
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const deltaX = Math.abs(dragStartXRef.current - clientX);
+    
+    // Only start dragging if moved more than 5px (allows clicks to work)
+    if (!isDraggingRef.current && deltaX < 5) {
+      return;
+    }
+    
+    // Now we're actually dragging
+    if (!isDraggingRef.current) {
+      isDraggingRef.current = true;
+      isUserScrollingRef.current = true;
+      isPausedRef.current = true;
+      setIsPaused(true);
+      
+      if (pausedPositionRef.current === null) {
+        pausedPositionRef.current = scrollPositionRef.current;
+      }
+    }
+    
+    e.preventDefault();
+    
+    const currentDeltaX = dragStartXRef.current - clientX; // Inverted because we're dragging left/right
+    
+    const cardWidth = 140;
+    const gap = 8;
+    const cardWithGap = cardWidth + gap;
+    const maxScroll = articles.length * cardWithGap;
+    
+    let newPosition = dragStartPositionRef.current + currentDeltaX;
+    
+    // Handle wrapping
+    if (newPosition < 0) {
+      newPosition = maxScroll + (newPosition % maxScroll);
+    } else if (newPosition > maxScroll) {
+      newPosition = newPosition % maxScroll;
+    }
+    
+    scrollPositionRef.current = newPosition;
+    pausedPositionRef.current = newPosition;
+    innerContainer.style.transform = `translateX(-${newPosition}px)`;
+  }, [articles.length]);
+
+  const handleDragEnd = useCallback(() => {
+    // Only handle if we've started a drag
+    if (!hasDragStartedRef.current) return;
+    
+    hasDragStartedRef.current = false;
+    
+    // Only handle pause/resume if we were actually dragging
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      
+      // Clear existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      
+      // Resume auto-scroll after 3 seconds of inactivity
+      scrollTimeoutRef.current = setTimeout(() => {
+        isUserScrollingRef.current = false;
+        isPausedRef.current = false;
+        setIsPaused(false);
+      }, 3000);
+    }
+    
+    // Reset drag start position
+    dragStartXRef.current = 0;
+    dragStartPositionRef.current = 0;
+  }, []);
+
+  // Add wheel and drag event listeners
   useEffect(() => {
     const emblaContainer = innerContainerRef.current?.parentElement;
     if (!emblaContainer) return;
     
     emblaContainer.addEventListener('wheel', handleWheel, { passive: false });
+    emblaContainer.addEventListener('mousedown', handleDragStart, { passive: false });
+    emblaContainer.addEventListener('touchstart', handleDragStart, { passive: false });
     
     return () => {
       emblaContainer.removeEventListener('wheel', handleWheel);
+      emblaContainer.removeEventListener('mousedown', handleDragStart);
+      emblaContainer.removeEventListener('touchstart', handleDragStart);
+      
+      // Clean up any active drag listeners
+      if (dragMoveHandlerRef.current) {
+        window.removeEventListener('mousemove', dragMoveHandlerRef.current);
+        window.removeEventListener('touchmove', dragMoveHandlerRef.current);
+      }
+      if (dragEndHandlerRef.current) {
+        window.removeEventListener('mouseup', dragEndHandlerRef.current);
+        window.removeEventListener('touchend', dragEndHandlerRef.current);
+      }
+      
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
     };
-  }, [handleWheel]);
+  }, [handleWheel, handleDragStart]);
 
-  const updateOpacities = useCallback(() => {
-    const innerContainer = innerContainerRef.current;
-    if (!innerContainer) return;
-
-    try {
-      const container = innerContainer.parentElement;
-      if (!container) return;
-
-      const containerRect = container.getBoundingClientRect();
-      const containerCenter = containerRect.left + containerRect.width / 2;
-      const cards = innerContainer.children;
-      const newOpacities = new Map<number, number>();
-
-      Array.from(cards).forEach((card, index) => {
-        const cardRect = card.getBoundingClientRect();
-        const cardCenter = cardRect.left + cardRect.width / 2;
-        const distanceFromCenter = Math.abs(cardCenter - containerCenter);
-        const maxDistance = containerRect.width / 2;
-        
-        const opacity = Math.max(0.5, 1 - (distanceFromCenter / maxDistance) * 0.5);
-        newOpacities.set(index, opacity);
-      });
-
-      setCardOpacities(newOpacities);
-    } catch (error) {
-      console.error("Opacity update error:", error);
-    }
-  }, []);
+  // Removed updateOpacities - keeping all cards at full opacity
 
   // Combined effect for scrolling and opacity updates - runs only once
   useEffect(() => {
@@ -289,9 +499,6 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
 
         // Use CSS transform to move the container - this bypasses scroll management
         innerContainer.style.transform = `translateX(-${scrollPositionRef.current}px)`;
-        
-        // Update opacities in the same frame
-        updateOpacities();
       } catch (error) {
         console.error("Carousel scroll error:", error);
       }
@@ -310,7 +517,7 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [articles.length, updateOpacities]); // Single combined effect
+  }, [articles.length]); // Single combined effect
 
   if (!articles || articles.length === 0) {
     return (
@@ -353,7 +560,6 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
         >
           {duplicatedArticles.map((article, index) => {
             const isCEOPhoto = article.imageType === "ceo" && article.imageUrl;
-            const opacity = cardOpacities.get(index) ?? 1.0;
             
             return (
               <CardWithGradient
@@ -361,7 +567,7 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
                 article={article}
                 index={index}
                 articlesLength={articles.length}
-                opacity={opacity}
+                opacity={1.0}
                 isCEOPhoto={isCEOPhoto}
                 onHoverStart={handlePause}
                 onHoverEnd={handleResume}
