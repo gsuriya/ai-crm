@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Newspaper } from "lucide-react";
 import Image from "next/image";
-import { motion } from "framer-motion";
 
 interface NewsArticle {
   id: string;
@@ -101,6 +100,12 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
   const innerContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const pausedPositionRef = useRef<number | null>(null);
+  
+  // Drag state
+  const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartScrollRef = useRef(0);
 
   // Synchronous pause handler that immediately locks position
   const handlePause = useCallback(() => {
@@ -122,90 +127,83 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
 
   // Synchronous resume handler
   const handleResume = useCallback(() => {
-    isPausedRef.current = false;
-    setIsPaused(false);
+    // Only resume if not dragging
+    if (!isDraggingRef.current) {
+      isPausedRef.current = false;
+      setIsPaused(false);
+    }
   }, []);
 
-  // Smooth continuous scrolling with requestAnimationFrame - LEFT TO RIGHT
-  useEffect(() => {
-    const innerContainer = innerContainerRef.current;
-    if (!innerContainer) return;
+  // Drag handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    dragStartXRef.current = e.clientX;
+    dragStartScrollRef.current = scrollPositionRef.current;
+    
+    // Pause the carousel
+    isPausedRef.current = true;
+    setIsPaused(true);
+    if (innerContainerRef.current && pausedPositionRef.current === null) {
+      pausedPositionRef.current = scrollPositionRef.current;
+    }
+    
+    // Prevent text selection during drag
+    e.preventDefault();
+  }, []);
 
-    let lastTime = performance.now();
-    const scrollSpeed = 80; // pixels per second - MUCH FASTER
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingRef.current || !innerContainerRef.current) return;
+    
+    const deltaX = e.clientX - dragStartXRef.current;
     const cardWidth = 140;
     const gap = 8;
     const cardWithGap = cardWidth + gap;
     const maxScroll = articles.length * cardWithGap;
-
-    // Initialize scroll position to start from the end for left-to-right scrolling
-    const initializeScroll = () => {
-      scrollPositionRef.current = maxScroll;
-      // Use transform instead of scrollLeft to bypass any scroll management
-      innerContainer.style.transform = `translateX(-${maxScroll}px)`;
-    };
     
-    // Wait for DOM to be ready and initialize
-    setTimeout(initializeScroll, 150);
+    // Update scroll position based on drag (negative because transform is negative)
+    let newPosition = dragStartScrollRef.current - deltaX;
+    
+    // Handle wrapping
+    if (newPosition < 0) {
+      newPosition = maxScroll + (newPosition % maxScroll);
+    } else if (newPosition > maxScroll) {
+      newPosition = newPosition % maxScroll;
+    }
+    
+    scrollPositionRef.current = newPosition;
+    pausedPositionRef.current = newPosition;
+    innerContainerRef.current.style.transform = `translateX(-${newPosition}px)`;
+  }, [articles.length]);
 
-    const scroll = (currentTime: number) => {
-      if (!innerContainer) {
-        lastTime = currentTime;
-        animationFrameRef.current = requestAnimationFrame(scroll);
-        return;
-      }
-
-      // Check ref for synchronous pause state
-      if (isPausedRef.current) {
-        // Keep position locked - use the paused position
-        if (pausedPositionRef.current !== null) {
-          innerContainer.style.transform = `translateX(-${pausedPositionRef.current}px)`;
-        }
-        lastTime = currentTime;
-        animationFrameRef.current = requestAnimationFrame(scroll);
-        return;
-      }
+  const handleMouseUp = useCallback(() => {
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      setIsDragging(false);
       
-      // Resume from paused position
-      if (pausedPositionRef.current !== null) {
-        scrollPositionRef.current = pausedPositionRef.current;
-        pausedPositionRef.current = null;
-      }
-
-      try {
-        const deltaTime = currentTime - lastTime;
-        lastTime = currentTime;
-
-        const pixelsToScroll = (scrollSpeed * deltaTime) / 1000;
-        // DECREASE for left-to-right scrolling
-        scrollPositionRef.current -= pixelsToScroll;
-        
-        // Loop seamlessly
-        if (scrollPositionRef.current <= 0) {
-          scrollPositionRef.current = maxScroll;
+      // Resume auto-scroll after a brief delay
+      setTimeout(() => {
+        if (!isDraggingRef.current) {
+          isPausedRef.current = false;
+          setIsPaused(false);
         }
+      }, 100);
+    }
+  }, []);
 
-        // Use CSS transform to move the container - this bypasses scroll management
-        innerContainer.style.transform = `translateX(-${scrollPositionRef.current}px)`;
-      } catch (error) {
-        console.error("Carousel scroll error:", error);
-      }
-      
-      animationFrameRef.current = requestAnimationFrame(scroll);
-    };
-
-    // Start scrolling after a delay to ensure DOM is ready
-    const timeoutId = setTimeout(() => {
-      animationFrameRef.current = requestAnimationFrame(scroll);
-    }, 400);
-
+  // Add and remove mouse event listeners
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => handleMouseMove(e);
+    const handleGlobalMouseUp = () => handleMouseUp();
+    
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    
     return () => {
-      clearTimeout(timeoutId);
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [articles.length]); // Remove isPaused dependency - we use ref instead
+  }, [handleMouseMove, handleMouseUp]);
 
   const updateOpacities = useCallback(() => {
     const innerContainer = innerContainerRef.current;
@@ -236,22 +234,89 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
     }
   }, []);
 
+  // Combined effect for scrolling and opacity updates - runs only once
   useEffect(() => {
-    updateOpacities();
+    const innerContainer = innerContainerRef.current;
+    if (!innerContainer) return;
 
-    let rafId: number;
-    const updateLoop = () => {
-      updateOpacities();
-      rafId = requestAnimationFrame(updateLoop);
+    let lastTime = performance.now();
+    const scrollSpeed = 80; // pixels per second - MUCH FASTER
+    const cardWidth = 140;
+    const gap = 8;
+    const cardWithGap = cardWidth + gap;
+    const maxScroll = articles.length * cardWithGap;
+
+    // Initialize scroll position to start from the end for left-to-right scrolling
+    const initializeScroll = () => {
+      scrollPositionRef.current = maxScroll;
+      // Use transform instead of scrollLeft to bypass any scroll management
+      innerContainer.style.transform = `translateX(-${maxScroll}px)`;
     };
-    rafId = requestAnimationFrame(updateLoop);
+    
+    // Wait for DOM to be ready and initialize
+    setTimeout(initializeScroll, 150);
+
+    const scroll = (currentTime: number) => {
+      if (!innerContainer) {
+        lastTime = currentTime;
+        animationFrameRef.current = requestAnimationFrame(scroll);
+        return;
+      }
+
+      // Check ref for synchronous pause state or dragging
+      if (isPausedRef.current || isDraggingRef.current) {
+        // Keep position locked - use the paused position
+        if (pausedPositionRef.current !== null) {
+          innerContainer.style.transform = `translateX(-${pausedPositionRef.current}px)`;
+        }
+        lastTime = currentTime;
+        animationFrameRef.current = requestAnimationFrame(scroll);
+        return;
+      }
+      
+      // Resume from paused position
+      if (pausedPositionRef.current !== null) {
+        scrollPositionRef.current = pausedPositionRef.current;
+        pausedPositionRef.current = null;
+      }
+
+      try {
+        const deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+
+        const pixelsToScroll = (scrollSpeed * deltaTime) / 1000;
+        // DECREASE for left-to-right scrolling
+        scrollPositionRef.current -= pixelsToScroll;
+        
+        // Loop seamlessly
+        if (scrollPositionRef.current <= 0) {
+          scrollPositionRef.current = maxScroll;
+        }
+
+        // Use CSS transform to move the container - this bypasses scroll management
+        innerContainer.style.transform = `translateX(-${scrollPositionRef.current}px)`;
+        
+        // Update opacities in the same frame
+        updateOpacities();
+      } catch (error) {
+        console.error("Carousel scroll error:", error);
+      }
+      
+      animationFrameRef.current = requestAnimationFrame(scroll);
+    };
+
+    // Start scrolling after a delay to ensure DOM is ready
+    const timeoutId = setTimeout(() => {
+      animationFrameRef.current = requestAnimationFrame(scroll);
+    }, 400);
 
     return () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId);
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [updateOpacities]);
+  }, [articles.length, updateOpacities]); // Single combined effect
 
   if (!articles || articles.length === 0) {
     return (
@@ -269,8 +334,6 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
   return (
     <div 
       className="pb-3 relative"
-      onMouseEnter={handlePause}
-      onMouseLeave={handleResume}
     >
       {/* Left fade gradient */}
       <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background via-background/50 to-transparent pointer-events-none z-10" />
@@ -283,7 +346,9 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
         ref={emblaRef}
         style={{
           willChange: 'transform',
+          cursor: isDragging ? 'grabbing' : 'grab',
         }}
+        onMouseDown={handleMouseDown}
       >
         <div 
           ref={innerContainerRef}
@@ -347,24 +412,16 @@ function CardWithGradient({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ 
-        opacity: 1, 
-        y: isHovered ? -12 : 0,
-      }}
-      transition={{ 
-        opacity: { delay: (index % articlesLength) * 0.05, duration: 0.3 },
-        y: { duration: 0.12, ease: [0.4, 0, 0.2, 1], delay: 0 },
-      }}
+    <div
       className="flex-shrink-0 w-[140px] group cursor-pointer"
       onClick={() => window.open(article.url, "_blank")}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       style={{ 
         opacity, 
-        transition: 'opacity 0.3s ease-out',
+        transition: 'opacity 0.3s ease-out, transform 0.12s cubic-bezier(0.4, 0, 0.2, 1)',
         willChange: 'transform',
+        transform: isHovered ? 'translateY(-12px)' : 'translateY(0)',
       }}
     >
                 <div className="relative overflow-hidden border border-gray-200/30 bg-white flex flex-col shadow-sm hover:shadow-md transition-shadow duration-150" style={{ height: 'auto', maxHeight: '120px' }}>
@@ -391,19 +448,12 @@ function CardWithGradient({
                   {/* Content section with gradient overlay */}
                   <div className="p-1.5 flex-1 flex flex-col bg-white border-t border-gray-100/50 relative overflow-hidden">
                     {/* Gradient overlay with smooth pulsing animation */}
-                    <motion.div
+                    <div
                       className="absolute inset-0 pointer-events-none z-0"
-                      initial={{ opacity: 0 }}
-                      animate={{ 
-                        opacity: isHovered ? 1 : 0,
-                      }}
-                      transition={{ 
-                        duration: 0.12,
-                        ease: [0.4, 0, 0.2, 1],
-                        delay: 0,
-                      }}
                       style={{
                         background: "linear-gradient(to top, rgba(147, 197, 253, 0.5) 0%, rgba(196, 181, 253, 0.4) 30%, rgba(251, 207, 232, 0.3) 60%, rgba(251, 207, 232, 0.15) 80%, transparent 100%)",
+                        opacity: isHovered ? 1 : 0,
+                        transition: 'opacity 0.12s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                     />
                     
@@ -445,6 +495,6 @@ function CardWithGradient({
                     </div>
                   </div>
                 </div>
-    </motion.div>
+    </div>
   );
 }
