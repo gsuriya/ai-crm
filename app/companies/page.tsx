@@ -241,7 +241,7 @@ export default function CompaniesPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="border-b-2 border-border bg-background px-8 py-6">
+      <div className="border-b border-border bg-background px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-foreground">Companies</h1>
@@ -249,7 +249,7 @@ export default function CompaniesPage() {
         </div>
         <div className="mt-6">
           <div className="relative max-w-2xl mx-auto">
-            <div className="relative flex items-center bg-background border-2 border-border rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all">
+            <div className="relative flex items-center bg-background border border-border rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all">
               <input
                 type="text"
                 placeholder={agentMode ? "Give agent commands (e.g., 'add SaaS companies to warm outreach cadence')..." : "Search companies..."}
@@ -339,7 +339,7 @@ export default function CompaniesPage() {
         ) : (
           <div className="h-full overflow-auto">
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 bg-background border-b-2 border-border">
+              <thead className="sticky top-0 z-10 bg-background border-b border-border">
                 <tr>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     NAME
@@ -354,7 +354,7 @@ export default function CompaniesPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y-2 divide-border">
+              <tbody className="divide-y divide-border">
                 {filteredCompanies.map((company, index) => {
                   const matches = searchMatches.get(company.id) || [];
                   const topMatch = matches[0];
@@ -366,12 +366,14 @@ export default function CompaniesPage() {
                   );
                   const firstContact = ceo || companyContacts.find(c => c.email && c.email.trim() !== '') || companyContacts[0];
                   
-                  // Display CEO name if available, otherwise email, otherwise "No contact listed"
+                  // Display name only (no title), otherwise email, otherwise "No contact listed"
                   const displayText = ceo 
-                    ? `${ceo.first_name} ${ceo.last_name}${ceo.title ? ` - ${ceo.title}` : ''}`
-                    : firstContact && firstContact.email && firstContact.email.trim() !== ''
-                      ? firstContact.email
-                      : "No contact listed";
+                    ? `${ceo.first_name} ${ceo.last_name}`
+                    : firstContact && firstContact.first_name && firstContact.last_name
+                      ? `${firstContact.first_name} ${firstContact.last_name}`
+                      : firstContact && firstContact.email && firstContact.email.trim() !== ''
+                        ? firstContact.email
+                        : "No contact listed";
 
                   return (
                     <motion.tr

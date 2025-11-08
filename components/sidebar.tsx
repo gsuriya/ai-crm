@@ -248,7 +248,7 @@ export function Sidebar() {
                     className="fixed inset-0 z-40"
                     onClick={() => setShowDropdown(false)}
                   />
-                  <div className="absolute bottom-full left-full ml-2 mb-0 w-64 bg-background border-2 border-border rounded-lg shadow-lg z-50">
+                  <div className="absolute bottom-full left-full ml-2 mb-0 w-64 bg-background border border-border rounded-lg shadow-lg z-50">
                     <div className="p-3 border-b border-border">
                       <div className="text-xs text-muted-foreground mb-1">Signed in as</div>
                       <div className="text-sm font-medium text-foreground truncate">

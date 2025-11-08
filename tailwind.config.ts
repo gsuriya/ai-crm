@@ -28,8 +28,8 @@ const config: Config = {
           DEFAULT: "hsl(220, 14%, 96%)",
           foreground: "hsl(222, 47%, 11%)",
         },
-        border: "hsl(220, 13%, 60%)",
-        input: "hsl(220, 13%, 60%)",
+        border: "hsl(220, 13%, 85%)",
+        input: "hsl(220, 13%, 85%)",
         ring: "hsl(222, 47%, 11%)",
         destructive: {
           DEFAULT: "hsl(0, 84%, 60%)",
