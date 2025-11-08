@@ -346,6 +346,12 @@ function CardWithGradient({
     onHoverEnd(); // Resume carousel
   };
 
+  // Unified animation config for smooth coordinated animations
+  const unifiedTransition = {
+    duration: 0.25,
+    ease: [0.25, 0.1, 0.25, 1],
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -382,36 +388,43 @@ function CardWithGradient({
                     )}
                   </div>
 
-                  {/* Content - no transform on hover to prevent shifting */}
-                  <div className="p-1.5 flex-1 flex flex-col bg-white border-t border-gray-100/50 relative overflow-hidden">
-                    {/* Gradient overlay on hover - instant CSS visibility, smooth framer animation */}
+                  {/* Content - expands upward to cover image */}
+                  <motion.div 
+                    className="p-1.5 flex-1 flex flex-col bg-white border-t border-gray-100/50 relative overflow-hidden"
+                    initial={false}
+                    animate={{
+                      y: isHovered ? -16 : 0,
+                    }}
+                    transition={{
+                      duration: 0.25,
+                      ease: [0.25, 0.1, 0.25, 1],
+                    }}
+                  >
+                    {/* Gradient overlay on hover - animates from bottom up, slower than white section */}
                     <motion.div
-                      className="absolute inset-0 pointer-events-none z-0 group-hover:opacity-100 opacity-0 transition-opacity duration-75"
+                      className="absolute inset-0 pointer-events-none z-0"
                       initial={false}
                       animate={{ 
                         y: isHovered ? "0%" : "100%",
+                        opacity: isHovered ? 1 : 0,
                       }}
-                      transition={{ 
-                        duration: 0.2,
-                        ease: [0.25, 0.1, 0.25, 1],
+                      transition={{
+                        y: {
+                          duration: 0.4,
+                          ease: [0.25, 0.1, 0.25, 1],
+                        },
+                        opacity: {
+                          duration: 0.05,
+                        },
                       }}
                       style={{
                         background: "linear-gradient(to top, rgba(147, 197, 253, 0.4) 0%, rgba(196, 181, 253, 0.3) 30%, rgba(251, 207, 232, 0.2) 60%, rgba(251, 207, 232, 0.1) 80%, transparent 100%)",
-                        willChange: 'transform',
+                        willChange: 'transform, opacity',
                       }}
                     />
                     
-                    {/* Content wrapper that lifts up on hover */}
-                    <motion.div
-                      className="flex-1 flex flex-col relative z-10"
-                      animate={{
-                        y: isHovered ? -2 : 0,
-                      }}
-                      transition={{
-                        duration: 0.2,
-                        ease: [0.25, 0.1, 0.25, 1],
-                      }}
-                    >
+                    {/* Content wrapper */}
+                    <div className="flex-1 flex flex-col relative z-10 pb-5">
                       {/* Company Name */}
                       <h3 className="text-[10px] font-semibold text-gray-900 mb-0.5 line-clamp-1 leading-tight tracking-tight">
                         {article.company}
@@ -445,8 +458,34 @@ function CardWithGradient({
                           {formatTimeAgo(article.daysAgo)}
                         </span>
                       </div>
-                    </motion.div>
-                  </div>
+
+                      {/* Explore button - appears on hover */}
+                      <motion.div
+                        className="absolute bottom-0 left-0 right-0 overflow-hidden"
+                        initial={false}
+                        animate={{
+                          opacity: isHovered ? 1 : 0,
+                          height: isHovered ? 20 : 0,
+                        }}
+                        transition={unifiedTransition}
+                        style={{
+                          pointerEvents: isHovered ? 'auto' : 'none',
+                        }}
+                      >
+                        <div className="pt-2 border-t border-gray-100/50 px-1.5">
+                          <a
+                            href={article.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[9px] font-medium text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Explore <span>→</span>
+                          </a>
+                        </div>
+                      </motion.div>
+                    </div>
+                  </motion.div>
                 </div>
     </motion.div>
   );
