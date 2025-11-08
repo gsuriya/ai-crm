@@ -150,7 +150,7 @@ export function Sidebar() {
   return (
     <div 
       data-sidebar 
-      className="flex flex-shrink-0 flex-col border-r border-border bg-background h-screen" 
+      className="flex flex-shrink-0 flex-col border-r border-gray-100 bg-background h-screen" 
       style={{ zIndex: 10 }}
     >
       {/* Logo at top */}
