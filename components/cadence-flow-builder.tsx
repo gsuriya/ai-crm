@@ -130,6 +130,9 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   const [startingCadence, setStartingCadence] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragAnimationFrameRef = useRef<number | null>(null);
+  const blockWidth = 280; // Standard block width
+  const flowCenterX = 400; // Center X position for the flow line
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [connectionPoint, setConnectionPoint] = useState<'output' | 'true' | 'false' | null>(null);
   const [draggingConnection, setDraggingConnection] = useState<{ fromX: number; fromY: number; point: 'output' | 'true' | 'false' } | null>(null);
@@ -957,13 +960,16 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   };
 
   const handleBlockDragStart = (e: React.MouseEvent, blockId: string) => {
-    if (connectingFrom || isPanning) return; // Don't drag while connecting or panning
-    if (e.target && (e.target as HTMLElement).closest('button')) return; // Don't drag if clicking buttons
+    // Don't drag if panning is active, connecting, or clicking buttons
+    if (connectingFrom || isPanning) return;
+    if (e.target && (e.target as HTMLElement).closest('button')) return;
+    
     const block = blocks.find(b => b.id === blockId);
     if (!block) return;
     
     e.preventDefault();
     e.stopPropagation();
+    
     setDragging(blockId);
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) {
@@ -978,11 +984,20 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   };
 
   const handleAddBlock = (type: BlockType) => {
+    // Find the lowest Y position to place new block below existing ones
+    const maxY = blocks.length > 0 
+      ? Math.max(...blocks.map(b => {
+          const blockHeight = b.subtitle ? 70 : 50;
+          const labelHeight = 20;
+          return b.y + blockHeight + labelHeight;
+        }))
+      : 100;
+    
     const newBlock: FlowBlock = {
       id: Date.now().toString(),
       type,
-      x: 400 + Math.random() * 200,
-      y: 300 + Math.random() * 200,
+      x: flowCenterX, // Center on flow line
+      y: maxY + 50, // Place below existing blocks with spacing
       title: getDefaultTitle(type),
       connections: [],
       config: getDefaultConfig(type),
@@ -1057,19 +1072,72 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   useEffect(() => {
     if (dragging) {
       const handleMouseMove = (e: MouseEvent) => {
-        if (!containerRef.current || !dragging) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        // Account for zoom and pan
-        const newX = ((e.clientX - rect.left - pan.x) / zoom) - dragOffset.x;
-        const newY = ((e.clientY - rect.top - pan.y) / zoom) - dragOffset.y;
+        // Immediately cancel block dragging if panning is active
+        if (isPanning) {
+          setDragging(null);
+          if (dragAnimationFrameRef.current) {
+            cancelAnimationFrame(dragAnimationFrameRef.current);
+            dragAnimationFrameRef.current = null;
+          }
+          return;
+        }
         
-        setBlocks(prev => prev.map(block =>
-          block.id === dragging ? { ...block, x: newX, y: newY } : block
-        ));
+        if (!containerRef.current || !dragging) return;
+
+        // Cancel any pending animation frame
+        if (dragAnimationFrameRef.current) {
+          cancelAnimationFrame(dragAnimationFrameRef.current);
+        }
+
+        // Use requestAnimationFrame for smooth, instant updates
+        dragAnimationFrameRef.current = requestAnimationFrame(() => {
+          // Double-check panning state - if panning started, cancel immediately
+          if (isPanning) {
+            setDragging(null);
+            return;
+          }
+          if (!containerRef.current || !dragging) return;
+          const rect = containerRef.current.getBoundingClientRect();
+          
+          // Account for zoom and pan
+          const rawX = ((e.clientX - rect.left - pan.x) / zoom) - dragOffset.x;
+          const rawY = ((e.clientY - rect.top - pan.y) / zoom) - dragOffset.y;
+          
+          // Snap X to flow center (with tolerance for slight misalignment)
+          const snapThreshold = 60;
+          const snappedX = Math.abs(rawX - flowCenterX) < snapThreshold 
+            ? flowCenterX 
+            : rawX;
+          
+          // Constrain Y to reasonable bounds (prevent dragging too far)
+          const minY = 50;
+          const maxY = 5000;
+          const constrainedY = Math.max(minY, Math.min(maxY, rawY));
+          
+          setBlocks(prev => prev.map(block =>
+            block.id === dragging ? { ...block, x: snappedX, y: constrainedY } : block
+          ));
+        });
       };
 
       const handleMouseUp = () => {
+        if (dragAnimationFrameRef.current) {
+          cancelAnimationFrame(dragAnimationFrameRef.current);
+          dragAnimationFrameRef.current = null;
+        }
         if (dragging) {
+          // Final snap to center on release if close enough
+          setBlocks(prev => prev.map(block => {
+            if (block.id === dragging) {
+              const snapThreshold = 100;
+              const finalX = Math.abs(block.x - flowCenterX) < snapThreshold 
+                ? flowCenterX 
+                : block.x;
+              return { ...block, x: finalX };
+            }
+            return block;
+          }));
+          
           setDragging(null);
           // Only auto-save if it's an existing cadence (autoSave is true)
           if (autoSave) {
@@ -1078,14 +1146,21 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
         }
       };
 
-      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mousemove', handleMouseMove, { passive: true });
       window.addEventListener('mouseup', handleMouseUp);
 
       return () => {
+        if (dragAnimationFrameRef.current) {
+          cancelAnimationFrame(dragAnimationFrameRef.current);
+        }
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
       };
-    } else if (draggingConnection) {
+    }
+  }, [dragging, dragOffset, pan, zoom, isPanning, flowCenterX, autoSave]);
+  
+  useEffect(() => {
+    if (draggingConnection) {
       // Handle connection dragging
       const handleMouseMove = (e: MouseEvent) => {
         if (!containerRef.current) return;
@@ -1154,22 +1229,49 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     if ((e.target as HTMLElement).closest('[data-block-id]') || (e.target as HTMLElement).closest('button')) {
       return;
     }
+    // Cancel any active block dragging when starting to pan
+    if (dragging) {
+      setDragging(null);
+      if (dragAnimationFrameRef.current) {
+        cancelAnimationFrame(dragAnimationFrameRef.current);
+        dragAnimationFrameRef.current = null;
+      }
+    }
     setIsPanning(true);
     setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
   const handlePanMove = useCallback((e: MouseEvent) => {
     if (isPanning) {
+      // Cancel any active block dragging when panning
+      if (dragging) {
+        setDragging(null);
+        if (dragAnimationFrameRef.current) {
+          cancelAnimationFrame(dragAnimationFrameRef.current);
+          dragAnimationFrameRef.current = null;
+        }
+      }
       setPan({
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
     }
-  }, [isPanning, panStart]);
+  }, [isPanning, panStart, dragging]);
 
   const handlePanEnd = () => {
     setIsPanning(false);
   };
+
+  // Immediately cancel block dragging when panning starts
+  useEffect(() => {
+    if (isPanning && dragging) {
+      setDragging(null);
+      if (dragAnimationFrameRef.current) {
+        cancelAnimationFrame(dragAnimationFrameRef.current);
+        dragAnimationFrameRef.current = null;
+      }
+    }
+  }, [isPanning, dragging]);
 
   useEffect(() => {
     if (isPanning) {
@@ -1383,10 +1485,13 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
           className={dragging === block.id ? "cursor-grabbing" : "cursor-move"}
           data-block-id={block.id}
           onMouseDown={(e) => {
-            // Only start dragging if clicking on the block itself, not buttons
-            if (!(e.target as HTMLElement).closest('button')) {
-              handleBlockDragStart(e, block.id);
+            // Don't start dragging if panning is active or if clicking on buttons
+            if (isPanning || (e.target as HTMLElement).closest('button')) {
+              return;
             }
+            // Stop event propagation to prevent pan from starting
+            e.stopPropagation();
+            handleBlockDragStart(e, block.id);
           }}
           onClick={(e) => {
             if (!dragging && !draggingConnection) {
@@ -1956,7 +2061,10 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
           }}
           onMouseDown={(e) => {
             e.stopPropagation(); // Prevent modal from closing when clicking canvas
-            handlePanStart(e);
+            // Only start panning if not clicking on a block
+            if (!(e.target as HTMLElement).closest('[data-block-id]')) {
+              handlePanStart(e);
+            }
           }}
         >
 

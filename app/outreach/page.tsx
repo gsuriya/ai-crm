@@ -57,7 +57,13 @@ export default function OutreachPage() {
         setLoading(true);
       }
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        // If no user, stop loading immediately - middleware/layout will handle redirect
+        if (showLoading) {
+          setLoading(false);
+        }
+        return;
+      }
 
       // Get all executions (active, paused, and completed - don't auto-delete completed ones)
       const { data: executionsData, error: execError } = await supabase
