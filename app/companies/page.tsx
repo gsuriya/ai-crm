@@ -11,9 +11,112 @@ import { motion } from "framer-motion";
 import { MatchIndicator } from "@/components/match-indicator";
 import { MatchSnippet } from "@/components/match-snippet";
 import { CompanyAvatar } from "@/components/company/company-avatar";
+import { NewsCarousel } from "@/components/news-carousel";
 import type { SearchMatch } from "@/lib/semantic-search";
 
 export const dynamic = 'force-dynamic';
+
+// Mock news data - realistic startup funding rounds
+const mockNewsArticles = [
+  {
+    id: "1",
+    title: "Raises $2.5M pre-seed round led by Y Combinator to build AI-powered sales automation",
+    company: "Revflow",
+    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces",
+    imageType: "ceo" as const,
+    source: "TechCrunch",
+    sourceLogoUrl: "https://logo.clearbit.com/techcrunch.com",
+    category: "funding" as const,
+    amount: "$2.5M",
+    daysAgo: 0,
+    url: "https://techcrunch.com",
+  },
+  {
+    id: "2",
+    title: "Secures $8M seed funding from a16z to expand developer tools platform",
+    company: "Codebase",
+    imageType: "news" as const,
+    source: "The Information",
+    sourceLogoUrl: "https://logo.clearbit.com/theinformation.com",
+    category: "funding" as const,
+    amount: "$8M",
+    daysAgo: 1,
+    url: "https://theinformation.com",
+  },
+  {
+    id: "3",
+    title: "Closes $15M Series A led by Sequoia to scale enterprise security platform",
+    company: "ShieldAI",
+    imageUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=faces",
+    imageType: "ceo" as const,
+    source: "StrictlyVC",
+    sourceLogoUrl: "https://logo.clearbit.com/strictlyvc.com",
+    category: "funding" as const,
+    amount: "$15M",
+    daysAgo: 2,
+    url: "https://strictlyvc.com",
+  },
+  {
+    id: "4",
+    title: "Raises $32M Series B from Accel to accelerate growth in European markets",
+    company: "Dataflow",
+    imageType: "news" as const,
+    source: "Bloomberg",
+    sourceLogoUrl: "https://logo.clearbit.com/bloomberg.com",
+    category: "funding" as const,
+    amount: "$32M",
+    daysAgo: 3,
+    url: "https://bloomberg.com",
+  },
+  {
+    id: "5",
+    title: "Partners with Microsoft to integrate AI capabilities into enterprise workflow tools",
+    company: "Taskforce",
+    imageUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop&crop=faces",
+    imageType: "ceo" as const,
+    source: "Forbes",
+    sourceLogoUrl: "https://logo.clearbit.com/forbes.com",
+    category: "partnership" as const,
+    daysAgo: 4,
+    url: "https://forbes.com",
+  },
+  {
+    id: "6",
+    title: "Acquires competitor CloudSync to expand market presence in SaaS integration space",
+    company: "IntegrateHub",
+    imageType: "news" as const,
+    source: "TechCrunch",
+    sourceLogoUrl: "https://logo.clearbit.com/techcrunch.com",
+    category: "acquisition" as const,
+    daysAgo: 5,
+    url: "https://techcrunch.com",
+  },
+  {
+    id: "7",
+    title: "Raises $1.8M pre-seed from First Round Capital to build next-gen CRM platform",
+    company: "SalesPulse",
+    imageUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop&crop=faces",
+    imageType: "ceo" as const,
+    source: "StrictlyVC",
+    sourceLogoUrl: "https://logo.clearbit.com/strictlyvc.com",
+    category: "funding" as const,
+    amount: "$1.8M",
+    daysAgo: 6,
+    url: "https://strictlyvc.com",
+  },
+  {
+    id: "8",
+    title: "Secures $12M Series A from Index Ventures to scale AI-powered analytics platform",
+    company: "AnalyticsAI",
+    imageType: "news" as const,
+    source: "The Verge",
+    sourceLogoUrl: "https://logo.clearbit.com/theverge.com",
+    category: "funding" as const,
+    amount: "$12M",
+    daysAgo: 7,
+    url: "https://theverge.com",
+  },
+];
 
 interface Company {
   id: string;
@@ -292,16 +395,7 @@ export default function CompaniesPage() {
       {/* Company News Section */}
       <div className="bg-background border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-8 pt-2 pb-2">
-          <div className="flex items-center justify-center py-6 bg-gray-50/30 rounded-lg border border-gray-100">
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <Newspaper className="w-8 h-8 text-gray-300 stroke-[1.5]" />
-              </div>
-              <p className="text-sm text-gray-500">
-                No recent news
-              </p>
-            </div>
-          </div>
+          <NewsCarousel articles={mockNewsArticles} />
         </div>
       </div>
 
