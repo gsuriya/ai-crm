@@ -30,9 +30,10 @@ interface Company {
 interface Contact {
   id: string;
   company_id: string;
-  email: string;
+  email?: string;
   first_name?: string;
   last_name?: string;
+  title?: string;
 }
 
 interface Cadence {
@@ -352,13 +353,7 @@ export default function CompaniesPage() {
                     </th>
                   )}
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    STATUS
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    OWNER
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    CREATED
+                    Added
                   </th>
                 </tr>
               </thead>
@@ -367,8 +362,19 @@ export default function CompaniesPage() {
                   const matches = searchMatches.get(company.id) || [];
                   const topMatch = matches[0];
                   const companyContacts = contacts.get(company.id) || [];
-                  const firstContact = companyContacts.find(c => c.email && c.email.trim() !== '') || companyContacts[0];
-                  const hasContact = firstContact && firstContact.email && firstContact.email.trim() !== '';
+                  
+                  // Find CEO first, then any contact with email, then any contact
+                  const ceo = companyContacts.find(c => 
+                    c.title && (c.title.toLowerCase().includes('ceo') || c.title.toLowerCase().includes('chief executive'))
+                  );
+                  const firstContact = ceo || companyContacts.find(c => c.email && c.email.trim() !== '') || companyContacts[0];
+                  
+                  // Display CEO name if available, otherwise email, otherwise "No contact listed"
+                  const displayText = ceo 
+                    ? `${ceo.first_name} ${ceo.last_name}${ceo.title ? ` - ${ceo.title}` : ''}`
+                    : firstContact && firstContact.email && firstContact.email.trim() !== ''
+                      ? firstContact.email
+                      : "No contact listed";
 
                   return (
                     <motion.tr
@@ -392,7 +398,7 @@ export default function CompaniesPage() {
                                 {company.name}
                               </div>
                               <div className="text-sm text-muted-foreground truncate">
-                                {hasContact ? firstContact.email : "No contact listed"}
+                                {displayText}
                               </div>
                             </div>
                           </div>
@@ -422,17 +428,6 @@ export default function CompaniesPage() {
                           )}
                         </td>
                       )}
-                      <td className="px-6 py-4">
-                        <select className="text-sm border-2 border-border rounded-lg px-3 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring" onClick={(e) => e.stopPropagation()}>
-                          <option>PLEASE SELECT</option>
-                          <option>QUALIFIED</option>
-                          <option>LEAD</option>
-                          <option>PROSPECT</option>
-                        </select>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-muted-foreground">Unassigned</div>
-                      </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-muted-foreground">
                           {new Date(company.created_at).toLocaleDateString()}
