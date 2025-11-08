@@ -14,7 +14,7 @@
   /* Sidebar base styles */
   [data-sidebar] {
     flex-shrink: 0 !important;
-    width: 16rem !important; /* 256px / w-64 */
+    width: 5rem !important; /* 80px - compact sidebar matching Mercor style */
     position: relative !important;
     z-index: 10 !important;
   }

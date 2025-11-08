@@ -150,22 +150,22 @@ export function Sidebar() {
   return (
     <div 
       data-sidebar 
-      className="flex w-14 flex-shrink-0 flex-col border-r border-border bg-background h-screen" 
+      className="flex flex-shrink-0 flex-col border-r border-border bg-background h-screen" 
       style={{ zIndex: 10 }}
     >
       {/* Logo at top */}
-      <div className="flex h-12 items-center justify-center border-b border-border flex-shrink-0">
+      <div className="flex h-16 items-center justify-center border-b border-border flex-shrink-0">
         <Link href="/" className="flex items-center justify-center">
           <img 
             src="/logo.png" 
             alt="Cheddar Logo" 
-            className="h-7 w-7"
+            className="h-10 w-10"
           />
         </Link>
       </div>
       
       {/* Navigation - icons above text */}
-      <nav className="flex-1 space-y-0.5 px-0.5 py-2 overflow-y-auto">
+      <nav className="flex-1 space-y-1 px-2 py-3 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
           return (
@@ -173,19 +173,19 @@ export function Sidebar() {
               key={item.name}
               href={item.href}
               className={cn(
-                "group flex flex-col items-center justify-center rounded-md py-1 px-0 transition-all duration-200",
+                "group flex flex-col items-center justify-center rounded-lg py-2 px-1 transition-all duration-200",
                 isActive
                   ? "bg-blue-400 text-white"
                   : "text-foreground/70 hover:bg-muted/50 hover:text-foreground"
               )}
             >
               <item.icon className={cn(
-                "h-4 w-4 mb-0.5 transition-colors",
+                "h-5 w-5 mb-1 transition-colors",
                 isActive ? "text-white" : "text-foreground/60 group-hover:text-foreground"
               )} />
               <span className={cn(
-                "text-[8px] font-medium text-center leading-tight",
-                isActive ? "text-white" : "text-foreground/70"
+                "text-[10px] font-medium text-center leading-tight",
+                isActive ? "text-white" : "text-foreground/70 group-hover:text-foreground"
               )}>
                 {item.name}
               </span>
@@ -194,19 +194,19 @@ export function Sidebar() {
         })}
       </nav>
       {/* Bottom section with notifications and profile */}
-      <div className="border-t border-border py-1.5 flex-shrink-0 flex flex-col items-center gap-1.5 relative">
+      <div className="border-t border-border py-2 flex-shrink-0 flex flex-col items-center gap-2 relative">
         {isAuthenticated === null ? (
-          <div className="text-[8px] text-muted-foreground text-center py-0.5">...</div>
+          <div className="text-[10px] text-muted-foreground text-center py-0.5">...</div>
         ) : isAuthenticated ? (
           <>
             {/* Notification Bell */}
             <button
               onClick={() => router.push('/companies')}
-              className="relative flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted/50 transition-colors"
+              className="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-muted/50 transition-colors"
             >
-              <Bell className="h-4 w-4 text-foreground/70" />
+              <Bell className="h-5 w-5 text-foreground/70 hover:text-foreground" />
               {notificationCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[8px] font-semibold">
+                <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-semibold">
                   {notificationCount > 99 ? '99+' : notificationCount}
                 </span>
               )}
@@ -216,7 +216,7 @@ export function Sidebar() {
             <div className="relative">
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-muted/50 transition-colors p-0.5"
+                className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-muted/50 transition-colors p-0.5"
               >
                 {userImage ? (
                   <img
@@ -233,8 +233,8 @@ export function Sidebar() {
                     }}
                   />
                 ) : (
-                  <div className="h-full w-full rounded-lg bg-primary/10 flex items-center justify-center">
-                    <span className="text-xs font-medium text-primary">
+                  <div className="h-full w-full rounded-lg bg-blue-400/20 flex items-center justify-center">
+                    <span className="text-sm font-medium text-blue-600">
                       {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
                     </span>
                   </div>
