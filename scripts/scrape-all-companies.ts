@@ -53,6 +53,7 @@ async function updateCompanyData(
   if (data.founding_date) updateData.founding_date = data.founding_date;
   if (data.linkedin_url) updateData.linkedin_url = data.linkedin_url;
   if (data.twitter_handle) updateData.twitter_handle = data.twitter_handle;
+  if (data.logo_url) updateData.logo_url = data.logo_url;
   if (data.funding_amount) updateData.funding_amount = data.funding_amount;
   if (data.funding_round) updateData.funding_round = data.funding_round;
 

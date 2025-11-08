@@ -20,6 +20,7 @@ export interface Company {
   industry?: string;
   description?: string;
   headquarters?: string;
+  logo_url?: string;
   created_at: string;
   updated_at: string;
   created_by?: string;

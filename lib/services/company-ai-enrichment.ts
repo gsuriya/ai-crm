@@ -43,6 +43,7 @@ export interface EnrichedCompanyData {
   founding_date?: string;
   linkedin_url?: string;
   twitter_handle?: string;
+  logo_url?: string;
   
   // Financials
   funding_amount?: number;
@@ -326,6 +327,30 @@ export async function enrichFromWebsite(
 }
 
 /**
+ * Get company logo URL from domain using Clearbit's logo API
+ */
+function getLogoUrl(website?: string, domain?: string): string | undefined {
+  let domainToUse: string | undefined;
+  
+  if (domain) {
+    domainToUse = domain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  } else if (website) {
+    try {
+      const url = new URL(website.startsWith('http') ? website : `https://${website}`);
+      domainToUse = url.hostname.replace('www.', '');
+    } catch {
+      return undefined;
+    }
+  }
+  
+  if (domainToUse) {
+    return `https://logo.clearbit.com/${domainToUse}`;
+  }
+  
+  return undefined;
+}
+
+/**
  * Merge data from multiple sources intelligently
  */
 export function mergeEnrichedData(
@@ -347,6 +372,7 @@ export function mergeEnrichedData(
     if (source.founding_date && !merged.founding_date) merged.founding_date = source.founding_date;
     if (source.linkedin_url && !merged.linkedin_url) merged.linkedin_url = source.linkedin_url;
     if (source.twitter_handle && !merged.twitter_handle) merged.twitter_handle = source.twitter_handle;
+    if (source.logo_url && !merged.logo_url) merged.logo_url = source.logo_url;
     
     // Financials (prefer Crunchbase)
     if (source.funding_amount && !merged.funding_amount) merged.funding_amount = source.funding_amount;
@@ -488,6 +514,11 @@ export async function enrichCompanyWithAI(
   if (gptFundingAmount) {
     merged.funding_amount = gptFundingAmount;
     merged.sources = [...(merged.sources || []), 'gpt-web-search'];
+  }
+
+  // Add logo URL if we have a website but no logo_url yet
+  if (!merged.logo_url && merged.website) {
+    merged.logo_url = getLogoUrl(merged.website);
   }
 
   return merged;

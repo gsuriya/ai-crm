@@ -10,6 +10,7 @@ import { Search, Sparkles, ArrowUp, Bot } from "lucide-react";
 import { motion } from "framer-motion";
 import { MatchIndicator } from "@/components/match-indicator";
 import { MatchSnippet } from "@/components/match-snippet";
+import { CompanyAvatar } from "@/components/company/company-avatar";
 import type { SearchMatch } from "@/lib/semantic-search";
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ interface Company {
   funding_amount?: number;
   industry?: string;
   website?: string;
+  logo_url?: string;
 }
 
 interface Contact {
@@ -379,11 +381,12 @@ export default function CompaniesPage() {
                       <td className="px-6 py-4">
                         <Link href={`/companies/${company.id}`} className="block">
                           <div className="flex items-center space-x-3">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm font-medium text-primary">
-                                {company.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
+                            <CompanyAvatar
+                              name={company.name}
+                              logoUrl={company.logo_url}
+                              website={company.website}
+                              size="md"
+                            />
                             <div className="min-w-0 flex-1">
                               <div className="font-medium text-foreground truncate">
                                 {company.name}

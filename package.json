@@ -15,7 +15,8 @@
     "migrate:add-position": "tsx scripts/add-position-column.ts",
     "enrich:companies": "tsx scripts/enrich-companies.ts",
     "scrape:companies": "tsx scripts/scrape-all-companies.ts",
-    "fix:funding": "tsx scripts/fix-company-funding.ts"
+    "fix:funding": "tsx scripts/fix-company-funding.ts",
+    "backfill:logos": "tsx scripts/backfill-company-logos.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
