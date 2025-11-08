@@ -248,22 +248,22 @@ export function Sidebar() {
                     className="fixed inset-0 z-40"
                     onClick={() => setShowDropdown(false)}
                   />
-                  <div className="absolute bottom-full left-full ml-2 mb-0 w-64 bg-background border border-border rounded-lg shadow-lg z-50">
-                    <div className="p-3 border-b border-border">
-                      <div className="text-xs text-muted-foreground mb-1">Signed in as</div>
-                      <div className="text-sm font-medium text-foreground truncate">
+                  <div className="absolute bottom-full left-full ml-2 mb-0 w-48 bg-background border border-border rounded-lg shadow-lg z-50">
+                    <div className="p-2 border-b border-border">
+                      <div className="text-[10px] text-muted-foreground mb-0.5">Signed in as</div>
+                      <div className="text-xs font-medium text-foreground truncate">
                         {userEmail || 'User'}
                       </div>
                     </div>
-                    <div className="py-1">
+                    <div className="py-0.5">
                       <button
                         onClick={() => {
                           setShowDropdown(false);
                           router.push('/settings');
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-muted transition-colors"
                       >
-                        <Settings className="h-4 w-4" />
+                        <Settings className="h-3.5 w-3.5" />
                         Settings
                       </button>
                       <button
@@ -271,17 +271,17 @@ export function Sidebar() {
                           setShowDropdown(false);
                           window.location.href = 'mailto:support@example.com';
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-muted transition-colors"
                       >
-                        <HelpCircle className="h-4 w-4" />
+                        <HelpCircle className="h-3.5 w-3.5" />
                         Contact support
                       </button>
-                      <div className="border-t border-border my-1" />
+                      <div className="border-t border-border my-0.5" />
                       <button
                         onClick={handleSignOut}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-muted transition-colors"
                       >
-                        <LogOut className="h-4 w-4" />
+                        <LogOut className="h-3.5 w-3.5" />
                         Sign out
                       </button>
                     </div>
@@ -294,11 +294,11 @@ export function Sidebar() {
           <Link href="/auth/signin" className="w-full px-2">
             <Button
               variant="default"
-              className="w-full flex flex-col items-center justify-center py-2 h-auto"
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 h-auto text-xs"
               size="sm"
             >
-              <LogIn className="h-4 w-4 mb-1" />
-              <span className="text-[10px]">Sign In</span>
+              <LogIn className="h-3 w-3" />
+              <span>Sign In</span>
             </Button>
           </Link>
         )}

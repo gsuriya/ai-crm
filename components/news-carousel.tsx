@@ -101,11 +101,9 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
   const animationFrameRef = useRef<number | null>(null);
   const pausedPositionRef = useRef<number | null>(null);
   
-  // Drag state
-  const [isDragging, setIsDragging] = useState(false);
-  const isDraggingRef = useRef(false);
-  const dragStartXRef = useRef(0);
-  const dragStartScrollRef = useRef(0);
+  // Scroll state
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isUserScrollingRef = useRef(false);
 
   // Synchronous pause handler that immediately locks position
   const handlePause = useCallback(() => {
@@ -127,42 +125,40 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
 
   // Synchronous resume handler
   const handleResume = useCallback(() => {
-    // Only resume if not dragging
-    if (!isDraggingRef.current) {
+    // Only resume if not user scrolling
+    if (!isUserScrollingRef.current) {
       isPausedRef.current = false;
       setIsPaused(false);
     }
   }, []);
 
-  // Drag handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    isDraggingRef.current = true;
-    setIsDragging(true);
-    dragStartXRef.current = e.clientX;
-    dragStartScrollRef.current = scrollPositionRef.current;
+  // Wheel scroll handler
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
     
-    // Pause the carousel
+    const innerContainer = innerContainerRef.current;
+    if (!innerContainer) return;
+    
+    // Pause auto-scroll
+    isUserScrollingRef.current = true;
     isPausedRef.current = true;
     setIsPaused(true);
-    if (innerContainerRef.current && pausedPositionRef.current === null) {
+    
+    // Capture current position if not already captured
+    if (pausedPositionRef.current === null) {
       pausedPositionRef.current = scrollPositionRef.current;
     }
     
-    // Prevent text selection during drag
-    e.preventDefault();
-  }, []);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingRef.current || !innerContainerRef.current) return;
-    
-    const deltaX = e.clientX - dragStartXRef.current;
+    // Calculate new position based on wheel delta
     const cardWidth = 140;
     const gap = 8;
     const cardWithGap = cardWidth + gap;
     const maxScroll = articles.length * cardWithGap;
     
-    // Update scroll position based on drag (negative because transform is negative)
-    let newPosition = dragStartScrollRef.current - deltaX;
+    // Use deltaX for horizontal scrolling (trackpad) or deltaY for vertical scrolling (mouse wheel)
+    const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    
+    let newPosition = scrollPositionRef.current + scrollDelta;
     
     // Handle wrapping
     if (newPosition < 0) {
@@ -173,37 +169,35 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
     
     scrollPositionRef.current = newPosition;
     pausedPositionRef.current = newPosition;
-    innerContainerRef.current.style.transform = `translateX(-${newPosition}px)`;
+    innerContainer.style.transform = `translateX(-${newPosition}px)`;
+    
+    // Clear existing timeout
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    
+    // Resume auto-scroll after 3 seconds of inactivity
+    scrollTimeoutRef.current = setTimeout(() => {
+      isUserScrollingRef.current = false;
+      isPausedRef.current = false;
+      setIsPaused(false);
+    }, 3000);
   }, [articles.length]);
 
-  const handleMouseUp = useCallback(() => {
-    if (isDraggingRef.current) {
-      isDraggingRef.current = false;
-      setIsDragging(false);
-      
-      // Resume auto-scroll after a brief delay
-      setTimeout(() => {
-        if (!isDraggingRef.current) {
-          isPausedRef.current = false;
-          setIsPaused(false);
-        }
-      }, 100);
-    }
-  }, []);
-
-  // Add and remove mouse event listeners
+  // Add wheel event listener
   useEffect(() => {
-    const handleGlobalMouseMove = (e: MouseEvent) => handleMouseMove(e);
-    const handleGlobalMouseUp = () => handleMouseUp();
+    const emblaContainer = innerContainerRef.current?.parentElement;
+    if (!emblaContainer) return;
     
-    window.addEventListener('mousemove', handleGlobalMouseMove);
-    window.addEventListener('mouseup', handleGlobalMouseUp);
+    emblaContainer.addEventListener('wheel', handleWheel, { passive: false });
     
     return () => {
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      emblaContainer.removeEventListener('wheel', handleWheel);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
     };
-  }, [handleMouseMove, handleMouseUp]);
+  }, [handleWheel]);
 
   const updateOpacities = useCallback(() => {
     const innerContainer = innerContainerRef.current;
@@ -263,8 +257,8 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
         return;
       }
 
-      // Check ref for synchronous pause state or dragging
-      if (isPausedRef.current || isDraggingRef.current) {
+      // Check ref for synchronous pause state or user scrolling
+      if (isPausedRef.current || isUserScrollingRef.current) {
         // Keep position locked - use the paused position
         if (pausedPositionRef.current !== null) {
           innerContainer.style.transform = `translateX(-${pausedPositionRef.current}px)`;
@@ -346,9 +340,7 @@ export function NewsCarousel({ articles }: NewsCarouselProps) {
         ref={emblaRef}
         style={{
           willChange: 'transform',
-          cursor: isDragging ? 'grabbing' : 'grab',
         }}
-        onMouseDown={handleMouseDown}
       >
         <div 
           ref={innerContainerRef}

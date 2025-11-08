@@ -125,7 +125,7 @@ export default function SignInPage() {
           >
             <img 
               src="/logo.png" 
-              alt="Cheddar CRM Logo" 
+              alt="Cheddar Logo" 
               className="h-24 w-24"
             />
           </motion.div>
@@ -135,7 +135,7 @@ export default function SignInPage() {
             transition={{ delay: 0.3, duration: 0.4 }}
             className="text-3xl font-bold text-foreground mb-2"
           >
-            Cheddar CRM
+            Cheddar
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 10 }}
