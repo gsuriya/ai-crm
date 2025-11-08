@@ -57,27 +57,26 @@ export default function PipelinePage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-muted-foreground">Loading pipeline data...</div>
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-600">Loading pipeline data...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex flex-col bg-background min-h-screen" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
       {/* Header */}
-      <div className="border-b border-border bg-background px-6 py-5">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-semibold text-foreground">Pipeline</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Firm-level and company-level pipeline analytics
-          </p>
+      <div className="bg-background">
+        <div className="max-w-7xl mx-auto px-8 pt-6 pb-2">
+          <div className="mb-8 pt-0">
+            <h1 className="text-2xl font-semibold text-gray-900 leading-6">Pipeline</h1>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="flex-1">
+        <div className="max-w-7xl mx-auto px-8 pb-6 space-y-6">
           {/* Metric Cards */}
           {metrics && <MetricCards metrics={metrics} />}
 
@@ -97,11 +96,15 @@ export default function PipelinePage() {
           <InsightsPanel filters={filters} />
 
           {/* Meetings Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-border p-5">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Upcoming & Overdue Meetings
-            </h2>
-            <MeetingsTable filters={filters} />
+          <div className="bg-white rounded-lg border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Upcoming & Overdue Meetings
+              </h2>
+            </div>
+            <div className="p-6">
+              <MeetingsTable filters={filters} />
+            </div>
           </div>
         </div>
       </div>
