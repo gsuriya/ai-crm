@@ -95,21 +95,25 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-5">
-        {/* Header */}
-        <div className="mb-6">
+    <div className="flex h-full flex-col bg-background">
+      {/* Header */}
+      <div className="bg-background pl-12 pr-6 py-8">
+        <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-semibold text-foreground">Home</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            My Pipeline at a glance, Overdue SLAs, Dormant companies, Upcoming meetings, Tasks
+          <p className="mt-1 text-sm text-muted-foreground">
+            Overview of your pipeline, tasks, and key insights
           </p>
         </div>
+      </div>
 
-        <div className="grid grid-cols-12 gap-6">
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto pl-12 pr-6 py-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-12 gap-6">
           {/* Left Column */}
           <div className="col-span-12 lg:col-span-8 space-y-6">
             {/* My Pipeline */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
+            <Card className="rounded-2xl shadow-sm p-5">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-foreground">
@@ -130,7 +134,7 @@ export default function HomePage() {
             </Card>
 
             {/* Overdue SLAs */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
+            <Card className="rounded-2xl shadow-sm p-5">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-foreground">
@@ -144,7 +148,7 @@ export default function HomePage() {
               <CardContent>
                 {metrics.overdueSLAs > 0 ? (
                   <div className="space-y-2">
-                    <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                    <div className="p-3 rounded-lg bg-red-50">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-foreground">
                           Task overdue by 5 days
@@ -164,7 +168,7 @@ export default function HomePage() {
             </Card>
 
             {/* Dormant Companies */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
+            <Card className="rounded-2xl shadow-sm p-5">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-foreground">
@@ -184,7 +188,7 @@ export default function HomePage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="p-3 rounded-lg bg-yellow-50 border border-yellow-200"
+                        className="p-3 rounded-lg bg-yellow-50"
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -214,7 +218,7 @@ export default function HomePage() {
           {/* Right Column */}
           <div className="col-span-12 lg:col-span-4 space-y-6">
             {/* Upcoming Meetings */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
+            <Card className="rounded-2xl shadow-sm p-5">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg font-semibold text-foreground">
                   Upcoming Meetings
@@ -223,7 +227,7 @@ export default function HomePage() {
               <CardContent>
                 {metrics.upcomingMeetings > 0 ? (
                   <div className="space-y-2">
-                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <div className="p-3 rounded-lg bg-blue-50">
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-sm font-medium text-foreground">
@@ -248,7 +252,7 @@ export default function HomePage() {
             </Card>
 
             {/* Tasks */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
+            <Card className="rounded-2xl shadow-sm p-5">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-foreground">
@@ -268,7 +272,7 @@ export default function HomePage() {
             </Card>
 
             {/* Top Signals */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
+            <Card className="rounded-2xl shadow-sm p-5">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
@@ -286,7 +290,7 @@ export default function HomePage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="p-3 rounded-lg bg-accent/50 border border-border"
+                        className="p-3 rounded-lg bg-accent/50"
                       >
                         <div className="text-sm font-medium text-foreground mb-1">
                           {signal.company}
@@ -306,7 +310,7 @@ export default function HomePage() {
             </Card>
 
             {/* New Lookalikes */}
-            <Card className="rounded-2xl shadow-sm border border-border p-5">
+            <Card className="rounded-2xl shadow-sm p-5">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-primary" />
@@ -324,7 +328,7 @@ export default function HomePage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="p-3 rounded-lg bg-accent/50 border border-border"
+                        className="p-3 rounded-lg bg-accent/50"
                       >
                         <div className="flex items-center justify-between mb-1">
                           <div className="text-sm font-medium text-foreground">
@@ -347,6 +351,7 @@ export default function HomePage() {
                 )}
               </CardContent>
             </Card>
+          </div>
           </div>
         </div>
       </div>

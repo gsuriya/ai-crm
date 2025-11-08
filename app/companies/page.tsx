@@ -241,54 +241,58 @@ export default function CompaniesPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="border-b border-border bg-background px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-foreground">Companies</h1>
-          </div>
-        </div>
-        <div className="mt-6">
-          <div className="relative max-w-2xl mx-auto">
-            <div className="relative flex items-center bg-background border border-border rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all">
-              <input
-                type="text"
-                placeholder={agentMode ? "Give agent commands (e.g., 'add SaaS companies to warm outreach cadence')..." : "Search companies..."}
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="flex-1 bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-muted-foreground pr-2"
-                disabled={searchLoading}
-              />
-              <button
-                onClick={() => setAgentMode(!agentMode)}
-                className={`ml-2 flex items-center justify-center h-8 w-8 rounded-full transition-all ${
-                  agentMode 
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
-                title={agentMode ? "Disable Agent Mode" : "Enable Agent Mode"}
-              >
-                <Bot className="h-4 w-4" />
-              </button>
-              <button
-                onClick={performSearch}
-                disabled={searchLoading || !searchInput.trim()}
-                className="ml-2 flex items-center justify-center h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all disabled:hover:bg-primary"
-              >
-                <ArrowUp className="h-4 w-4" />
-              </button>
+      {/* Header */}
+      <div className="bg-background pl-12 pr-6 py-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground">Companies</h1>
             </div>
-            {agentMode && (
-              <div className="mt-2 text-xs text-muted-foreground text-center">
-                <Bot className="h-3 w-3 inline mr-1" />
-                Agent Mode: I&apos;ll automatically find companies and add them to cadences based on your commands
+          </div>
+          <div className="mt-6">
+            <div className="relative max-w-2xl mx-auto">
+              <div className="relative flex items-center bg-background border-2 border-indigo-600 rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-indigo-600 transition-all">
+                <input
+                  type="text"
+                  placeholder={agentMode ? "Give agent commands (e.g., 'add SaaS companies to warm outreach cadence')..." : "Search companies..."}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="flex-1 bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-muted-foreground pr-2"
+                  disabled={searchLoading}
+                />
+                <button
+                  onClick={() => setAgentMode(!agentMode)}
+                  className={`ml-2 flex items-center justify-center h-8 w-8 rounded-full transition-all ${
+                    agentMode 
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-500' 
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                  title={agentMode ? "Disable Agent Mode" : "Enable Agent Mode"}
+                >
+                  <Bot className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={performSearch}
+                  disabled={searchLoading || !searchInput.trim()}
+                  className="ml-2 flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all disabled:hover:bg-indigo-600"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </button>
               </div>
-            )}
+              {agentMode && (
+                <div className="mt-2 text-xs text-muted-foreground text-center">
+                  <Bot className="h-3 w-3 inline mr-1" />
+                  Agent Mode: I&apos;ll automatically find companies and add them to cadences based on your commands
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden pl-12 pr-6">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-muted-foreground">Loading companies...</div>
@@ -311,7 +315,7 @@ export default function CompaniesPage() {
                   {[0, 1, 2].map((i) => (
                     <motion.span
                       key={i}
-                      className="w-1.5 h-1.5 rounded-full bg-primary"
+                      className="w-1.5 h-1.5 rounded-full bg-indigo-600"
                       animate={{
                         scale: [1, 1.5, 1],
                         opacity: [0.5, 1, 0.5],
@@ -338,105 +342,107 @@ export default function CompaniesPage() {
           </div>
         ) : (
           <div className="h-full overflow-auto">
-            <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 bg-background border-b border-border">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    NAME
-                  </th>
-                  {isSemanticSearch && (
+            <div className="max-w-7xl mx-auto">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 z-10 bg-background">
+                  <tr>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                      MATCHES
+                      Name
                     </th>
-                  )}
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Added
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredCompanies.map((company, index) => {
-                  const matches = searchMatches.get(company.id) || [];
-                  const topMatch = matches[0];
-                  const companyContacts = contacts.get(company.id) || [];
-                  
-                  // Find CEO first, then any contact with email, then any contact
-                  const ceo = companyContacts.find(c => 
-                    c.title && (c.title.toLowerCase().includes('ceo') || c.title.toLowerCase().includes('chief executive'))
-                  );
-                  const firstContact = ceo || companyContacts.find(c => c.email && c.email.trim() !== '') || companyContacts[0];
-                  
-                  // Display name only (no title), otherwise email, otherwise "No contact listed"
-                  const displayText = ceo 
-                    ? `${ceo.first_name} ${ceo.last_name}`
-                    : firstContact && firstContact.first_name && firstContact.last_name
-                      ? `${firstContact.first_name} ${firstContact.last_name}`
-                      : firstContact && firstContact.email && firstContact.email.trim() !== ''
-                        ? firstContact.email
-                        : "No contact listed";
+                    {isSemanticSearch && (
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                        Matches
+                      </th>
+                    )}
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Added
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCompanies.map((company, index) => {
+                    const matches = searchMatches.get(company.id) || [];
+                    const topMatch = matches[0];
+                    const companyContacts = contacts.get(company.id) || [];
+                    
+                    // Find CEO first, then any contact with email, then any contact
+                    const ceo = companyContacts.find(c => 
+                      c.title && (c.title.toLowerCase().includes('ceo') || c.title.toLowerCase().includes('chief executive'))
+                    );
+                    const firstContact = ceo || companyContacts.find(c => c.email && c.email.trim() !== '') || companyContacts[0];
+                    
+                    // Display name only (no title), otherwise email, otherwise "No contact listed"
+                    const displayText = ceo 
+                      ? `${ceo.first_name} ${ceo.last_name}`
+                      : firstContact && firstContact.first_name && firstContact.last_name
+                        ? `${firstContact.first_name} ${firstContact.last_name}`
+                        : firstContact && firstContact.email && firstContact.email.trim() !== ''
+                          ? firstContact.email
+                          : "No contact listed";
 
-                  return (
-                    <motion.tr
-                      key={company.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: index * 0.02 }}
-                      className="group hover:bg-accent/50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <Link href={`/companies/${company.id}`} className="block">
-                          <div className="flex items-center space-x-3">
-                            <CompanyAvatar
-                              name={company.name}
-                              logoUrl={company.logo_url}
-                              website={company.website}
-                              size="md"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium text-foreground truncate">
-                                {company.name}
-                              </div>
-                              <div className="text-sm text-muted-foreground truncate">
-                                {displayText}
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      </td>
-                      {isSemanticSearch && (
-                        <td className="px-6 py-4">
-                          {topMatch ? (
-                            <div className="flex items-center gap-2 max-w-md">
-                              <MatchIndicator 
-                                contentType={topMatch.content_type} 
-                                source={topMatch.source}
+                    return (
+                      <motion.tr
+                        key={company.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: index * 0.02 }}
+                        className="group hover:bg-indigo-50/50 transition-colors"
+                      >
+                        <td className="px-6 py-5">
+                          <Link href={`/companies/${company.id}`} className="block">
+                            <div className="flex items-center space-x-3">
+                              <CompanyAvatar
+                                name={company.name}
+                                logoUrl={company.logo_url}
+                                website={company.website}
+                                size="md"
                               />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs text-foreground bg-accent/30 rounded px-2 py-1 border-2 border-border truncate">
-                                  &quot;{highlightMatchText(topMatch.content_snippet.slice(0, 120), searchQuery)}{topMatch.content_snippet.length > 120 ? '...' : ''}&quot;
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-foreground truncate">
+                                  {company.name}
+                                </div>
+                                <div className="text-sm text-muted-foreground truncate">
+                                  {displayText}
                                 </div>
                               </div>
-                              {matches.length > 1 && (
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                  +{matches.length - 1}
-                                </span>
-                              )}
                             </div>
-                          ) : (
-                            <div className="text-xs text-muted-foreground">—</div>
-                          )}
+                          </Link>
                         </td>
-                      )}
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(company.created_at).toLocaleDateString()}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {isSemanticSearch && (
+                          <td className="px-6 py-5">
+                            {topMatch ? (
+                              <div className="flex items-center gap-2 max-w-md">
+                                <MatchIndicator 
+                                  contentType={topMatch.content_type} 
+                                  source={topMatch.source}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs text-foreground bg-accent/30 rounded px-2 py-1 truncate">
+                                    &quot;{highlightMatchText(topMatch.content_snippet.slice(0, 120), searchQuery)}{topMatch.content_snippet.length > 120 ? '...' : ''}&quot;
+                                  </div>
+                                </div>
+                                {matches.length > 1 && (
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    +{matches.length - 1}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground">—</div>
+                            )}
+                          </td>
+                        )}
+                        <td className="px-6 py-5">
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(company.created_at).toLocaleDateString()}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

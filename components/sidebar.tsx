@@ -154,7 +154,7 @@ export function Sidebar() {
       style={{ zIndex: 10 }}
     >
       {/* Logo at top */}
-      <div className="flex h-16 items-center justify-center border-b border-border flex-shrink-0">
+      <div className="flex h-16 items-center justify-center flex-shrink-0">
         <Link href="/" className="flex items-center justify-center">
           <img 
             src="/logo.png" 
@@ -177,16 +177,16 @@ export function Sidebar() {
                 "group flex flex-col items-center justify-center rounded-lg py-2 px-1 transition-all duration-200",
                 isActive
                   ? "bg-indigo-50 text-indigo-600"
-                  : "text-foreground/70 hover:bg-muted/50 hover:text-foreground"
+                  : "text-black hover:bg-muted/50"
               )}
             >
               <item.icon className={cn(
                 "h-5 w-5 mb-1 transition-colors",
-                isActive ? "text-indigo-600" : "text-foreground/60 group-hover:text-foreground"
+                isActive ? "text-indigo-600" : "text-black"
               )} />
               <span className={cn(
                 "text-[10px] font-medium text-center leading-tight",
-                isActive ? "text-indigo-600" : "text-foreground/70 group-hover:text-foreground"
+                isActive ? "text-indigo-600" : "text-black"
               )}>
                 {item.name}
               </span>
@@ -205,7 +205,7 @@ export function Sidebar() {
               onClick={() => router.push('/companies')}
               className="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-muted/50 transition-colors"
             >
-              <Bell className="h-5 w-5 text-foreground/70 hover:text-foreground" />
+              <Bell className="h-5 w-5 text-black hover:text-black/80" />
               {notificationCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-semibold">
                   {notificationCount > 99 ? '99+' : notificationCount}
