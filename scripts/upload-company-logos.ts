@@ -17,14 +17,64 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-async function uploadLogoToStorage(filePath: string, fileName: string, bucket: string = 'pitch-decks'): Promise<string | null> {
+async function createBucketIfNotExists(bucketName: string): Promise<boolean> {
+  try {
+    // Try to list buckets to check if it exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.error('Error listing buckets:', listError);
+      return false;
+    }
+
+    const bucketExists = buckets?.some(b => b.id === bucketName);
+    
+    if (!bucketExists) {
+      console.log(`📦 Creating bucket '${bucketName}'...`);
+      
+      // Create bucket using Management API
+      const response = await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'apikey': supabaseServiceKey,
+        },
+        body: JSON.stringify({
+          id: bucketName,
+          name: bucketName,
+          public: true,
+          file_size_limit: 5242880, // 5MB
+          allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`   ❌ Failed to create bucket: ${errorText}`);
+        return false;
+      }
+
+      console.log(`   ✅ Bucket created successfully!`);
+    } else {
+      console.log(`   ✅ Bucket '${bucketName}' already exists`);
+    }
+    
+    return true;
+  } catch (error: any) {
+    console.error(`Error checking/creating bucket:`, error.message);
+    return false;
+  }
+}
+
+async function uploadLogoToStorage(filePath: string, fileName: string, bucket: string = 'company-logos'): Promise<string | null> {
   try {
     // Read the file
     const fileBuffer = fs.readFileSync(filePath);
     const fileExt = path.extname(filePath);
     
-    // Upload to Supabase Storage
-    const storageFileName = `company-logos/${fileName}${fileExt}`;
+    // Upload to Supabase Storage (no prefix needed, bucket name is already company-logos)
+    const storageFileName = `${fileName}${fileExt}`;
     const { data, error } = await supabase.storage
       .from(bucket)
       .upload(storageFileName, fileBuffer, {
@@ -34,9 +84,14 @@ async function uploadLogoToStorage(filePath: string, fileName: string, bucket: s
 
     if (error) {
       // Try creating the bucket if it doesn't exist
-      if (error.message.includes('Bucket not found')) {
-        console.log(`⚠️  Bucket '${bucket}' not found. Please create it in Supabase Dashboard > Storage.`);
-        console.log(`   Or we can try uploading to a different bucket...`);
+      if (error.message.includes('Bucket not found') || error.message.includes('not found')) {
+        console.log(`⚠️  Bucket '${bucket}' not found.`);
+        console.log(`   Please create it in Supabase Dashboard:`);
+        console.log(`   1. Go to Storage > Buckets`);
+        console.log(`   2. Click "New bucket"`);
+        console.log(`   3. Name: company-logos`);
+        console.log(`   4. Make it public`);
+        console.log(`   5. Run this script again`);
         return null;
       }
       throw error;
@@ -71,6 +126,9 @@ async function updateCompanyLogo(companyName: string, logoUrl: string): Promise<
 
 async function main() {
   console.log('\n🚀 Uploading company logos to Supabase Storage...\n');
+
+  // Check/create bucket
+  await createBucketIfNotExists('company-logos');
 
   const logos = [
     { filePath: './public/flank.jpeg', companyName: 'Flank', fileName: 'flank' },

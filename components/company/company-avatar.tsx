@@ -77,7 +77,7 @@ export function CompanyAvatar({
         <img
           src={logoSource}
           alt={`${name} logo`}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
           onError={() => {
             if (logoUrl && !imageError) {
               // If logo_url failed, try Clearbit
