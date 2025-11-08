@@ -195,7 +195,7 @@ export function Sidebar() {
         })}
       </nav>
       {/* Bottom section with notifications and profile */}
-      <div className="border-t border-border py-2 flex-shrink-0 flex flex-col items-center gap-2 relative">
+      <div className="py-2 flex-shrink-0 flex flex-col items-center gap-2 relative">
         {isAuthenticated === null ? (
           <div className="text-[10px] text-muted-foreground text-center py-0.5">...</div>
         ) : isAuthenticated ? (

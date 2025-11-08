@@ -99,7 +99,7 @@ export default function CompanyLayout({
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Header Bar */}
-      <div className="border-b border-border bg-background px-6 py-8">
+      <div className="border-b border-border bg-background px-8 py-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-foreground tracking-tight mb-3">

@@ -97,7 +97,7 @@ export default function HomePage() {
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Header */}
-      <div className="bg-background pl-12 pr-6 py-8">
+      <div className="bg-background px-8 py-8">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-semibold text-foreground">Home</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -107,7 +107,7 @@ export default function HomePage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto pl-12 pr-6 py-6">
+      <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-12 gap-6">
           {/* Left Column */}

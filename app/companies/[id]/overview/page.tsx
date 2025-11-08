@@ -220,7 +220,7 @@ export default function CompanyOverviewPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-8 py-8">
         {/* KPI Strip */}
         <div className="mb-12">
           <KpiStrip items={kpiItems} />

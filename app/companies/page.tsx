@@ -242,12 +242,10 @@ export default function CompaniesPage() {
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Header */}
-      <div className="bg-background pl-12 pr-6 py-8">
+      <div className="bg-background px-8 py-8">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground">Companies</h1>
-            </div>
+          <div className="mb-8">
+            <h1 className="text-2xl font-medium text-foreground">Companies</h1>
           </div>
           <div className="mt-6">
             <div className="relative max-w-2xl mx-auto">
@@ -292,7 +290,7 @@ export default function CompaniesPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden pl-12 pr-6">
+      <div className="flex-1 overflow-hidden px-8">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-muted-foreground">Loading companies...</div>
@@ -354,7 +352,7 @@ export default function CompaniesPage() {
                         Matches
                       </th>
                     )}
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                    <th className="px-6 py-3 text-right text-sm font-semibold text-foreground">
                       Added
                     </th>
                   </tr>
@@ -433,7 +431,7 @@ export default function CompaniesPage() {
                           </td>
                         )}
                         <td className="px-6 py-5">
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-muted-foreground text-right">
                             {new Date(company.created_at).toLocaleDateString()}
                           </div>
                         </td>
