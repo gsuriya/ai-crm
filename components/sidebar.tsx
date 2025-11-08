@@ -291,15 +291,14 @@ export function Sidebar() {
             </div>
           </>
         ) : (
-          <Link href="/auth/signin" className="w-full px-2">
-            <Button
-              variant="default"
-              className="w-full flex items-center justify-center gap-1.5 py-1.5 h-auto text-xs"
-              size="sm"
-            >
-              <LogIn className="h-3 w-3" />
-              <span>Sign In</span>
-            </Button>
+          <Link
+            href="/auth/signin"
+            className="group flex flex-col items-center justify-center rounded-lg py-2 px-1 transition-all duration-200 text-black hover:bg-muted/50 w-full"
+          >
+            <LogIn className="h-5 w-5 mb-1 transition-colors text-black" />
+            <span className="text-[10px] font-medium text-center leading-tight text-black">
+              Sign In
+            </span>
           </Link>
         )}
       </div>
