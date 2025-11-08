@@ -170,10 +170,15 @@ export default function CompaniesPage() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching companies:", error);
+        setCompanies([]);
+        return;
+      }
       setCompanies(data || []);
     } catch (error) {
       console.error("Error fetching companies:", error);
+      setCompanies([]);
     } finally {
       setLoading(false);
     }
@@ -231,9 +236,28 @@ export default function CompaniesPage() {
 
 
   useEffect(() => {
-    fetchCompanies();
-    fetchContacts();
-    fetchCadences();
+    let mounted = true;
+    
+    const loadData = async () => {
+      try {
+        await Promise.all([
+          fetchCompanies(),
+          fetchContacts(),
+          fetchCadences(),
+        ]);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      mounted = false;
+    };
   }, [fetchCompanies, fetchContacts, fetchCadences]);
 
   // Perform search manually (triggered by Enter key or button click)
@@ -394,10 +418,7 @@ export default function CompaniesPage() {
 
       {/* Company News Section */}
       <div className="bg-background border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-8 pt-4 pb-3">
-          <div className="mb-2">
-            <p className="text-xs font-medium text-gray-500">Recent News</p>
-          </div>
+        <div className="max-w-5xl mx-auto px-8 pt-1 pb-3">
           <NewsCarousel articles={mockNewsArticles} />
         </div>
       </div>
