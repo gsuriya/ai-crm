@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -316,16 +315,16 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
 
   if (loading) {
     return (
-      <Card className="rounded-2xl shadow-sm border border-border p-5">
+      <div className="py-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="h-5 bg-muted rounded w-1/2"></div>
           <div className="space-y-2">
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded"></div>
+            <div className="h-4 bg-muted rounded"></div>
+            <div className="h-4 bg-muted rounded"></div>
+            <div className="h-4 bg-muted rounded"></div>
           </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -447,36 +446,34 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
   ];
 
   return (
-    <Card className="rounded-2xl shadow-sm border border-border p-4">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-primary" />
-            <CardTitle className="text-lg font-semibold text-foreground">
-              Company Details
-            </CardTitle>
-          </div>
-          {unreadEventCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push(`/companies/${companyId}/events`)}
-              className="relative h-8 px-3"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="ml-1.5 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
-                {unreadEventCount > 99 ? '99+' : unreadEventCount}
-              </span>
-            </Button>
-          )}
+    <div className="py-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-primary" />
+          <h2 className="text-xl font-semibold text-foreground">
+            Company Details
+          </h2>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+        {unreadEventCount > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/companies/${companyId}/events`)}
+            className="relative h-8 px-3"
+          >
+            <Bell className="h-4 w-4" />
+            <span className="ml-1.5 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+              {unreadEventCount > 99 ? '99+' : unreadEventCount}
+            </span>
+          </Button>
+        )}
+      </div>
+      <div className="space-y-4">
         {details.map((detail) => {
           const Icon = detail.icon;
           const isFieldEditing = editingField === detail.key;
           return (
-            <div key={detail.key} className="flex items-start gap-3 group">
+            <div key={detail.key} className="flex items-start gap-3 group pb-4 border-b border-border/50 last:border-0 last:pb-0">
               <div className="mt-0.5">
                 <Icon className="h-4 w-4 text-muted-foreground" />
               </div>
@@ -569,8 +566,8 @@ export function CompanyDetails({ companyId }: CompanyDetailsProps) {
             </div>
           );
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

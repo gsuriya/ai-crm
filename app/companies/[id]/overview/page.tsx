@@ -158,10 +158,10 @@ export default function CompanyOverviewPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-5">
-        <div className="grid grid-cols-12 gap-6">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-12 gap-8">
           {/* Center Column (col-span-8) */}
-          <div className="col-span-12 lg:col-span-8 space-y-6">
+          <div className="col-span-12 lg:col-span-8 space-y-8">
             {/* Key Metrics */}
             <CompanyKeyMetrics companyId={companyId} />
 
@@ -176,7 +176,7 @@ export default function CompanyOverviewPage() {
           </div>
 
           {/* Right Column (col-span-4) */}
-          <div className="col-span-12 lg:col-span-4 space-y-6">
+          <div className="col-span-12 lg:col-span-4 space-y-8">
             {/* Company Details */}
             <CompanyDetails companyId={companyId} />
 

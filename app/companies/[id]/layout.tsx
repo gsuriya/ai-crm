@@ -119,9 +119,6 @@ export default function CompanyLayout({
         <div className="max-w-7xl mx-auto">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xl font-bold">
-                {company.name.charAt(0).toUpperCase()}
-              </div>
               <div>
                 <h1 className="text-2xl font-semibold text-foreground">
                   {company.name}
@@ -168,51 +165,6 @@ export default function CompanyLayout({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={company.status || ""}
-                onChange={(e) => {
-                  // TODO: Update company status
-                  console.log("Update status:", e.target.value);
-                }}
-                className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background"
-              >
-                <option value="">Select status</option>
-                <option value="lead">Lead</option>
-                <option value="qualified">Qualified</option>
-                <option value="prospect">Prospect</option>
-                <option value="diligence">Diligence</option>
-                <option value="closed">Closed</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Primary CTA Row */}
-          <div className="flex items-center gap-2 mb-4">
-            <Button size="sm" variant="outline">
-              <FileText className="h-4 w-4 mr-2" />
-              Add Note
-            </Button>
-            <Button size="sm" variant="outline">
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Deck
-            </Button>
-            <Button size="sm" variant="outline">
-              <Mail className="h-4 w-4 mr-2" />
-              Email CEO
-            </Button>
-            <Button size="sm" variant="outline">
-              <Calendar className="h-4 w-4 mr-2" />
-              Create Task
-            </Button>
-            <Button size="sm" variant="outline">
-              <Workflow className="h-4 w-4 mr-2" />
-              Open Cadence
-            </Button>
-            <Button size="sm" variant="outline">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Open Deal
-            </Button>
           </div>
 
           {/* Tab Navigation */}

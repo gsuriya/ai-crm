@@ -8,7 +8,6 @@ import {
   History,
   DollarSign,
   FileUp,
-  Sparkles,
   Workflow,
   Bell,
 } from "lucide-react";
@@ -31,7 +30,6 @@ export function CompanyTabs({ companyId, currentTab }: CompanyTabsProps) {
     { id: "financials", label: "Financials", icon: DollarSign, shortcut: "f" },
     { id: "notes", label: "Notes", icon: FileText, shortcut: "n" },
     { id: "docs", label: "Docs", icon: FileUp, shortcut: "d" },
-    { id: "ai-insights", label: "AI Insights", icon: Sparkles, shortcut: "i" },
     { id: "cadences", label: "Cadences", icon: Workflow, shortcut: "c" },
     { id: "events", label: "Events", icon: Bell, shortcut: "e" },
   ];
@@ -99,7 +97,7 @@ export function CompanyTabs({ companyId, currentTab }: CompanyTabsProps) {
 
   return (
     <Tabs value={currentTab} onValueChange={handleTabChange}>
-      <TabsList className="grid w-full grid-cols-9">
+      <TabsList className="grid w-full grid-cols-8">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const showBadge = tab.id === "events" && unreadEventCount > 0;

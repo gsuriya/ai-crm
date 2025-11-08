@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Newspaper, ExternalLink, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
@@ -103,54 +102,50 @@ export function RecentNews({ companyId }: RecentNewsProps) {
 
   if (loading) {
     return (
-      <Card className="rounded-2xl shadow-sm border border-border p-5">
+      <div className="py-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-          <div className="h-16 bg-gray-200 rounded"></div>
+          <div className="h-5 bg-muted rounded w-1/2"></div>
+          <div className="h-16 bg-muted rounded"></div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (news.length === 0) {
     return (
-      <Card className="rounded-2xl shadow-sm border border-border p-5">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Newspaper className="h-4 w-4 text-primary" />
-            <CardTitle className="text-lg font-semibold text-foreground">
-              Recent News
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">No recent news found</p>
-        </CardContent>
-      </Card>
+      <div className="py-6">
+        <div className="flex items-center gap-2 mb-6">
+          <Newspaper className="h-4 w-4 text-primary" />
+          <h2 className="text-xl font-semibold text-foreground">
+            Recent News
+          </h2>
+        </div>
+        <p className="text-sm text-muted-foreground">No recent news found</p>
+      </div>
     );
   }
 
   return (
-    <Card className="rounded-2xl shadow-sm border border-border p-5">
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
+    <div className="py-6">
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-1">
           <Newspaper className="h-4 w-4 text-primary" />
-          <CardTitle className="text-lg font-semibold text-foreground">
+          <h2 className="text-xl font-semibold text-foreground">
             Recent News
-          </CardTitle>
+          </h2>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-xs text-muted-foreground">
           Latest updates & announcements
         </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </div>
+      <div className="space-y-3">
         {news.map((item, index) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-3 rounded-lg border border-border bg-background hover:bg-accent/50 transition-colors"
+            className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-border/50"
           >
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1">
@@ -185,7 +180,7 @@ export function RecentNews({ companyId }: RecentNewsProps) {
             )}
           </motion.div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

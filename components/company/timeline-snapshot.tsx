@@ -1,6 +1,5 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Phone, Calendar, FileText, Reply, PhoneCall, Plus, ChevronRight, ExternalLink } from "lucide-react";
@@ -95,7 +94,7 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
 
   if (activities.length === 0) {
     return (
-      <Card className="rounded-2xl shadow-sm border-2 border-border p-4">
+      <div className="py-8">
         <EmptyState
           icon={Calendar}
           title="No recent activity"
@@ -106,30 +105,28 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
             console.log("Email CEO");
           }}
         />
-      </Card>
+      </div>
     );
   }
 
   return (
     <>
-      <Card 
-        className="rounded-2xl shadow-sm border-2 border-border p-5 cursor-pointer hover:border-primary/50 transition-colors"
+      <div 
+        className="py-6 cursor-pointer"
         onClick={() => router.push(`/companies/${companyId}/activity`)}
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-lg font-semibold text-foreground">
-                Call Logs
-              </CardTitle>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <span className="text-xs text-muted-foreground">
-              Last 5 activities
-            </span>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold text-foreground">
+              Recent Activity
+            </h2>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </div>
-        </CardHeader>
-      <CardContent className="space-y-4">
+          <span className="text-xs text-muted-foreground">
+            Last 5 activities
+          </span>
+        </div>
+      <div className="space-y-4">
         {Object.entries(groupedActivities).map(([date, dayActivities]) => (
           <div key={date} className="space-y-3">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -144,8 +141,8 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
                   key={activity.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`p-3 rounded-lg border-2 border-border bg-background hover:bg-accent/50 transition-colors cursor-pointer ${
-                    isSelected ? "ring-2 ring-primary" : ""
+                  className={`p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer border border-border/50 ${
+                    isSelected ? "ring-2 ring-primary ring-offset-2" : ""
                   }`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -216,8 +213,8 @@ export function TimelineSnapshot({ companyId, activities }: TimelineSnapshotProp
             })}
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
 
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
