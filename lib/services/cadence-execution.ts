@@ -741,6 +741,10 @@ export async function executeNextBlock(
       
       // CLIENT-SIDE LOGGING: Also log to browser console via fetch
       try {
+        const hasPreviousEmail = blocks
+          .filter(b => b.type === 'email' && b.id !== currentBlock.id && executedBlockIds.includes(b.id))
+          .length > 0;
+        
         await fetch('/api/cadence/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -749,27 +753,71 @@ export async function executeNextBlock(
             message: `📧 EMAIL BLOCK: ${currentBlock.id}`,
             data: {
               subject: currentBlock.config?.subject || '(empty)',
-              threadSelection: currentBlock.config?.threadSelection || (currentBlock.config?.replyToThread ? 'previous' : 'new'),
+              threadMode: hasPreviousEmail ? 'auto-reply' : 'new-thread',
             }
           })
         }).catch(() => {}); // Ignore errors
       } catch {}
       
-      if (!currentBlock.config?.subject || !currentBlock.config?.body) {
-        console.error(`[Workflow] ❌ Email block missing subject or body`);
-        console.error(`[Workflow] ❌ Subject:`, currentBlock.config?.subject);
-        console.error(`[Workflow] ❌ Body:`, currentBlock.config?.body);
-        throw new Error(`Email block is missing subject or body. Please configure the email block in the cadence editor.`);
+      // Check for body (required)
+      if (!currentBlock.config?.body) {
+        console.error(`[Workflow] ❌ Email block missing body`);
+        throw new Error(`Email block is missing body. Please configure the email block in the cadence editor.`);
       }
       
-      // Determine thread selection
-      const threadSelection = currentBlock.config?.threadSelection || 
-                             (currentBlock.config?.replyToThread ? 'previous' : 'new');
+      // Automatically determine thread selection: if there's a previous email block executed, reply in thread
+      // Find the most recently executed email block (if any)
+      const previousEmailBlocks = blocks
+        .filter(b => b.type === 'email' && b.id !== currentBlock.id && executedBlockIds.includes(b.id))
+        .map(b => ({
+          block: b,
+          executionIndex: executedBlockIds.indexOf(b.id),
+        }))
+        .sort((a, b) => b.executionIndex - a.executionIndex); // Most recent first
+      
+      const hasPreviousEmail = previousEmailBlocks.length > 0;
+      
+      // CRITICAL: ALL emails after the first MUST use the first email's subject to stay in the same thread
+      // Find the FIRST email block in the cadence (by execution order, not block order)
+      const firstEmailBlockInCadence = blocks
+        .filter(b => b.type === 'email')
+        .sort((a, b) => {
+          // Sort by execution order if executed, otherwise by block position
+          const aExecuted = executedBlockIds.includes(a.id);
+          const bExecuted = executedBlockIds.includes(b.id);
+          if (aExecuted && bExecuted) {
+            return executedBlockIds.indexOf(a.id) - executedBlockIds.indexOf(b.id);
+          }
+          if (aExecuted) return -1;
+          if (bExecuted) return 1;
+          // If neither executed, use block order (first email block in cadence)
+          return 0; // Keep original order
+        })[0];
+      
+      // If this is NOT the first email, ALWAYS use the first email's subject
+      if (hasPreviousEmail && firstEmailBlockInCadence && firstEmailBlockInCadence.id !== currentBlock.id) {
+        if (firstEmailBlockInCadence.config?.subject) {
+          console.log(`[Workflow] 🔗 Using first email's subject for threading: "${firstEmailBlockInCadence.config.subject}"`);
+          console.log(`[Workflow] 🔗 First email block ID: ${firstEmailBlockInCadence.id}, Current block ID: ${currentBlock.id}`);
+          currentBlock.config = { ...currentBlock.config, subject: firstEmailBlockInCadence.config.subject };
+        } else {
+          console.error(`[Workflow] ❌ First email block has no subject!`);
+          throw new Error(`First email block in cadence is missing subject. Please configure the first email block.`);
+        }
+      } else if (!hasPreviousEmail) {
+        // This is the first email - require subject
+        if (!currentBlock.config?.subject) {
+          console.error(`[Workflow] ❌ First email block missing subject`);
+          throw new Error(`Email block is missing subject. Please configure the email block in the cadence editor.`);
+        }
+      }
+      
+      const threadSelection = hasPreviousEmail ? 'previous' : 'new';
       
       console.log(`[Workflow] ========== EMAIL BLOCK THREADING ANALYSIS ==========`);
       console.log(`[Workflow] 📧 Current Email Block ID: ${currentBlock.id}`);
       console.log(`[Workflow] 📧 Current Email Block Title: ${currentBlock.title}`);
-      console.log(`[Workflow] 📧 Thread Selection Config: ${threadSelection}`);
+      console.log(`[Workflow] 📧 Auto-detected thread selection: ${threadSelection} (${hasPreviousEmail ? `${previousEmailBlocks.length} previous email(s) found` : 'no previous emails'})`);
       console.log(`[Workflow] 📧 Execution ID: ${execution.id}`);
       console.log(`[Workflow] 📧 Execution Created At: ${execution.created_at}`);
       console.log(`[Workflow] 📧 Current Time: ${new Date().toISOString()}`);
@@ -786,79 +834,69 @@ export async function executeNextBlock(
       
       let threadId: string | undefined = undefined;
       let messageId: string | undefined = undefined;
+      let selectedBlockId: string | undefined = undefined;
       
       if (threadSelection !== 'new') {
-        // Find the MOST RECENT email block in the same thread (not the first one!)
-        let selectedBlockId: string | undefined = undefined;
+        // Automatically find the MOST RECENTLY EXECUTED email block
+        // Use executedBlockIds to determine execution order - the LAST email block in executedBlockIds
+        // is the most recently executed one
+        const emailBlocksWithThreadInfo = blocks
+          .filter(b => b.type === 'email' && b.id !== currentBlock.id && threadInfoMap.has(b.id))
+          .map(b => ({
+            block: b,
+            threadInfo: threadInfoMap.get(b.id)!,
+            executionIndex: executedBlockIds.indexOf(b.id), // Index in execution order (-1 if not executed)
+          }))
+          .filter(item => item.executionIndex >= 0); // Only blocks executed in THIS execution
         
-        if (threadSelection === 'previous') {
-          // CRITICAL: Find the MOST RECENTLY EXECUTED email block (not just last in array!)
-          // Use executedBlockIds to determine execution order - the LAST email block in executedBlockIds
-          // is the most recently executed one
-          const emailBlocksWithThreadInfo = blocks
-            .filter(b => b.type === 'email' && b.id !== currentBlock.id && threadInfoMap.has(b.id))
-            .map(b => ({
-              block: b,
-              threadInfo: threadInfoMap.get(b.id)!,
-              executionIndex: executedBlockIds.indexOf(b.id), // Index in execution order (-1 if not executed)
-            }))
-            .filter(item => item.executionIndex >= 0); // Only blocks executed in THIS execution
-          
-          // Sort by execution order (most recent = highest index in executedBlockIds)
-          emailBlocksWithThreadInfo.sort((a, b) => b.executionIndex - a.executionIndex);
-          
-          const selectedBlock = emailBlocksWithThreadInfo[0]; // Most recently executed
-          selectedBlockId = selectedBlock?.block.id;
-          
-          console.log(`[Workflow] 🔍 Finding MOST RECENTLY EXECUTED email block (previous mode)`);
-          console.log(`[Workflow]   Execution order (executedBlockIds):`, executedBlockIds);
-          console.log(`[Workflow]   Available email blocks with threadInfo (sorted by execution order):`, emailBlocksWithThreadInfo.map(e => ({
-            blockId: e.block.id,
-            executionIndex: e.executionIndex,
-            threadId: e.threadInfo.threadId,
-            messageId: e.threadInfo.messageId?.substring(0, 50) + '...',
-            isMostRecent: emailBlocksWithThreadInfo.indexOf(e) === 0,
-          })));
-          console.log(`[Workflow]   Selected (most recently executed): ${selectedBlockId} (execution index: ${selectedBlock?.executionIndex})`);
-          
-          // CRITICAL VALIDATION: Verify selected block is actually executed in THIS execution
-          if (selectedBlockId && !executedBlockIds.includes(selectedBlockId)) {
-            console.error(`[Workflow] ❌❌❌ CRITICAL: Selected block ${selectedBlockId} is NOT in executedBlockIds!`);
-            console.error(`[Workflow] ❌ This is a STALE entry - clearing threadInfoMap for this block!`);
-            threadInfoMap.delete(selectedBlockId);
-            selectedBlockId = undefined; // Clear selection
-            console.error(`[Workflow] ❌ Will create NEW thread instead of replying to old one`);
-          }
-          
-          if (selectedBlock) {
-            console.log(`[Workflow]   ✅ Selected block thread info:`, {
-              blockId: selectedBlock.block.id,
-              executionIndex: selectedBlock.executionIndex,
-              threadId: selectedBlock.threadInfo.threadId,
-              messageId: selectedBlock.threadInfo.messageId?.substring(0, 50) + '...',
-              isFromThisExecution: executedBlockIds.includes(selectedBlock.block.id),
-              executionId: execution.id,
-              executionCreatedAt: execution.created_at,
-              executionAgeMinutes: executionAgeMinutes,
-            });
-          } else {
-            console.error(`[Workflow] ❌ No email blocks found that were executed in THIS execution!`);
-            console.error(`[Workflow] ❌ executedBlockIds:`, executedBlockIds);
-            console.error(`[Workflow] ❌ threadInfoMap keys:`, Array.from(threadInfoMap.keys()));
-          }
-        } else {
-          // Specific block ID selected
-          selectedBlockId = threadSelection;
+        // Sort by execution order (most recent = highest index in executedBlockIds)
+        emailBlocksWithThreadInfo.sort((a, b) => b.executionIndex - a.executionIndex);
+        
+        const selectedBlock = emailBlocksWithThreadInfo[0]; // Most recently executed
+        selectedBlockId = selectedBlock?.block.id;
+        
+        console.log(`[Workflow] 🔍 Auto-detecting previous email block to reply to`);
+        console.log(`[Workflow]   Execution order (executedBlockIds):`, executedBlockIds);
+        console.log(`[Workflow]   Available email blocks with threadInfo (sorted by execution order):`, emailBlocksWithThreadInfo.map(e => ({
+          blockId: e.block.id,
+          executionIndex: e.executionIndex,
+          threadId: e.threadInfo.threadId,
+          messageId: e.threadInfo.messageId?.substring(0, 50) + '...',
+          isMostRecent: emailBlocksWithThreadInfo.indexOf(e) === 0,
+        })));
+        console.log(`[Workflow]   Selected (most recently executed): ${selectedBlockId} (execution index: ${selectedBlock?.executionIndex})`);
+        
+        // CRITICAL VALIDATION: Verify selected block is actually executed in THIS execution
+        if (selectedBlockId && !executedBlockIds.includes(selectedBlockId)) {
+          console.error(`[Workflow] ❌❌❌ CRITICAL: Selected block ${selectedBlockId} is NOT in executedBlockIds!`);
+          console.error(`[Workflow] ❌ This is a STALE entry - clearing threadInfoMap for this block!`);
+          threadInfoMap.delete(selectedBlockId);
+          console.error(`[Workflow] ❌ Will create NEW thread instead of replying to old one`);
         }
         
-        console.log(`[Workflow] 🔍 Thread selection: ${threadSelection}, selectedBlockId: ${selectedBlockId}`);
+        if (selectedBlock) {
+          console.log(`[Workflow]   ✅ Selected block thread info:`, {
+            blockId: selectedBlock.block.id,
+            executionIndex: selectedBlock.executionIndex,
+            threadId: selectedBlock.threadInfo.threadId,
+            messageId: selectedBlock.threadInfo.messageId?.substring(0, 50) + '...',
+            isFromThisExecution: executedBlockIds.includes(selectedBlock.block.id),
+            executionId: execution.id,
+            executionCreatedAt: execution.created_at,
+            executionAgeMinutes: executionAgeMinutes,
+          });
+        } else {
+          console.error(`[Workflow] ❌ No email blocks found that were executed in THIS execution!`);
+          console.error(`[Workflow] ❌ executedBlockIds:`, executedBlockIds);
+          console.error(`[Workflow] ❌ threadInfoMap keys:`, Array.from(threadInfoMap.keys()));
+        }
+        
+        console.log(`[Workflow] 🔍 Auto-detected selectedBlockId: ${selectedBlockId}`);
         console.log(`[Workflow] 🔍 Available threadInfoMap entries:`, Array.from(threadInfoMap.keys()));
         console.log(`[Workflow] 🔍 ThreadInfoMap size: ${threadInfoMap.size}`);
         
         if (!selectedBlockId) {
-          console.error(`[Workflow] ❌ CRITICAL: selectedBlockId is null/undefined!`);
-          console.error(`[Workflow] ❌ threadSelection: ${threadSelection}`);
-          console.error(`[Workflow] ❌ Available email blocks:`, blocks.filter(b => b.type === 'email').map(b => b.id));
+          console.log(`[Workflow] ⚠️ No previous email block found - will create new thread`);
         }
         
         if (selectedBlockId && threadInfoMap.has(selectedBlockId)) {
@@ -949,33 +987,37 @@ export async function executeNextBlock(
             preview: messageId.substring(0, 30) + '...'
           });
           
-          // IMPORTANT: Use the original subject exactly as stored (from the FIRST email in thread)
+          // CRITICAL: Subject should already be set to first email's subject from earlier logic
+          // Just verify it matches the first email's subject for proper threading
           const firstEmailBlock = blocks.find(b => b.id === firstBlockId);
-          const originalSubject = firstEmailBlock?.config?.subject || '';
-          const currentSubject = currentBlock.config?.subject || '';
-          console.log(`[Workflow]   Subject comparison:`, {
-            firstEmailSubject: originalSubject,
+          const firstEmailSubject = firstEmailBlock?.config?.subject || '';
+          const currentSubject = currentBlock.config?.subject || finalSubject;
+          
+          console.log(`[Workflow]   Subject verification for threading:`, {
+            firstEmailSubject: firstEmailSubject,
             currentBlockSubject: currentSubject,
-            match: originalSubject === currentSubject
+            finalSubject: finalSubject,
+            match: firstEmailSubject === currentSubject || firstEmailSubject === finalSubject,
+            note: 'Subject should already be set to first email\'s subject from earlier logic'
           });
           
-          if (originalSubject) {
-            // Force subject to match original for threading
-            // Variables will be replaced later in the process
-            finalSubject = originalSubject;
-            // Also replace variables in the original subject
+          // If somehow the subject doesn't match, correct it (shouldn't happen, but safety check)
+          if (firstEmailSubject && currentSubject !== firstEmailSubject && finalSubject !== firstEmailSubject) {
+            console.log(`[Workflow]   ⚠️ Subject mismatch detected, correcting to first email's subject`);
+            finalSubject = firstEmailSubject;
+            // Variables already replaced above, but replace again to be safe
             finalSubject = replaceBasicVariables(finalSubject, {
               contactName,
               companyName,
               companyDescription,
               companyWebsite,
             });
-            currentBlock.config = { ...currentBlock.config, subject: originalSubject };
-            console.log(`[Workflow]   Subject locked to FIRST email's subject: "${originalSubject}"`);
-            console.log(`[Workflow]   Final subject (with variables): "${finalSubject}"`);
-          } else {
-            console.error(`[Workflow] ❌ WARNING: Could not find original subject for first email block ${firstBlockId}`);
+            console.log(`[Workflow]   ✅ Corrected finalSubject to first email's subject: "${firstEmailSubject}"`);
           }
+          
+          // Note: finalSubject already has variables replaced from earlier code
+          // We're just ensuring it matches the first email's subject for threading
+          console.log(`[Workflow]   ✅ Final subject for email send: "${finalSubject}"`);
           
           // Store both Message-IDs in metadata for proper References header
           // We'll use mostRecentMessageId for In-Reply-To and firstMessageId for References
@@ -998,7 +1040,7 @@ export async function executeNextBlock(
         console.log(`[Workflow]   Thread ID: ${threadId || 'NEW THREAD'}`);
         console.log(`[Workflow]   Message-ID: ${messageId || 'NONE'}`);
         console.log(`[Workflow]   Current block ID: ${currentBlock.id}`);
-        console.log(`[Workflow]   Thread selection mode: ${threadSelection}`);
+        console.log(`[Workflow]   Thread mode: ${threadId ? 'REPLY TO THREAD' : 'NEW THREAD'} (auto-detected)`);
         if (threadId) {
           console.log(`[Workflow]   ⚠️⚠️⚠️ REPLYING TO EXISTING THREAD ⚠️⚠️⚠️`);
           console.log(`[Workflow]   ⚠️ Thread ID: ${threadId}`);
@@ -1483,16 +1525,26 @@ export async function executeNextBlock(
       metadata: updatedMetadata,
     });
     
+    // CRITICAL: Delay blocks MUST be executed immediately (even with skipRecursion)
+    // because they need to set scheduled_for. Other blocks can skip recursion.
+    if (nextBlock.type === 'delay') {
+      console.log(`[Workflow] Next block is a delay block - executing immediately to set scheduled_for`);
+      const updatedExecution = await getExecution(supabase, execution.id);
+      if (updatedExecution && updatedExecution.current_block_id === nextBlockId) {
+        await executeNextBlock(supabase, updatedExecution, blocks, options);
+      }
+      return; // Delay block will handle its own return
+    }
+    
     // CRITICAL: Skip recursive execution if this was called from background processor
     // This prevents double execution when background processor picks up scheduled executions
+    // BUT: Delay blocks are handled above and must execute immediately
     if (options?.skipRecursion) {
       console.log(`[Workflow] Skipping recursive execution (called from background processor) to prevent double-processing`);
       return;
     }
     
-    // Recursively execute next block
-    // CRITICAL: Delay blocks MUST be executed immediately so they can set scheduled_for
-    // Delay blocks return early after setting scheduled_for, so recursion will stop there
+    // Recursively execute next block (for non-delay blocks)
     const updatedExecution = await getExecution(supabase, execution.id);
     if (updatedExecution && updatedExecution.current_block_id === nextBlockId) {
       await executeNextBlock(supabase, updatedExecution, blocks);

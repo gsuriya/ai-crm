@@ -304,22 +304,23 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
             log(`   Body: ${block.config?.body || '(empty)'}`);
             
             try {
-              // Determine thread selection
-              const threadSelection = block.config?.threadSelection || 
-                                     (block.config?.replyToThread ? 'previous' : 'new'); // Support legacy
+              // Auto-detect if there's a previous email block to reply to
+              const previousEmailBlocks = blocksFromSupabase
+                .filter(b => b.type === 'email' && b.id !== block.id && threadInfoMap.has(b.id));
+              
+              const hasPreviousEmail = previousEmailBlocks.length > 0;
               
               let threadId: string | undefined = undefined;
               let messageId: string | undefined = undefined;
               
               let finalSubject = block.config?.subject || '';
               
-              if (threadSelection !== 'new') {
-                // Find the thread info from the selected block
-                const selectedBlockId = threadSelection === 'previous' 
-                  ? blocksFromSupabase.find(b => b.type === 'email' && b.id !== block.id && threadInfoMap.has(b.id))?.id
-                  : threadSelection;
+              if (hasPreviousEmail) {
+                // Find the most recent email block (last one in the array)
+                const selectedBlock = previousEmailBlocks[previousEmailBlocks.length - 1];
+                const selectedBlockId = selectedBlock.id;
                 
-                if (selectedBlockId && threadInfoMap.has(selectedBlockId)) {
+                if (threadInfoMap.has(selectedBlockId)) {
                   const threadInfo = threadInfoMap.get(selectedBlockId)!;
                   threadId = threadInfo.threadId;
                   // Ensure messageId is in correct format with angle brackets if not already
@@ -328,7 +329,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                     msgId = `<${msgId}>`;
                   }
                   messageId = msgId;
-                  log(`   Replying to thread from block ${selectedBlockId}`);
+                  log(`   Auto-replying to thread from block ${selectedBlockId}`);
                   log(`   Thread ID: ${threadId}, Message ID: ${messageId}`);
                   
                   // IMPORTANT: Use the original subject exactly as stored (from FIRST email in thread)
@@ -339,9 +340,8 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                     threadInfoMap.get(b.id)?.threadId === threadId
                   );
                   
-                  const originalSubject = firstEmailInThread?.config?.subject || selectedBlockId 
-                    ? blocksFromSupabase.find(b => b.id === selectedBlockId)?.config?.subject || ''
-                    : '';
+                  const originalSubject = firstEmailInThread?.config?.subject || 
+                    blocksFromSupabase.find(b => b.id === selectedBlockId)?.config?.subject || '';
                   
                   if (originalSubject) {
                     // Force subject to match original for threading
@@ -352,7 +352,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                     log(`   ⚠️ Warning: Could not find original subject, using current: "${finalSubject}"`);
                   }
                 } else {
-                  log(`   ⚠️ Warning: Selected thread block not found or hasn't sent yet. Creating new thread.`);
+                  log(`   ⚠️ Warning: Previous email block not found in threadInfoMap. Creating new thread.`);
                 }
               } else {
                 log(`   Creating new thread with subject: "${finalSubject}"`);
@@ -1019,7 +1019,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   const getDefaultConfig = (type: BlockType) => {
     switch (type) {
       case 'email':
-        return { subject: '', body: '', threadSelection: 'new' as const };
+        return { subject: '', body: '' };
       case 'voicecall':
         return { customPrompt: '', voicemailMessage: '', enableVoicemailFallback: true }; // Optional - uses defaults if empty
       case 'delay':
@@ -1629,20 +1629,16 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                   <div>
                     <label className="text-sm font-medium mb-1 block">Subject</label>
                     {(() => {
-                      const threadSelection = block.config?.threadSelection || 
-                                             (block.config?.replyToThread ? 'previous' : 'new');
-                      const isReplying = threadSelection !== 'new';
+                      // Automatically detect if there's a previous email block connected
+                      const previousEmailBlocks = getPreviousEmailBlocks(block.id);
+                      const isReplying = previousEmailBlocks.length > 0;
                       
-                      // If replying, find the original subject
+                      // If replying, find the original subject from the first email in the chain
                       let originalSubject = '';
-                      if (isReplying) {
-                        const selectedBlockId = threadSelection === 'previous' 
-                          ? blocks.find(b => b.type === 'email' && b.id !== block.id && b.config?.subject)?.id
-                          : threadSelection;
-                        if (selectedBlockId) {
-                          const prevBlock = blocks.find(b => b.id === selectedBlockId);
-                          originalSubject = prevBlock?.config?.subject || '';
-                        }
+                      if (isReplying && previousEmailBlocks.length > 0) {
+                        // Get the subject from the first email block in the chain
+                        const firstEmailBlock = previousEmailBlocks[0];
+                        originalSubject = firstEmailBlock.config?.subject || '';
                       }
                       
                       return (
@@ -1683,41 +1679,6 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       placeholder="Hi {{first_name}},&#10;&#10;I came across your profile and wanted to reach out...&#10;&#10;Best regards"
                       className="w-full min-h-[100px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
                     />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Thread</label>
-                    <select
-                      value={block.config?.threadSelection || (block.config?.replyToThread ? 'previous' : 'new')}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        const updates: any = { 
-                          threadSelection: value,
-                          replyToThread: value !== 'new' // Legacy support
-                        };
-                        
-                        // If replying to a specific thread, auto-copy the subject and lock it
-                        if (value !== 'new') {
-                          const prevBlock = blocks.find(b => b.id === value);
-                          if (prevBlock?.config?.subject) {
-                            // Ensure subject matches exactly for threading
-                            updates.subject = prevBlock.config.subject;
-                          }
-                        }
-                        
-                        updateBlockConfig(block.id, updates);
-                      }}
-                      className="w-full p-2 border rounded bg-white text-gray-900"
-                    >
-                      <option value="new">New thread</option>
-                      {getPreviousEmailBlocks(block.id).map((prevBlock) => (
-                        <option key={prevBlock.id} value={prevBlock.id}>
-                          Reply to: {prevBlock.config?.subject || prevBlock.title || `Email ${prevBlock.id}`}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Select which thread to reply to. Subject will be automatically locked to match the original for proper threading.
-                    </p>
                   </div>
                 </>
               )}

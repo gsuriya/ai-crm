@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendEmail } from '@/lib/services/gmail-simple';
+import { getExecution, executeNextBlock } from '@/lib/services/cadence-execution';
 
 export const dynamic = 'force-dynamic';
 
@@ -219,7 +220,10 @@ export async function POST(request: NextRequest) {
       console.log('[Add to Cadence] Created company_cadence:', companyCadence.id);
     }
 
-    // Step 5: Send the custom email
+    // Step 5: Send the custom email and capture thread info
+    let emailThreadInfo: { threadId: string; messageId: string } | null = null;
+    let userIdForExecution: string | null = null;
+    
     if (customEmail && customEmail.subject && customEmail.body) {
       console.log('[Add to Cadence] Sending email to:', contact.email);
       
@@ -243,12 +247,21 @@ export async function POST(request: NextRequest) {
         for (const session of sessions) {
           try {
             console.log(`[Add to Cadence] Attempting to send with user_id: ${session.user_id}`);
-            await sendEmail(session.user_id, {
+            const emailResult = await sendEmail(session.user_id, {
               to: contact.email,
               subject: customEmail.subject,
               body: customEmail.body,
             });
             console.log('[Add to Cadence] Email sent successfully!');
+            console.log('[Add to Cadence] Thread ID:', emailResult.threadId);
+            console.log('[Add to Cadence] Message ID:', emailResult.messageId);
+            
+            // Store thread info for cadence execution
+            emailThreadInfo = {
+              threadId: emailResult.threadId,
+              messageId: emailResult.messageId,
+            };
+            userIdForExecution = session.user_id;
             emailSent = true;
             break;
           } catch (err: any) {
@@ -274,43 +287,115 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 6: Find or create cadence execution
+    // Step 6: Find or create cadence execution and continue workflow
     const blocks = cadence.nodes || [];
+    const triggerBlock = blocks.find((b: any) => b.type === 'trigger');
     const firstEmailBlock = blocks.find((b: any) => b.type === 'email');
     
-    // Check if execution already exists
-    const { data: existingExecution } = await supabase
+    if (!triggerBlock || !firstEmailBlock) {
+      return NextResponse.json(
+        { error: 'Cadence must have a trigger and at least one email block' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    
+    // Delete any existing executions for this company_cadence (start fresh)
+    await supabase
       .from('cadence_executions')
-      .select('*')
-      .eq('company_cadence_id', companyCadence.id)
+      .delete()
+      .eq('company_cadence_id', companyCadence.id);
+    
+    console.log('[Add to Cadence] Cleaned up old executions, creating new one...');
+    
+    // Create new execution with thread info if email was sent
+    const threadInfoMap: Record<string, { threadId: string; messageId: string }> = {};
+    const executedBlockIds: string[] = [triggerBlock.id]; // Trigger is always executed first
+    
+    // If we sent an email, store its thread info
+    if (emailThreadInfo && firstEmailBlock) {
+      threadInfoMap[firstEmailBlock.id] = emailThreadInfo;
+      executedBlockIds.push(firstEmailBlock.id);
+      console.log('[Add to Cadence] Storing thread info for first email block:', firstEmailBlock.id);
+    }
+    
+    // Find the next block after the first email (wait block)
+    const nextBlockAfterEmail = firstEmailBlock.connections && firstEmailBlock.connections.length > 0
+      ? firstEmailBlock.connections[0]
+      : null;
+    
+    console.log('[Add to Cadence] Next block after first email:', nextBlockAfterEmail);
+    
+    const { data: execution, error: execError } = await supabase
+      .from('cadence_executions')
+      .insert({
+        company_cadence_id: companyCadence.id,
+        current_block_id: nextBlockAfterEmail || firstEmailBlock.id, // Start at next block (wait) or first email if no next block
+        status: 'active',
+        metadata: {
+          company_id: companyId,
+          cadence_id: cadenceId,
+          contact_id: contact.id,
+          user_id: userIdForExecution, // Store user_id for future email sends
+          blocks: blocks,
+          threadInfoMap: threadInfoMap,
+          executedBlockIds: executedBlockIds,
+        },
+      })
+      .select()
       .single();
 
-    if (!existingExecution) {
-      // Create new execution
-      const { data: execution, error: execError } = await supabase
-        .from('cadence_executions')
-        .insert({
-          company_cadence_id: companyCadence.id,
-          current_block_id: firstEmailBlock?.id || blocks[0]?.id,
-          status: 'active',
-          metadata: {
-            company_id: companyId,
-            cadence_id: cadenceId,
-            contact_id: contact.id,
-            blocks: blocks,
-            executedBlockIds: firstEmailBlock ? [firstEmailBlock.id] : [],
-          },
-        })
-        .select()
-        .single();
-
-      if (execError) {
-        console.error('[Add to Cadence] Error creating execution:', execError);
-      } else {
-        console.log('[Add to Cadence] Created execution:', execution.id);
+    if (execError) {
+      console.error('[Add to Cadence] Error creating execution:', execError);
+      return NextResponse.json(
+        { error: 'Failed to create execution: ' + execError.message },
+        { status: 500, headers: corsHeaders }
+      );
+    }
+    
+    console.log('[Add to Cadence] Created execution:', execution.id);
+    console.log('[Add to Cadence] Current block ID:', execution.current_block_id);
+    
+    // Step 7: Continue workflow execution (process wait block and schedule next email)
+    if (emailThreadInfo && userIdForExecution) {
+      console.log('[Add to Cadence] Continuing workflow execution...');
+      console.log('[Add to Cadence] Execution ID:', execution.id);
+      console.log('[Add to Cadence] Current block ID:', execution.current_block_id);
+      console.log('[Add to Cadence] Blocks:', blocks.map((b: any) => `${b.id}: ${b.type} - ${b.title || ''}`));
+      
+      try {
+        // Get the full execution with metadata
+        const fullExecution = await getExecution(supabase, execution.id);
+        if (!fullExecution) {
+          throw new Error('Failed to fetch execution');
+        }
+        
+        console.log('[Add to Cadence] Full execution fetched, current_block_id:', fullExecution.current_block_id);
+        const currentBlock = blocks.find((b: any) => b.id === fullExecution.current_block_id);
+        console.log('[Add to Cadence] Current block:', currentBlock ? `${currentBlock.type} - ${currentBlock.title || currentBlock.id}` : 'NOT FOUND');
+        
+        // Execute the workflow - this will process the wait block and schedule the next email
+        // The current_block_id should already be pointing to the wait block (next after first email)
+        console.log('[Add to Cadence] Calling executeNextBlock...');
+        await executeNextBlock(supabase, fullExecution, blocks, { skipRecursion: false });
+        console.log('[Add to Cadence] ✅ Workflow execution continued successfully');
+        
+        // Check the execution status after
+        const updatedExecution = await getExecution(supabase, execution.id);
+        if (updatedExecution) {
+          console.log('[Add to Cadence] Execution after workflow:');
+          console.log('[Add to Cadence]   Status:', updatedExecution.status);
+          console.log('[Add to Cadence]   Current block ID:', updatedExecution.current_block_id);
+          if (updatedExecution.scheduled_for) {
+            console.log('[Add to Cadence]   Scheduled for:', new Date(updatedExecution.scheduled_for).toLocaleString());
+          }
+        }
+      } catch (execError: any) {
+        console.error('[Add to Cadence] ❌ Error continuing workflow:', execError);
+        console.error('[Add to Cadence] Error stack:', execError.stack);
+        // Don't fail the whole request - email was sent successfully
       }
     } else {
-      console.log('[Add to Cadence] Execution already exists:', existingExecution.id);
+      console.log('[Add to Cadence] ⚠️ Skipping workflow execution - emailThreadInfo:', !!emailThreadInfo, 'userIdForExecution:', !!userIdForExecution);
     }
 
     console.log('[Add to Cadence] Success!');
