@@ -1,47 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { checkAndPauseCadencesWithReplies } from '@/lib/services/email-reply-detector';
+import { NextResponse } from "next/server";
+import { checkAndPauseCadencesWithReplies, checkCompletedCadencesForReplies } from "@/lib/services/email-reply-detector";
 
-export async function POST(request: NextRequest) {
+/**
+ * Check for email replies on all cadences (active and completed)
+ * Call this endpoint periodically to detect late replies
+ */
+export async function POST() {
   try {
-    // Create Supabase client with server-side auth
-    const supabase = await createServerSupabaseClient();
+    console.log('[Check Replies] Starting reply check...');
     
-    // Check for replies and pause cadences
-    const result = await checkAndPauseCadencesWithReplies(supabase);
-
+    // Check active cadences
+    const activeResults = await checkAndPauseCadencesWithReplies();
+    console.log(`[Check Replies] Active cadences: checked ${activeResults.checked}, paused ${activeResults.paused}`);
+    
+    // Check completed cadences for late replies
+    const completedResults = await checkCompletedCadencesForReplies();
+    console.log(`[Check Replies] Completed cadences: checked ${completedResults.checked}, responded ${completedResults.responded}`);
+    
     return NextResponse.json({
       success: true,
-      paused: result.paused,
-      checked: result.checked,
-      message: `Checked ${result.checked} cadence(s), paused ${result.paused} due to replies`,
+      results: {
+        active: {
+          checked: activeResults.checked,
+          paused: activeResults.paused,
+        },
+        completed: {
+          checked: completedResults.checked,
+          responded: completedResults.responded,
+        },
+      },
     });
   } catch (error: any) {
-    console.error('Error checking for email replies:', error);
+    console.error('[Check Replies] Error:', error.message);
     return NextResponse.json(
-      { error: error.message || 'Failed to check for email replies' },
+      { error: error.message || 'Failed to check replies' },
       { status: 500 }
     );
   }
 }
 
-// GET endpoint for manual triggering or health checks
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createServerSupabaseClient();
-    const result = await checkAndPauseCadencesWithReplies(supabase);
-    
-    return NextResponse.json({
-      success: true,
-      paused: result.paused,
-      checked: result.checked,
-    });
-  } catch (error: any) {
-    console.error('Error checking for email replies:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to check for email replies' },
-      { status: 500 }
-    );
-  }
+// Also support GET for easy testing
+export async function GET() {
+  return POST();
 }
-

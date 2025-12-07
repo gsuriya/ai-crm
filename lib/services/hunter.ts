@@ -90,14 +90,14 @@ export interface HunterEmailVerifierResult {
 }
 
 /**
- * Find email address using first name, last name, and company domain
- * This is the main method for finding emails
+ * Find email address using first name, last name, and company name
+ * Hunter.io will automatically determine the correct domain from the company name
+ * NO domain guessing - let Hunter.io handle everything
  */
 export async function findEmail(params: {
   firstName: string;
   lastName: string;
-  domain: string;
-  company?: string;
+  company: string;
 }): Promise<HunterEmailFinderResult | null> {
   try {
     const HUNTER_API_KEY = getHunterApiKey();
@@ -107,18 +107,14 @@ export async function findEmail(params: {
     }
 
     const url = new URL(`${HUNTER_API_BASE}/email-finder`);
-    url.searchParams.append('domain', params.domain);
     url.searchParams.append('first_name', params.firstName);
     url.searchParams.append('last_name', params.lastName);
-    if (params.company) {
-      url.searchParams.append('company', params.company);
-    }
+    url.searchParams.append('company', params.company);
     url.searchParams.append('api_key', HUNTER_API_KEY);
 
     console.log('[Hunter] Finding email for:', {
       firstName: params.firstName,
       lastName: params.lastName,
-      domain: params.domain,
       company: params.company,
     });
 
@@ -251,26 +247,3 @@ export async function verifyEmail(email: string): Promise<HunterEmailVerifierRes
   }
 }
 
-/**
- * Helper function to extract domain from company name or website
- */
-export function extractDomain(companyNameOrWebsite: string): string | null {
-  try {
-    // If it's a URL, extract domain
-    if (companyNameOrWebsite.includes('http') || companyNameOrWebsite.includes('www')) {
-      const url = new URL(companyNameOrWebsite.startsWith('http') ? companyNameOrWebsite : `https://${companyNameOrWebsite}`);
-      return url.hostname.replace('www.', '');
-    }
-    
-    // If it's a company name, try to guess domain
-    // This is a simple heuristic - in production you'd want a more sophisticated approach
-    const cleaned = companyNameOrWebsite
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '');
-    
-    return `${cleaned}.com`;
-  } catch (error) {
-    console.error('[Hunter] Error extracting domain:', error);
-    return null;
-  }
-}

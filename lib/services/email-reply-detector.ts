@@ -341,3 +341,142 @@ export async function checkAndPauseCadencesWithReplies(
   }
 }
 
+/**
+ * Check for replies on COMPLETED cadences and update status to "responded"
+ * This catches replies that come in after all emails were sent
+ */
+export async function checkCompletedCadencesForReplies(
+  supabaseClient?: SupabaseClient
+): Promise<{ responded: number; checked: number }> {
+  const db = supabaseClient || supabase;
+  
+  let respondedCount = 0;
+  let checkedCount = 0;
+
+  try {
+    // Get all completed cadence executions that haven't been marked as responded
+    const { data: executions, error: execError } = await db
+      .from('cadence_executions')
+      .select('*')
+      .eq('status', 'completed');
+
+    if (execError) {
+      console.error('[Reply Detector] Error fetching completed executions:', execError);
+      return { responded: 0, checked: 0 };
+    }
+
+    if (!executions || executions.length === 0) {
+      console.log('[Reply Detector] No completed executions to check');
+      return { responded: 0, checked: 0 };
+    }
+
+    // Filter out already responded ones
+    const uncheckedExecutions = executions.filter(
+      (e: any) => !e.metadata?.responded && e.metadata?.paused_reason !== 'email_reply_received'
+    );
+
+    console.log(`[Reply Detector] Checking ${uncheckedExecutions.length} completed executions for late replies`);
+
+    if (uncheckedExecutions.length === 0) {
+      return { responded: 0, checked: 0 };
+    }
+
+    // Get company_cadence associations
+    const companyCadenceIds = uncheckedExecutions.map((e: any) => e.company_cadence_id);
+    const { data: companyCadences, error: ccError } = await db
+      .from('company_cadences')
+      .select('id, company_id, cadence_id')
+      .in('id', companyCadenceIds);
+
+    if (ccError || !companyCadences) {
+      console.error('[Reply Detector] Error fetching company cadences:', ccError);
+      return { responded: 0, checked: 0 };
+    }
+
+    // Get company IDs
+    const companyIds = companyCadences.map((cc: any) => cc.company_id);
+    
+    // Get contacts for these companies
+    const { data: contacts, error: contactsError } = await db
+      .from('contacts')
+      .select('company_id, email')
+      .in('company_id', companyIds);
+
+    if (contactsError) {
+      console.error('[Reply Detector] Error fetching contacts:', contactsError);
+      return { responded: 0, checked: 0 };
+    }
+
+    // Create map of company_id -> contact email
+    const contactMap = new Map<string, string>();
+    contacts?.forEach((contact: any) => {
+      if (!contactMap.has(contact.company_id)) {
+        contactMap.set(contact.company_id, contact.email);
+      }
+    });
+
+    // Check each completed execution for late replies
+    for (const execution of uncheckedExecutions) {
+      const companyCadence = companyCadences.find((cc: any) => cc.id === execution.company_cadence_id);
+      if (!companyCadence) continue;
+
+      const recipientEmail = contactMap.get(companyCadence.company_id);
+      if (!recipientEmail) continue;
+
+      const userId = execution.metadata?.user_id;
+      if (!userId) continue;
+
+      const threadInfoMap = execution.metadata?.threadInfoMap || {};
+      const threadIds = Object.values(threadInfoMap).map((info: any) => info?.threadId).filter(Boolean);
+      
+      if (threadIds.length === 0) continue;
+
+      console.log(`[Reply Detector] Checking completed execution ${execution.id} for late replies...`);
+
+      const threadIdsArray = Array.from(new Set(threadIds)) as string[];
+      let hasReply = false;
+      
+      for (let i = threadIdsArray.length - 1; i >= 0; i--) {
+        const threadId = threadIdsArray[i];
+        checkedCount++;
+        const replyFound = await checkThreadForReply(userId, threadId, recipientEmail, db);
+        
+        if (replyFound) {
+          hasReply = true;
+          console.log(`[Reply Detector] Late reply found for completed execution ${execution.id}`);
+          break;
+        }
+      }
+
+      if (hasReply) {
+        // Update the execution to mark as responded
+        await db
+          .from('cadence_executions')
+          .update({
+            status: 'paused', // Use paused status with responded reason
+            metadata: {
+              ...execution.metadata,
+              responded: true,
+              paused_reason: 'email_reply_received',
+              responded_at: new Date().toISOString(),
+            },
+          })
+          .eq('id', execution.id);
+
+        // Update company_cadence status
+        await db
+          .from('company_cadences')
+          .update({ status: 'paused' })
+          .eq('id', execution.company_cadence_id);
+
+        respondedCount++;
+        console.log(`[Reply Detector] Marked execution ${execution.id} as responded`);
+      }
+    }
+
+    return { responded: respondedCount, checked: checkedCount };
+  } catch (error: any) {
+    console.error('[Reply Detector] Error checking completed cadences:', error.message);
+    return { responded: 0, checked: checkedCount };
+  }
+}

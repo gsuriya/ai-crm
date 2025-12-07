@@ -23,22 +23,10 @@ export async function GET(request: NextRequest) {
   );
 }
 
-// Simple heuristic to convert company name to domain
-// Hunter.io will handle the actual domain validation and email finding
-function companyToDomain(companyName: string): string {
-  const cleaned = companyName
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s]/g, '') // Remove special chars
-    .replace(/\s+/g, '') // Remove spaces
-    .replace(/inc|llc|ltd|corp|corporation|company|co|ventures|capital|partners/g, ''); // Remove common suffixes
-  
-  return `${cleaned}.com`;
-}
-
 /**
  * POST /api/people/find-email
  * Finds email for a person using Hunter.io (without adding to CRM)
+ * NO domain guessing - Hunter.io handles domain detection from company name
  */
 export async function POST(request: NextRequest) {
   try {
@@ -52,13 +40,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const domain = companyToDomain(company);
-    console.log('[Find Email] Finding email for:', firstName, lastName, 'at', company, '→', domain);
+    console.log('[Find Email] Finding email for:', firstName, lastName, 'at', company);
 
     const emailResult = await findEmail({
       firstName,
       lastName,
-      domain,
       company,
     });
 

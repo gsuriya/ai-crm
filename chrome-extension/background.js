@@ -8,13 +8,14 @@ const HUNTER_API_KEY = 'YOUR_HUNTER_API_KEY_HERE'; // User needs to add their ke
 const CRM_API_URL = 'http://localhost:3000/api'; // Update with your actual CRM URL
 
 // Find email using Hunter.io
-async function findEmail(firstName, lastName, companyDomain) {
+// NO domain guessing - pass company name directly to Hunter.io
+async function findEmail(firstName, lastName, companyName) {
   try {
     if (!HUNTER_API_KEY || HUNTER_API_KEY === 'YOUR_HUNTER_API_KEY_HERE') {
       throw new Error('Hunter.io API key not configured');
     }
     
-    const url = `https://api.hunter.io/v2/email-finder?domain=${companyDomain}&first_name=${firstName}&last_name=${lastName}&api_key=${HUNTER_API_KEY}`;
+    const url = `https://api.hunter.io/v2/email-finder?company=${encodeURIComponent(companyName)}&first_name=${encodeURIComponent(firstName)}&last_name=${encodeURIComponent(lastName)}&api_key=${HUNTER_API_KEY}`;
     
     const response = await fetch(url);
     const data = await response.json();
@@ -29,7 +30,7 @@ async function findEmail(firstName, lastName, companyDomain) {
     } else {
       return {
         success: false,
-        error: 'Email not found'
+        error: 'Email not found by Hunter.io'
       };
     }
   } catch (error) {
@@ -127,7 +128,7 @@ async function sendEmail(emailData) {
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'findEmail') {
-    findEmail(request.firstName, request.lastName, request.companyDomain)
+    findEmail(request.firstName, request.lastName, request.companyName)
       .then(sendResponse);
     return true; // Keep channel open for async response
   }

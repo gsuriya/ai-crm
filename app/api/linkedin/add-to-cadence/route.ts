@@ -67,35 +67,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Import and use the findEmail function
+      // Import and use the findEmail function (NO domain guessing)
       const { findEmail } = await import('@/lib/services/hunter');
-      const companyToDomain = (companyName: string): string => {
-        const COMPANY_DOMAIN_MAP: Record<string, string> = {
-          'google': 'google.com', 'meta': 'meta.com', 'facebook': 'meta.com',
-          'apple': 'apple.com', 'microsoft': 'microsoft.com', 'amazon': 'amazon.com',
-          'moelis': 'moelis.com', 'moelis & company': 'moelis.com',
-          'goldman sachs': 'gs.com', 'morgan stanley': 'morganstanley.com',
-          'insight partners': 'insightpartners.com', 'herbalife': 'herbalife.com',
-        };
-        
-        const cleaned = companyName.toLowerCase().trim();
-        for (const [key, domain] of Object.entries(COMPANY_DOMAIN_MAP)) {
-          if (cleaned.includes(key)) return domain;
-        }
-        
-        const domainName = cleaned
-          .replace(/[^a-z0-9\s]/g, '')
-          .replace(/\s+/g, '')
-          .replace(/inc|llc|ltd|corp|corporation|company|co/g, '');
-        
-        return `${domainName}.com`;
-      };
-
-      const domain = companyToDomain(profileData.company);
+      
       const emailResult = await findEmail({
         firstName: profileData.firstName,
         lastName: profileData.lastName,
-        domain: domain,
         company: profileData.company,
       });
 

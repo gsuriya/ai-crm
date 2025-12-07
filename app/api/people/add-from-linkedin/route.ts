@@ -24,24 +24,11 @@ export async function GET(request: NextRequest) {
   );
 }
 
-// Simple heuristic to convert company name to domain
-// Hunter.io will handle the actual domain validation and email finding
-function companyToDomain(companyName: string): string {
-  const cleaned = companyName
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s]/g, '') // Remove special chars
-    .replace(/\s+/g, '') // Remove spaces
-    .replace(/inc|llc|ltd|corp|corporation|company|co|ventures|capital|partners/g, ''); // Remove common suffixes
-  
-  return `${cleaned}.com`;
-}
-
 /**
  * POST /api/people/add-from-linkedin
  * Adds a person from LinkedIn to the CRM
  * 1. Extracts profile data from LinkedIn
- * 2. Finds email with Hunter.io
+ * 2. Finds email with Hunter.io (NO domain guessing)
  * 3. Creates contact in database
  */
 export async function POST(request: NextRequest) {
@@ -59,7 +46,7 @@ export async function POST(request: NextRequest) {
     console.log('[Add from LinkedIn] Starting process...');
     console.log('[Add from LinkedIn] Profile data:', profileData);
 
-    // Step 1: Get company domain
+    // Step 1: Get company name
     const companyName = profileData?.company || '';
     if (!companyName) {
       return NextResponse.json(
@@ -68,15 +55,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const domain = companyToDomain(companyName);
-    console.log('[Add from LinkedIn] Company:', companyName, '→ Domain:', domain);
+    console.log('[Add from LinkedIn] Company:', companyName);
 
-    // Step 2: Find email with Hunter.io
+    // Step 2: Find email with Hunter.io (they handle domain detection)
     console.log('[Add from LinkedIn] Finding email with Hunter.io...');
     const emailResult = await findEmail({
       firstName: profileData.firstName,
       lastName: profileData.lastName,
-      domain: domain,
       company: companyName,
     });
 

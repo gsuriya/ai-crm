@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
 
     // Create Supabase client
     const cookieStore = await cookies();
-    const response = NextResponse.redirect(`${requestUrl.origin}/companies`);
+    const response = NextResponse.redirect(`${requestUrl.origin}/`);
     
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

@@ -207,6 +207,36 @@ export default function CadencesPage() {
 
       // Check if we're editing an existing cadence
       if (editingCadence && editingCadence.id) {
+        // Check if this cadence has active executions
+        const { data: activeExecutions, error: execError } = await supabase
+          .from('company_cadences')
+          .select('id, status, company:companies(name), contact:contacts(first_name, last_name)')
+          .eq('cadence_id', editingCadence.id)
+          .in('status', ['active', 'paused']);
+
+        if (execError) {
+          console.error('Error checking active executions:', execError);
+        }
+
+        if (activeExecutions && activeExecutions.length > 0) {
+          const activeCount = activeExecutions.filter((e: any) => e.status === 'active').length;
+          const pausedCount = activeExecutions.filter((e: any) => e.status === 'paused').length;
+          
+          const message = `This cadence has ${activeCount} active and ${pausedCount} paused execution(s).\n\n` +
+            `⚠️ Important: Changes will only apply to NEW executions.\n` +
+            `Existing outreach will continue using the old version.\n\n` +
+            `Active executions:\n` +
+            activeExecutions.slice(0, 5).map((e: any) => 
+              `  • ${e.company?.name || 'Unknown'} - ${e.contact?.first_name || 'Unknown'} ${e.contact?.last_name || ''} (${e.status})`
+            ).join('\n') +
+            (activeExecutions.length > 5 ? `\n  ... and ${activeExecutions.length - 5} more` : '') +
+            `\n\nDo you want to continue?`;
+
+          if (!confirm(message)) {
+            return;
+          }
+        }
+
         // Update existing cadence in Supabase (all cadences are shared)
         const { error } = await supabase
           .from('cadences')

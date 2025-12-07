@@ -11,7 +11,6 @@ import { supabase } from "@/lib/supabase";
 
 const navigation = [
   { name: "Companies", href: "/companies", icon: Building2 },
-  { name: "People", href: "/people", icon: Users },
   { name: "Outreach", href: "/outreach", icon: Send },
   { name: "Cadences", href: "/cadences", icon: Workflow },
 ];

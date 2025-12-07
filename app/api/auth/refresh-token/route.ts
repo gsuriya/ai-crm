@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     // Redirect to sign-in page with a flag to force re-auth
     const redirectUrl = new URL('/auth/signin', request.nextUrl.origin);
     redirectUrl.searchParams.set('reauth', 'true');
-    redirectUrl.searchParams.set('next', '/companies');
+    redirectUrl.searchParams.set('next', '/');
     
     return NextResponse.redirect(redirectUrl.toString());
   } catch (error: any) {
