@@ -18,7 +18,11 @@
     "fix:funding": "tsx scripts/fix-company-funding.ts",
     "backfill:logos": "tsx scripts/backfill-company-logos.ts",
     "scatter:dates": "tsx scripts/scatter-company-dates.ts",
-    "find:ceos": "tsx scripts/find-and-add-ceos.ts"
+    "find:ceos": "tsx scripts/find-and-add-ceos.ts",
+    "test:apollo": "tsx scripts/test-apollo.ts",
+    "test:hunter": "tsx scripts/test-hunter.ts",
+    "test:linkedin-email": "tsx scripts/test-linkedin-to-email.ts",
+    "test:hunter-abhi": "tsx scripts/test-hunter-abhi.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

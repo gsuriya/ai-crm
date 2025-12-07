@@ -6,411 +6,24 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Sparkles, ArrowUp, Bot, Newspaper } from "lucide-react";
+import { Search, Sparkles, ArrowUp, Bot, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { MatchIndicator } from "@/components/match-indicator";
-import { MatchSnippet } from "@/components/match-snippet";
-import { CompanyAvatar } from "@/components/company/company-avatar";
-import { NewsCarousel } from "@/components/news-carousel";
-import type { SearchMatch } from "@/lib/semantic-search";
 
 export const dynamic = 'force-dynamic';
-
-// Mock news data - realistic startup funding rounds
-const mockNewsArticles = [
-  {
-    id: "1",
-    title: "Raises $2.5M pre-seed round led by Y Combinator to build AI-powered sales automation",
-    company: "Revflow",
-    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "TechCrunch",
-    sourceLogoUrl: "https://logo.clearbit.com/techcrunch.com",
-    category: "funding" as const,
-    amount: "$2.5M",
-    daysAgo: 0,
-    url: "https://techcrunch.com",
-  },
-  {
-    id: "2",
-    title: "Secures $8M seed funding from a16z to expand developer tools platform",
-    company: "Codebase",
-    imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "The Information",
-    sourceLogoUrl: "https://logo.clearbit.com/theinformation.com",
-    category: "funding" as const,
-    amount: "$8M",
-    daysAgo: 1,
-    url: "https://theinformation.com",
-  },
-  {
-    id: "3",
-    title: "Closes $15M Series A led by Sequoia to scale enterprise security platform",
-    company: "ShieldAI",
-    imageUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "StrictlyVC",
-    sourceLogoUrl: "https://logo.clearbit.com/strictlyvc.com",
-    category: "funding" as const,
-    amount: "$15M",
-    daysAgo: 2,
-    url: "https://strictlyvc.com",
-  },
-  {
-    id: "4",
-    title: "Raises $32M Series B from Accel to accelerate growth in European markets",
-    company: "Dataflow",
-    imageType: "news" as const,
-    source: "Bloomberg",
-    sourceLogoUrl: "https://logo.clearbit.com/bloomberg.com",
-    category: "funding" as const,
-    amount: "$32M",
-    daysAgo: 3,
-    url: "https://bloomberg.com",
-  },
-  {
-    id: "5",
-    title: "Partners with Microsoft to integrate AI capabilities into enterprise workflow tools",
-    company: "Taskforce",
-    imageUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "Forbes",
-    sourceLogoUrl: "https://logo.clearbit.com/forbes.com",
-    category: "partnership" as const,
-    daysAgo: 4,
-    url: "https://forbes.com",
-  },
-  {
-    id: "6",
-    title: "Acquires competitor CloudSync to expand market presence in SaaS integration space",
-    company: "IntegrateHub",
-    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "TechCrunch",
-    sourceLogoUrl: "https://logo.clearbit.com/techcrunch.com",
-    category: "acquisition" as const,
-    daysAgo: 5,
-    url: "https://techcrunch.com",
-  },
-  {
-    id: "7",
-    title: "Raises $1.8M pre-seed from First Round Capital to build next-gen CRM platform",
-    company: "SalesPulse",
-    imageUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "StrictlyVC",
-    sourceLogoUrl: "https://logo.clearbit.com/strictlyvc.com",
-    category: "funding" as const,
-    amount: "$1.8M",
-    daysAgo: 6,
-    url: "https://strictlyvc.com",
-  },
-  {
-    id: "8",
-    title: "Secures $12M Series A from Index Ventures to scale AI-powered analytics platform",
-    company: "AnalyticsAI",
-    imageUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "The Verge",
-    sourceLogoUrl: "https://logo.clearbit.com/theverge.com",
-    category: "funding" as const,
-    amount: "$12M",
-    daysAgo: 7,
-    url: "https://theverge.com",
-  },
-  {
-    id: "9",
-    title: "Raises $5M seed round from General Catalyst to build developer infrastructure tools",
-    company: "DevStack",
-    imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "TechCrunch",
-    sourceLogoUrl: "https://logo.clearbit.com/techcrunch.com",
-    category: "funding" as const,
-    amount: "$5M",
-    daysAgo: 8,
-    url: "https://techcrunch.com",
-  },
-  {
-    id: "10",
-    title: "Launches new AI assistant feature for enterprise customers",
-    company: "WorkflowAI",
-    imageType: "news" as const,
-    source: "VentureBeat",
-    sourceLogoUrl: "https://logo.clearbit.com/venturebeat.com",
-    category: "product" as const,
-    daysAgo: 9,
-    url: "https://venturebeat.com",
-  },
-  {
-    id: "11",
-    title: "Closes $20M Series A led by Lightspeed to expand into healthcare vertical",
-    company: "HealthTech Solutions",
-    imageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "Forbes",
-    sourceLogoUrl: "https://logo.clearbit.com/forbes.com",
-    category: "funding" as const,
-    amount: "$20M",
-    daysAgo: 10,
-    url: "https://forbes.com",
-  },
-  {
-    id: "12",
-    title: "Partners with AWS to offer cloud-native security solutions",
-    company: "SecureCloud",
-    imageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "The Information",
-    sourceLogoUrl: "https://logo.clearbit.com/theinformation.com",
-    category: "partnership" as const,
-    daysAgo: 11,
-    url: "https://theinformation.com",
-  },
-  {
-    id: "13",
-    title: "Raises $3.5M pre-seed from Founders Fund to revolutionize e-commerce logistics",
-    company: "ShipFast",
-    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "StrictlyVC",
-    sourceLogoUrl: "https://logo.clearbit.com/strictlyvc.com",
-    category: "funding" as const,
-    amount: "$3.5M",
-    daysAgo: 12,
-    url: "https://strictlyvc.com",
-  },
-  {
-    id: "14",
-    title: "Acquires competitor DataSync to consolidate market position",
-    company: "DataFlow",
-    imageUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "Bloomberg",
-    sourceLogoUrl: "https://logo.clearbit.com/bloomberg.com",
-    category: "acquisition" as const,
-    daysAgo: 13,
-    url: "https://bloomberg.com",
-  },
-  {
-    id: "15",
-    title: "Secures $18M Series B from Sequoia to scale international operations",
-    company: "GlobalScale",
-    imageUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "TechCrunch",
-    sourceLogoUrl: "https://logo.clearbit.com/techcrunch.com",
-    category: "funding" as const,
-    amount: "$18M",
-    daysAgo: 14,
-    url: "https://techcrunch.com",
-  },
-  {
-    id: "16",
-    title: "Launches beta version of AI-powered content generation platform",
-    company: "ContentAI",
-    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "The Verge",
-    sourceLogoUrl: "https://logo.clearbit.com/theverge.com",
-    category: "product" as const,
-    daysAgo: 15,
-    url: "https://theverge.com",
-  },
-  {
-    id: "17",
-    title: "Raises $7M seed funding from Accel to build next-gen collaboration tools",
-    company: "CollabSpace",
-    imageUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "The Information",
-    sourceLogoUrl: "https://logo.clearbit.com/theinformation.com",
-    category: "funding" as const,
-    amount: "$7M",
-    daysAgo: 16,
-    url: "https://theinformation.com",
-  },
-  {
-    id: "18",
-    title: "Partners with Google Cloud to integrate AI capabilities",
-    company: "CloudAI",
-    imageType: "news" as const,
-    source: "VentureBeat",
-    sourceLogoUrl: "https://logo.clearbit.com/venturebeat.com",
-    category: "partnership" as const,
-    daysAgo: 17,
-    url: "https://venturebeat.com",
-  },
-  {
-    id: "19",
-    title: "Raises $4.2M pre-seed from Y Combinator to build fintech infrastructure",
-    company: "FinTech Core",
-    imageUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "StrictlyVC",
-    sourceLogoUrl: "https://logo.clearbit.com/strictlyvc.com",
-    category: "funding" as const,
-    amount: "$4.2M",
-    daysAgo: 18,
-    url: "https://strictlyvc.com",
-  },
-  {
-    id: "20",
-    title: "Acquires smaller competitor to expand product portfolio",
-    company: "ProductHub",
-    imageUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "Forbes",
-    sourceLogoUrl: "https://logo.clearbit.com/forbes.com",
-    category: "acquisition" as const,
-    daysAgo: 19,
-    url: "https://forbes.com",
-  },
-  {
-    id: "21",
-    title: "Closes $25M Series A led by a16z to accelerate growth in enterprise market",
-    company: "EnterpriseAI",
-    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "TechCrunch",
-    sourceLogoUrl: "https://logo.clearbit.com/techcrunch.com",
-    category: "funding" as const,
-    amount: "$25M",
-    daysAgo: 20,
-    url: "https://techcrunch.com",
-  },
-  {
-    id: "22",
-    title: "Launches new mobile app for remote team management",
-    company: "TeamSync",
-    imageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "The Verge",
-    sourceLogoUrl: "https://logo.clearbit.com/theverge.com",
-    category: "product" as const,
-    daysAgo: 21,
-    url: "https://theverge.com",
-  },
-  {
-    id: "23",
-    title: "Raises $6M seed from First Round Capital to build AI customer support platform",
-    company: "SupportAI",
-    imageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "Bloomberg",
-    sourceLogoUrl: "https://logo.clearbit.com/bloomberg.com",
-    category: "funding" as const,
-    amount: "$6M",
-    daysAgo: 22,
-    url: "https://bloomberg.com",
-  },
-  {
-    id: "24",
-    title: "Partners with Microsoft Azure to offer integrated cloud solutions",
-    company: "AzureCloud",
-    imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "The Information",
-    sourceLogoUrl: "https://logo.clearbit.com/theinformation.com",
-    category: "partnership" as const,
-    daysAgo: 23,
-    url: "https://theinformation.com",
-  },
-  {
-    id: "25",
-    title: "Secures $9M Series A from Index Ventures to scale marketing automation",
-    company: "MarketFlow",
-    imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "VentureBeat",
-    sourceLogoUrl: "https://logo.clearbit.com/venturebeat.com",
-    category: "funding" as const,
-    amount: "$9M",
-    daysAgo: 24,
-    url: "https://venturebeat.com",
-  },
-  {
-    id: "26",
-    title: "Acquires design tool startup to enhance product capabilities",
-    company: "DesignPro",
-    imageType: "news" as const,
-    source: "StrictlyVC",
-    sourceLogoUrl: "https://logo.clearbit.com/strictlyvc.com",
-    category: "acquisition" as const,
-    daysAgo: 25,
-    url: "https://strictlyvc.com",
-  },
-  {
-    id: "27",
-    title: "Raises $11M Series B from Sequoia to expand into European markets",
-    company: "EuroTech",
-    imageUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "Forbes",
-    sourceLogoUrl: "https://logo.clearbit.com/forbes.com",
-    category: "funding" as const,
-    amount: "$11M",
-    daysAgo: 26,
-    url: "https://forbes.com",
-  },
-  {
-    id: "28",
-    title: "Launches enterprise version of collaboration platform",
-    company: "CollabEnterprise",
-    imageUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop&crop=faces",
-    imageType: "ceo" as const,
-    source: "TechCrunch",
-    sourceLogoUrl: "https://logo.clearbit.com/techcrunch.com",
-    category: "product" as const,
-    daysAgo: 27,
-    url: "https://techcrunch.com",
-  },
-];
 
 interface Company {
   id: string;
   name: string;
   created_at: string;
   updated_at: string;
-  arr?: number;
-  funding_amount?: number;
-  industry?: string;
-  website?: string;
-  logo_url?: string;
-}
-
-interface Contact {
-  id: string;
-  company_id: string;
-  email?: string;
-  first_name?: string;
-  last_name?: string;
-  title?: string;
-}
-
-interface Cadence {
-  id: string;
-  name: string;
-  user_id: string;
-}
-
-interface CompanyWithMatches extends Company {
-  matches?: SearchMatch[];
 }
 
 export default function CompaniesPage() {
   const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [contacts, setContacts] = useState<Map<string, Contact[]>>(new Map());
-  const [cadences, setCadences] = useState<Cadence[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchMatches, setSearchMatches] = useState<Map<string, SearchMatch[]>>(new Map());
-  const [isSemanticSearch, setIsSemanticSearch] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
   const [searchInput, setSearchInput] = useState("");
-  const [agentMode, setAgentMode] = useState(false);
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -434,124 +47,12 @@ export default function CompaniesPage() {
     }
   }, []);
 
-  const fetchContacts = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
-      
-      // Group contacts by company_id
-      const contactsMap = new Map<string, Contact[]>();
-      (data || []).forEach((contact) => {
-        const existing = contactsMap.get(contact.company_id) || [];
-        contactsMap.set(contact.company_id, [...existing, contact]);
-      });
-      
-      setContacts(contactsMap);
-    } catch (error) {
-      console.error("Error fetching contacts:", error);
-    }
-  }, []);
-
-  const fetchCadences = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('[Companies] No user found, cadences will be empty');
-        setCadences([]);
-        return;
-      }
-
-      // All cadences are shared company-wide - no user filter (same as cadences page)
-      const { data, error } = await supabase
-        .from("cadences")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error('[Companies] Error fetching cadences:', error);
-        throw error;
-      }
-      
-      console.log('[Companies] Fetched cadences:', data?.length || 0, data);
-      setCadences(data || []);
-    } catch (error) {
-      console.error("Error fetching cadences:", error);
-      setCadences([]);
-    }
-  }, []);
-
-
   useEffect(() => {
-    let mounted = true;
-    
-    const loadData = async () => {
-      try {
-        await Promise.all([
-          fetchCompanies(),
-          fetchContacts(),
-          fetchCadences(),
-        ]);
-      } catch (error) {
-        console.error("Error loading data:", error);
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-    
-    loadData();
-    
-    return () => {
-      mounted = false;
-    };
-  }, [fetchCompanies, fetchContacts, fetchCadences]);
+    fetchCompanies();
+  }, [fetchCompanies]);
 
-  // Perform search manually (triggered by Enter key or button click)
-  const performSearch = useCallback(async () => {
-    const query = searchInput.trim();
-    
-    if (!query || query.length < 2) {
-      setSearchQuery("");
-      setSearchMatches(new Map());
-      setIsSemanticSearch(false);
-      return;
-    }
-
-    setSearchQuery(query);
-    setIsSemanticSearch(true);
-    setSearchLoading(true);
-
-    try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: query,
-          limit: 50,
-          threshold: 0.3,
-        }),
-      });
-
-      if (response.ok) {
-        const { results } = await response.json();
-        const matchesMap = new Map<string, SearchMatch[]>();
-        
-        results.forEach((match: SearchMatch) => {
-          const existing = matchesMap.get(match.company_id) || [];
-          matchesMap.set(match.company_id, [...existing, match]);
-        });
-
-        setSearchMatches(matchesMap);
-      }
-    } catch (error) {
-      console.error('Error performing search:', error);
-    } finally {
-      setSearchLoading(false);
-    }
+  const performSearch = useCallback(() => {
+    setSearchQuery(searchInput.trim());
   }, [searchInput]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -563,57 +64,21 @@ export default function CompaniesPage() {
 
   const filteredCompanies = useMemo(() => {
     if (!searchQuery) {
-      // No search query, show all companies
       return companies;
     }
     
-    if (isSemanticSearch && searchMatches.size > 0) {
-      // Return companies that have matches
-      const matchedCompanyIds = Array.from(searchMatches.keys());
-      return companies.filter(c => matchedCompanyIds.includes(c.id));
-    } else if (isSemanticSearch && searchMatches.size === 0 && !searchLoading) {
-      // Semantic search completed but no matches
-      return [];
-    } else {
-      // Regular text search (fallback)
-      return companies.filter((company) =>
-        company.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-  }, [companies, searchQuery, isSemanticSearch, searchMatches, searchLoading]);
+    const query = searchQuery.toLowerCase();
+    return companies.filter((company) => {
+      const name = company.name?.toLowerCase() || "";
+      return name.includes(query);
+    });
+  }, [companies, searchQuery]);
 
-  // Highlight matching terms in text - handles partial matches like "food" in "FoodTech"
-  const highlightMatchText = (text: string, query?: string) => {
-    if (!query || query.length < 2) {
-      return text;
-    }
-
-    // Extract key terms from query (simple word extraction)
-    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-    
-    if (queryWords.length === 0) {
-      return text;
-    }
-
-    // Find the first matching word (for partial matches like "food" in "FoodTech")
-    for (const word of queryWords) {
-      const index = text.toLowerCase().indexOf(word.toLowerCase());
-      if (index >= 0) {
-        const beforeMatch = text.slice(0, index);
-        const match = text.slice(index, index + word.length);
-        const afterMatch = text.slice(index + word.length);
-        
-        return (
-          <>
-            {beforeMatch}
-            <strong className="font-semibold bg-accent/50 px-0.5 rounded">{match}</strong>
-            {afterMatch}
-          </>
-        );
-      }
-    }
-
-    return text;
+  const getInitials = (name: string) => {
+    const words = name.split(' ').filter(word => word.length > 0);
+    if (words.length === 0) return '?';
+    if (words.length === 1) return words[0].charAt(0).toUpperCase();
+    return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
   };
 
   return (
@@ -629,47 +94,22 @@ export default function CompaniesPage() {
               <div className="relative flex items-center bg-background border-2 border-indigo-600 rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-indigo-600 transition-all">
                 <input
                   type="text"
-                  placeholder={agentMode ? "Give agent commands (e.g., 'add SaaS companies to warm outreach cadence')..." : "Search companies..."}
+                  placeholder="Search companies..."
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="flex-1 bg-transparent border-0 outline-none text-sm text-gray-900 placeholder:text-gray-600 pr-2"
-                  disabled={searchLoading}
                 />
                 <button
-                  onClick={() => setAgentMode(!agentMode)}
-                  className={`ml-2 flex items-center justify-center h-8 w-8 rounded-full transition-all ${
-                    agentMode 
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-500' 
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                  title={agentMode ? "Disable Agent Mode" : "Enable Agent Mode"}
-                >
-                  <Bot className="h-4 w-4" />
-                </button>
-                <button
                   onClick={performSearch}
-                  disabled={searchLoading || !searchInput.trim()}
+                  disabled={!searchInput.trim()}
                   className="ml-2 flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all disabled:hover:bg-indigo-600"
                 >
                   <ArrowUp className="h-4 w-4" />
                 </button>
               </div>
-              {agentMode && (
-                <div className="mt-2 text-xs text-gray-600 text-center">
-                  <Bot className="h-3 w-3 inline mr-1" />
-                  Agent Mode: I&apos;ll automatically find companies and add them to cadences based on your commands
-                </div>
-              )}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Company News Section */}
-      <div className="bg-background border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-8 pt-1 pb-3">
-          <NewsCarousel articles={mockNewsArticles} />
         </div>
       </div>
 
@@ -679,43 +119,6 @@ export default function CompaniesPage() {
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-gray-600">Loading companies...</div>
-          </div>
-        ) : searchLoading ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center gap-4"
-            >
-              <div className="flex items-center gap-2 text-gray-900">
-                <span className="text-lg font-medium">Finding companies</span>
-                <motion.div
-                  className="flex gap-1"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  {[0, 1, 2].map((i) => (
-                    <motion.span
-                      key={i}
-                      className="w-1.5 h-1.5 rounded-full bg-indigo-600"
-                      animate={{
-                        scale: [1, 1.5, 1],
-                        opacity: [0.5, 1, 0.5],
-                      }}
-                      transition={{
-                        duration: 1,
-                        repeat: Infinity,
-                        delay: i * 0.2,
-                      }}
-                    />
-                  ))}
-                </motion.div>
-              </div>
-              <p className="text-sm text-gray-600">
-                Searching through company data...
-              </p>
-            </motion.div>
           </div>
         ) : filteredCompanies.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
@@ -731,11 +134,6 @@ export default function CompaniesPage() {
                   <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
                     Name
                   </th>
-                  {isSemanticSearch && (
-                    <th className="px-7 py-4 text-left text-sm font-semibold text-gray-900 select-none">
-                      Matches
-                    </th>
-                  )}
                   <th className="px-7 py-4 text-right text-sm font-semibold text-gray-900 select-none">
                     Added
                   </th>
@@ -743,25 +141,6 @@ export default function CompaniesPage() {
               </thead>
               <tbody>
                 {filteredCompanies.map((company, index) => {
-                  const matches = searchMatches.get(company.id) || [];
-                  const topMatch = matches[0];
-                  const companyContacts = contacts.get(company.id) || [];
-                  
-                  // Find CEO first, then any contact with email, then any contact
-                  const ceo = companyContacts.find(c => 
-                    c.title && (c.title.toLowerCase().includes('ceo') || c.title.toLowerCase().includes('chief executive'))
-                  );
-                  const firstContact = ceo || companyContacts.find(c => c.email && c.email.trim() !== '') || companyContacts[0];
-                  
-                  // Display name only (no title), otherwise email, otherwise "No contact listed"
-                  const displayText = ceo 
-                    ? `${ceo.first_name} ${ceo.last_name}`
-                    : firstContact && firstContact.first_name && firstContact.last_name
-                      ? `${firstContact.first_name} ${firstContact.last_name}`
-                      : firstContact && firstContact.email && firstContact.email.trim() !== ''
-                        ? firstContact.email
-                        : "No contact listed";
-
                   return (
                     <motion.tr
                       key={company.id}
@@ -773,47 +152,19 @@ export default function CompaniesPage() {
                       <td className="px-7 py-5 text-sm">
                         <Link href={`/companies/${company.id}`} className="block">
                           <div className="flex items-center space-x-3">
-                            <CompanyAvatar
-                              name={company.name}
-                              logoUrl={company.logo_url}
-                              website={company.website}
-                              size="md"
-                            />
+                            <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                              <span className="text-sm font-semibold text-indigo-600">
+                                {getInitials(company.name)}
+                              </span>
+                            </div>
                             <div className="min-w-0 flex-1">
                               <div className="text-base font-medium text-gray-900 truncate leading-6">
                                 {company.name}
-                              </div>
-                              <div className="text-sm text-gray-600 truncate leading-5 mt-0.5">
-                                {displayText}
                               </div>
                             </div>
                           </div>
                         </Link>
                       </td>
-                      {isSemanticSearch && (
-                        <td className="px-7 py-5 text-sm">
-                          {topMatch ? (
-                            <div className="flex items-center gap-2 max-w-md">
-                              <MatchIndicator 
-                                contentType={topMatch.content_type} 
-                                source={topMatch.source}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs text-gray-900 bg-accent/30 rounded px-2 py-1 truncate">
-                                  &quot;{highlightMatchText(topMatch.content_snippet.slice(0, 120), searchQuery)}{topMatch.content_snippet.length > 120 ? '...' : ''}&quot;
-                                </div>
-                              </div>
-                              {matches.length > 1 && (
-                                <span className="text-xs text-gray-600 whitespace-nowrap">
-                                  +{matches.length - 1}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-gray-600">—</div>
-                          )}
-                        </td>
-                      )}
                       <td className="px-7 py-5 text-sm">
                         <div className="text-sm text-gray-600 text-right leading-5">
                           {new Date(company.created_at).toLocaleDateString()}

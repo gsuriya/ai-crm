@@ -529,12 +529,21 @@ export default function CadencesPage() {
     }
   };
 
-  const handleCloseFlowBuilder = useCallback((force = false) => {
+  const handleCloseFlowBuilder = useCallback(async (force = false, saveData?: { blocks: FlowBlock[], name?: string, description?: string }) => {
     if (!force && hasUnsavedChanges) {
-      const confirmed = confirm('You have unsaved changes. Are you sure you want to exit without saving?');
-      if (!confirmed) {
-        return;
+      // Show custom dialog with Save/Don't Save/Cancel options
+      const result = window.confirm('Do you want to save your changes before closing?\n\nClick OK to save, or Cancel to discard changes.');
+      
+      if (result) {
+        // User wants to save - call handleSaveFlow with the current data
+        if (saveData) {
+          await handleSaveFlow(saveData.blocks, saveData.name, saveData.description);
+        } else {
+          alert('Cannot save: No data provided');
+          return;
+        }
       }
+      // If user clicks Cancel on the confirm, we treat it as "Don't Save" and continue closing
     }
     setShowFlowBuilder(false);
     setEditingCadence(null);
@@ -658,15 +667,6 @@ export default function CadencesPage() {
                       </td>
                       <td className="px-7 py-5 text-sm text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewCompanies(cadence.id)}
-                            className="h-8 text-xs border-gray-200 hover:bg-gray-50"
-                          >
-                            <User className="h-3.5 w-3.5 mr-1.5" />
-                            View Companies
-                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

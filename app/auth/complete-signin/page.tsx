@@ -34,7 +34,7 @@ export default function CompleteSignInPage() {
           setStatus('success');
           setMessage('Sign-in completed! Redirecting...');
           setTimeout(() => {
-            router.push('/companies');
+            router.push('/people');
           }, 1500);
         } else {
           throw new Error(data.error || 'Sign-in failed');

@@ -10,14 +10,10 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
 const navigation = [
-  { name: "Home", href: "/", icon: Home },
   { name: "Companies", href: "/companies", icon: Building2 },
-  { name: "Ongoing", href: "/outreach", icon: Send },
-  { name: "Cadences", href: "/cadences", icon: Workflow },
   { name: "People", href: "/people", icon: Users },
-  { name: "Pipeline", href: "/pipeline", icon: Briefcase },
-  { name: "Tasks", href: "/tasks", icon: CheckSquare },
-  { name: "Insights", href: "/insights", icon: BarChart3 },
+  { name: "Outreach", href: "/outreach", icon: Send },
+  { name: "Cadences", href: "/cadences", icon: Workflow },
 ];
 
 export function Sidebar() {
@@ -202,7 +198,7 @@ export function Sidebar() {
           <>
             {/* Notification Bell */}
             <button
-              onClick={() => router.push('/companies')}
+              onClick={() => router.push('/people')}
               className="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-muted/50 transition-colors"
             >
               <Bell className="h-5 w-5 text-black hover:text-black/80" />

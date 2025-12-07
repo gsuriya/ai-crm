@@ -176,7 +176,20 @@ export async function sendEmail(
   }
 
   emailLines.push(''); // Empty line before body
-  emailLines.push(params.body);
+  // Convert line breaks to HTML <br> tags for proper formatting
+  // Handle both plain text (\n) and already-HTML content
+  let htmlBody = params.body;
+  
+  // If body doesn't already contain HTML tags, convert \n to <br>
+  if (!htmlBody.includes('<br>') && !htmlBody.includes('<p>') && !htmlBody.includes('<div>')) {
+    htmlBody = htmlBody
+      .replace(/\r\n/g, '\n') // Normalize Windows line endings
+      .replace(/\r/g, '\n')   // Normalize Mac line endings
+      .replace(/\n\n/g, '<br><br>') // Double line breaks (paragraphs)
+      .replace(/\n/g, '<br>'); // Single line breaks
+  }
+  
+  emailLines.push(htmlBody);
 
   // Encode email
   const rawEmail = emailLines.join('\r\n');

@@ -74,7 +74,7 @@ interface CadenceFlowBuilderProps {
   cadenceDescription?: string; // Optional: description of the cadence
   companyId?: string; // Optional: company ID for workflow execution
   onSave?: (blocks: FlowBlock[], name?: string, description?: string) => void;
-  onClose?: (force?: boolean) => void;
+  onClose?: (force?: boolean, saveData?: { blocks: FlowBlock[], name?: string, description?: string }) => void;
   autoSave?: boolean; // Whether to auto-save to Supabase
   onChanges?: (hasChanges: boolean) => void; // Callback when changes are detected
   saveSuccess?: boolean; // Whether save was successful (to show message)
@@ -1674,10 +1674,13 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Body</label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      💡 Use variables: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{first_name}}'}</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{last_name}}'}</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{name}}'}</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{company}}'}</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{position}}'}</code>
+                    </p>
                     <textarea
                       value={block.config?.body || ''}
                       onChange={(e) => updateBlockConfig(block.id, { body: e.target.value })}
-                      placeholder="Email body"
+                      placeholder="Hi {{first_name}},&#10;&#10;I came across your profile and wanted to reach out...&#10;&#10;Best regards"
                       className="w-full min-h-[100px] p-2 border rounded bg-white text-gray-900 placeholder:text-gray-400"
                     />
                   </div>
@@ -1933,7 +1936,7 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               )}
             </AnimatePresence>
             {onClose && (
-              <Button variant="outline" size="sm" onClick={() => onClose(false)}>
+              <Button variant="outline" size="sm" onClick={() => onClose(false, { blocks, name, description })}>
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -2021,20 +2024,33 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {Object.entries(blockTypeConfig)
-                  .filter(([type]) => type !== 'trigger') // Exclude trigger/start block from palette
+                  .filter(([type]) => type !== 'trigger' && type !== 'voicecall') // Exclude trigger/start block and voice call from palette
                   .map(([type, config]) => {
                     const Icon = config.icon;
+                    const isComingSoon = type === 'linkedinmessage';
                     return (
                       <button
                         key={type}
-                        onClick={() => handleAddBlock(type as BlockType)}
-                        className="w-full flex items-center gap-3 p-3 bg-white border rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left"
+                        onClick={() => {
+                          if (!isComingSoon) {
+                            handleAddBlock(type as BlockType);
+                          }
+                        }}
+                        disabled={isComingSoon}
+                        className={`w-full flex items-center gap-3 p-3 border rounded-lg transition-colors text-left relative ${
+                          isComingSoon 
+                            ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-60' 
+                            : 'bg-white hover:border-blue-500 hover:bg-blue-50'
+                        }`}
                       >
-                        <div className={`${config.color} p-2 rounded`}>
+                        <div className={`${config.color} p-2 rounded ${isComingSoon ? 'opacity-50' : ''}`}>
                           <Icon className="h-4 w-4 text-white" />
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <div className="font-medium text-sm">{config.label}</div>
+                          {isComingSoon && (
+                            <div className="text-xs text-gray-500 mt-0.5">Coming soon!</div>
+                          )}
                         </div>
                       </button>
                     );

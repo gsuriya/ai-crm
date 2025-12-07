@@ -130,13 +130,13 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
             <Command.Group heading="Quick Actions">
               <Command.Item
                 onSelect={() => {
-                  router.push("/companies/new");
+                  router.push("/people");
                   onOpenChange(false);
                 }}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer hover:bg-accent"
               >
                 <Plus className="h-4 w-4 text-muted-foreground" />
-                <span>New Company</span>
+                <span>View People</span>
               </Command.Item>
               <Command.Item
                 onSelect={() => {

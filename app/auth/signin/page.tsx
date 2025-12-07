@@ -25,7 +25,7 @@ export default function SignInPage() {
         const session = await Promise.race([sessionPromise, timeoutPromise]).catch(() => null) as any;
         
         if (session) {
-          router.push("/companies");
+          router.push("/people");
         } else {
           setChecking(false);
         }
