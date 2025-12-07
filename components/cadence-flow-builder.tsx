@@ -1031,6 +1031,42 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     }
   };
 
+  // Get the first email block in the cadence (by execution order)
+  const getFirstEmailBlock = (): FlowBlock | null => {
+    const visited = new Set<string>();
+    let firstEmailBlock: FlowBlock | null = null;
+    
+    // Traverse forward from trigger to find the first email block
+    const traverseForward = (currentId: string) => {
+      if (visited.has(currentId)) return;
+      visited.add(currentId);
+      
+      const currentBlock = blocks.find(b => b.id === currentId);
+      if (!currentBlock) return;
+      
+      // If this is the first email block we encounter, save it
+      if (currentBlock.type === 'email' && !firstEmailBlock) {
+        firstEmailBlock = currentBlock;
+        return; // Found first email, stop searching
+      }
+      
+      // Continue traversing forward through connections
+      if (currentBlock.connections && currentBlock.connections.length > 0) {
+        for (const nextId of currentBlock.connections) {
+          traverseForward(nextId);
+        }
+      }
+    };
+    
+    // Start from trigger and traverse forward
+    const triggerBlock = blocks.find(b => b.type === 'trigger');
+    if (triggerBlock) {
+      traverseForward(triggerBlock.id);
+    }
+    
+    return firstEmailBlock;
+  };
+
   // Get all email blocks that come before the given block (for thread selection)
   const getPreviousEmailBlocks = (blockId: string): FlowBlock[] => {
     const visited = new Set<string>();
@@ -1348,11 +1384,66 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   }, [zoom]);
 
   const updateBlockConfig = (blockId: string, config: Partial<FlowBlock['config']>) => {
-    setBlocks(prev => prev.map(block =>
-      block.id === blockId
-        ? { ...block, config: { ...block.config, ...config } }
-        : block
-    ));
+    setBlocks(prev => {
+      // Check if we're updating the first email block's subject
+      const firstEmailBlock = prev.find(b => {
+        // Find first email block by traversing from trigger
+        const visited = new Set<string>();
+        let firstEmail: FlowBlock | null = null;
+        
+        const traverseForward = (currentId: string) => {
+          if (visited.has(currentId)) return;
+          visited.add(currentId);
+          
+          const currentBlock = prev.find(b => b.id === currentId);
+          if (!currentBlock) return;
+          
+          if (currentBlock.type === 'email' && !firstEmail) {
+            firstEmail = currentBlock;
+            return;
+          }
+          
+          if (currentBlock.connections && currentBlock.connections.length > 0) {
+            for (const nextId of currentBlock.connections) {
+              traverseForward(nextId);
+            }
+          }
+        };
+        
+        const triggerBlock = prev.find(b => b.type === 'trigger');
+        if (triggerBlock) {
+          traverseForward(triggerBlock.id);
+        }
+        
+        return firstEmail;
+      });
+      
+      const isFirstEmailBlock = firstEmailBlock?.id === blockId;
+      const isUpdatingSubject = 'subject' in config;
+      
+      // If updating the first email block's subject, update all subsequent email blocks
+      if (isFirstEmailBlock && isUpdatingSubject && config.subject !== undefined) {
+        const newSubject = config.subject;
+        
+        return prev.map(block => {
+          if (block.id === blockId) {
+            // Update the first email block
+            return { ...block, config: { ...block.config, ...config } };
+          } else if (block.type === 'email') {
+            // Update all other email blocks to use the first email's subject
+            return { ...block, config: { ...block.config, subject: newSubject } };
+          }
+          return block;
+        });
+      }
+      
+      // Normal update for non-first-email or non-subject changes
+      return prev.map(block =>
+        block.id === blockId
+          ? { ...block, config: { ...block.config, ...config } }
+          : block
+      );
+    });
   };
 
   const updateBlockTitle = (blockId: string, title: string) => {
@@ -1633,35 +1724,38 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                       const previousEmailBlocks = getPreviousEmailBlocks(block.id);
                       const isReplying = previousEmailBlocks.length > 0;
                       
-                      // If replying, find the original subject from the first email in the chain
-                      let originalSubject = '';
-                      if (isReplying && previousEmailBlocks.length > 0) {
-                        // Get the subject from the first email block in the chain
-                        const firstEmailBlock = previousEmailBlocks[0];
-                        originalSubject = firstEmailBlock.config?.subject || '';
-                      }
+                      // Find the first email block in the entire cadence
+                      const firstEmailBlock = getFirstEmailBlock();
+                      const isFirstEmail = firstEmailBlock?.id === block.id;
+                      const firstEmailSubject = firstEmailBlock?.config?.subject || '';
+                      
+                      // If this is not the first email, use the first email's subject
+                      const displaySubject = isFirstEmail ? (block.config?.subject || '') : firstEmailSubject;
+                      const isSynced = !isFirstEmail && isReplying;
                       
                       return (
                         <>
                           <Input
-                            value={isReplying ? originalSubject : (block.config?.subject || '')}
+                            value={displaySubject}
                             onChange={(e) => {
-                              if (!isReplying) {
+                              if (isFirstEmail) {
+                                // Update first email's subject (will auto-update all others)
                                 updateBlockConfig(block.id, { subject: e.target.value });
                               }
+                              // For non-first emails, subject is locked and synced automatically
                             }}
                             placeholder="Email subject"
-                            disabled={isReplying}
-                            className={isReplying ? "bg-gray-100 cursor-not-allowed" : ""}
+                            disabled={!isFirstEmail}
+                            className={!isFirstEmail ? "bg-gray-100 cursor-not-allowed" : ""}
                           />
-                          {isReplying && (
+                          {isSynced && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              ✓ Subject locked to match original thread for proper threading
+                              ✓ Subject automatically synced with first email for proper threading
                             </p>
                           )}
-                          {!isReplying && (
+                          {isFirstEmail && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              Subject for new email thread
+                              Subject for email thread (will sync to all subsequent emails)
                             </p>
                           )}
                         </>

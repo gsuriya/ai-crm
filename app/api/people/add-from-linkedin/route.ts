@@ -16,48 +16,25 @@ export async function OPTIONS(request: NextRequest) {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// Company name to domain mapping
-const COMPANY_DOMAIN_MAP: Record<string, string> = {
-  'google': 'google.com',
-  'meta': 'meta.com',
-  'facebook': 'meta.com',
-  'apple': 'apple.com',
-  'microsoft': 'microsoft.com',
-  'amazon': 'amazon.com',
-  'moelis': 'moelis.com',
-  'moelis & company': 'moelis.com',
-  'goldman sachs': 'gs.com',
-  'morgan stanley': 'morganstanley.com',
-  'jpmorgan': 'jpmorganchase.com',
-  'jp morgan': 'jpmorganchase.com',
-  'bank of america': 'bofa.com',
-  'citigroup': 'citi.com',
-  'wells fargo': 'wellsfargo.com',
-  'stripe': 'stripe.com',
-  'nyu': 'nyu.edu',
-  'nyu stern': 'stern.nyu.edu',
-};
+// GET handler for testing/debugging
+export async function GET(request: NextRequest) {
+  return NextResponse.json(
+    { message: 'Add from LinkedIn API endpoint is working', method: 'GET' },
+    { headers: corsHeaders }
+  );
+}
 
-/**
- * Convert company name to domain
- */
+// Simple heuristic to convert company name to domain
+// Hunter.io will handle the actual domain validation and email finding
 function companyToDomain(companyName: string): string {
-  const cleaned = companyName.toLowerCase().trim();
-  
-  // Check if it's in our mapping
-  for (const [key, domain] of Object.entries(COMPANY_DOMAIN_MAP)) {
-    if (cleaned.includes(key)) {
-      return domain;
-    }
-  }
-  
-  // Fallback: clean company name and add .com
-  const domainName = cleaned
+  const cleaned = companyName
+    .toLowerCase()
+    .trim()
     .replace(/[^a-z0-9\s]/g, '') // Remove special chars
     .replace(/\s+/g, '') // Remove spaces
-    .replace(/inc|llc|ltd|corp|corporation|company|co/g, ''); // Remove common suffixes
+    .replace(/inc|llc|ltd|corp|corporation|company|co|ventures|capital|partners/g, ''); // Remove common suffixes
   
-  return `${domainName}.com`;
+  return `${cleaned}.com`;
 }
 
 /**
