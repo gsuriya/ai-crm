@@ -15,18 +15,10 @@ export async function OPTIONS(request: NextRequest) {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// GET handler for testing/debugging
-export async function GET(request: NextRequest) {
-  return NextResponse.json(
-    { message: 'Find Email API endpoint is working', method: 'GET' },
-    { headers: corsHeaders }
-  );
-}
-
 /**
  * POST /api/people/find-email
- * Finds email for a person using Hunter.io (without adding to CRM)
- * NO domain guessing - Hunter.io handles domain detection from company name
+ * Finds an email address using Hunter.io
+ * Does NOT add to CRM - just returns the email
  */
 export async function POST(request: NextRequest) {
   try {
@@ -40,26 +32,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Find Email] Finding email for:', firstName, lastName, 'at', company);
+    console.log('[Find Email] Searching for:', { firstName, lastName, company });
 
-    const emailResult = await findEmail({
+    // Use Hunter.io to find the email
+    const result = await findEmail({
       firstName,
       lastName,
       company,
     });
 
-    if (!emailResult || !emailResult.data || !emailResult.data.email) {
+    if (!result || !result.data || !result.data.email) {
       return NextResponse.json(
-        { error: 'Could not find email' },
+        { 
+          error: `Could not find email for ${firstName} ${lastName} at ${company}`,
+          details: 'This person may not be in Hunter.io\'s database. Try entering the email manually.',
+        },
         { status: 404, headers: corsHeaders }
       );
     }
 
-    console.log('[Find Email] Found:', emailResult.data.email, 'Score:', emailResult.data.score);
+    console.log('[Find Email] Found:', {
+      email: result.data.email,
+      score: result.data.score,
+    });
 
     return NextResponse.json({
-      email: emailResult.data.email,
-      score: emailResult.data.score,
+      success: true,
+      email: result.data.email,
+      score: result.data.score,
+      firstName: result.data.first_name,
+      lastName: result.data.last_name,
+      position: result.data.position,
+      company: result.data.company,
+      sources: result.data.sources?.length || 0,
     }, { headers: corsHeaders });
 
   } catch (error: any) {

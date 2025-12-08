@@ -7,14 +7,32 @@ import { getSession } from "@/lib/auth";
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isChecking, setIsChecking] = useState(false); // Set to false initially for development
+  const [isChecking, setIsChecking] = useState(true);
   const isAuthPage = pathname.startsWith('/auth');
 
   useEffect(() => {
-    // TEMPORARY: Skip auth check entirely for development
-    // This allows the app to load immediately without waiting for auth
-    setIsChecking(false);
-  }, []);
+    const checkAuth = async () => {
+      if (isAuthPage) {
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        const session = await getSession();
+        if (!session) {
+          console.log('[AuthGuard] No session found, redirecting to sign in');
+          router.push('/auth/signin');
+        } else {
+          setIsChecking(false);
+        }
+      } catch (error) {
+        console.error('[AuthGuard] Error checking auth:', error);
+        router.push('/auth/signin');
+      }
+    };
+
+    checkAuth();
+  }, [pathname, router, isAuthPage]);
 
   // Show loading state while checking auth (only for protected routes)
   if (isChecking && !isAuthPage) {

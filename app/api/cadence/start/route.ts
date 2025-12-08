@@ -175,8 +175,7 @@ export async function PUT(request: NextRequest) {
                   error: error.message || String(error),
                 }
               })
-              .eq('id', executionId)
-              .catch(console.error);
+              .eq('id', executionId);
           }
         })();
         
@@ -249,7 +248,7 @@ export async function PUT(request: NextRequest) {
                     }
                   })
                   .eq('id', activeExecution.id)
-                  .catch(console.error);
+                  ;
               }
             })();
             return NextResponse.json({
@@ -278,7 +277,7 @@ export async function PUT(request: NextRequest) {
                 }
               })
               .eq('id', activeExecution.id)
-              .catch(console.error);
+              ;
           }
         })();
           return NextResponse.json({
@@ -314,7 +313,7 @@ export async function PUT(request: NextRequest) {
                   }
                 })
                 .eq('id', executionId)
-                .catch(console.error);
+                ;
             }
           })();
       return NextResponse.json({

@@ -58,6 +58,46 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [isAuthPage]);
 
+  // Background reply checker - checks every 5 minutes for email responses
+  useEffect(() => {
+    if (isAuthPage) return;
+
+    const checkForReplies = async () => {
+      try {
+        const response = await fetch('/api/cadence/check-replies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await response.json();
+        if (data.results?.active?.paused > 0 || data.results?.completed?.responded > 0) {
+          console.log(`[Reply Checker] 📬 Found replies! Active paused: ${data.results.active.paused}, Completed responded: ${data.results.completed.responded}`);
+          
+          // Show browser notification
+          if (Notification.permission === 'granted') {
+            new Notification('📬 New Email Reply!', {
+              body: `Someone responded to your outreach`,
+              icon: '/favicon.ico',
+            });
+          } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission();
+          }
+        }
+      } catch (error) {
+        // Silently fail
+      }
+    };
+
+    // Check immediately on page load
+    checkForReplies();
+
+    // Check every 5 minutes (300000ms)
+    const replyInterval = setInterval(() => {
+      checkForReplies();
+    }, 300000);
+
+    return () => clearInterval(replyInterval);
+  }, [isAuthPage]);
+
   return (
     <AuthGuard>
       {isAuthPage ? (

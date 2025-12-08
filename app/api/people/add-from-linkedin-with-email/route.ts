@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { findEmail } from '@/lib/services/hunter';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,25 +15,15 @@ export async function OPTIONS(request: NextRequest) {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// GET handler for testing/debugging
-export async function GET(request: NextRequest) {
-  return NextResponse.json(
-    { message: 'Add from LinkedIn API endpoint is working', method: 'GET' },
-    { headers: corsHeaders }
-  );
-}
-
 /**
- * POST /api/people/add-from-linkedin
- * Adds a person from LinkedIn to the CRM
- * 1. Extracts profile data from LinkedIn
- * 2. Finds email with Hunter.io (NO domain guessing)
- * 3. Creates contact in database
+ * POST /api/people/add-from-linkedin-with-email
+ * Adds a person from LinkedIn to the CRM with a manually provided email
+ * Used when Hunter.io can't find the email
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { linkedinUrl, profileData } = body;
+    const { linkedinUrl, profileData, email } = body;
 
     if (!linkedinUrl) {
       return NextResponse.json(
@@ -43,53 +32,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Add from LinkedIn] Starting process...');
-    console.log('[Add from LinkedIn] Profile data:', profileData);
-
-    // Step 1: Get company name
-    const companyName = profileData?.company || '';
-    if (!companyName) {
+    if (!email || !email.includes('@')) {
       return NextResponse.json(
-        { error: 'Company name is required to find email' },
+        { error: 'Valid email is required' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    console.log('[Add from LinkedIn] Company:', companyName);
+    console.log('[Add from LinkedIn with Email] Starting process...');
+    console.log('[Add from LinkedIn with Email] Email:', email);
+    console.log('[Add from LinkedIn with Email] Profile data:', profileData);
 
-    // Step 2: Find email with Hunter.io (they handle domain detection)
-    console.log('[Add from LinkedIn] Finding email with Hunter.io...');
-    const emailResult = await findEmail({
-      firstName: profileData.firstName,
-      lastName: profileData.lastName,
-      company: companyName,
-    });
+    const companyName = profileData?.company || '';
 
-    if (!emailResult || !emailResult.data || !emailResult.data.email) {
-      return NextResponse.json(
-        { error: `Could not find email for ${profileData.firstName} ${profileData.lastName} at ${companyName}. They may not be in Hunter.io's database.` },
-        { status: 404, headers: corsHeaders }
-      );
-    }
-
-    const email = emailResult.data.email;
-    const emailScore = emailResult.data.score;
-    console.log('[Add from LinkedIn] Found email:', email, 'Score:', emailScore);
-
-    // Step 3: Find or create company
+    // Find or create company
     let companyId: string | null = null;
     
     if (companyName) {
-      // Check if company exists
+      // Check if company exists (case-insensitive)
       const { data: existingCompany } = await supabase
         .from('companies')
         .select('id')
-        .eq('name', companyName)
+        .ilike('name', companyName)
         .single();
       
       if (existingCompany) {
         companyId = existingCompany.id;
-        console.log('[Add from LinkedIn] Found existing company:', companyName, 'ID:', companyId);
+        console.log('[Add from LinkedIn with Email] Found existing company:', companyName, 'ID:', companyId);
       } else {
         // Create new company
         const { data: newCompany, error: companyError } = await supabase
@@ -99,19 +68,19 @@ export async function POST(request: NextRequest) {
           .single();
         
         if (companyError) {
-          console.error('[Add from LinkedIn] Error creating company:', companyError);
+          console.error('[Add from LinkedIn with Email] Error creating company:', companyError);
         } else {
           companyId = newCompany.id;
-          console.log('[Add from LinkedIn] Created new company:', companyName, 'ID:', companyId);
+          console.log('[Add from LinkedIn with Email] Created new company:', companyName, 'ID:', companyId);
         }
       }
     }
 
-    // Step 4: Check if contact already exists
+    // Check if contact already exists
     const { data: existingContact } = await supabase
       .from('contacts')
       .select('id')
-      .eq('email', email)
+      .eq('email', email.toLowerCase())
       .single();
 
     if (existingContact) {
@@ -124,11 +93,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 5: Create contact in database
+    // Create contact in database
     const contactData = {
       first_name: profileData.firstName || '',
       last_name: profileData.lastName || '',
-      email: email,
+      email: email.toLowerCase(),
       company_id: companyId,
       linkedin_url: linkedinUrl,
       job_title: profileData.title || '',
@@ -137,7 +106,7 @@ export async function POST(request: NextRequest) {
       location: profileData.location || null,
     };
 
-    console.log('[Add from LinkedIn] Creating contact:', contactData);
+    console.log('[Add from LinkedIn with Email] Creating contact:', contactData);
 
     const { data: newContact, error: insertError } = await supabase
       .from('contacts')
@@ -146,11 +115,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error('[Add from LinkedIn] Error creating contact:', insertError);
+      console.error('[Add from LinkedIn with Email] Error creating contact:', insertError);
       throw insertError;
     }
 
-    console.log('[Add from LinkedIn] Success! Contact ID:', newContact.id);
+    console.log('[Add from LinkedIn with Email] Success! Contact ID:', newContact.id);
 
     return NextResponse.json({
       success: true,
@@ -160,12 +129,12 @@ export async function POST(request: NextRequest) {
         lastName: newContact.last_name,
         email: newContact.email,
         company: newContact.current_company,
-        emailScore: emailScore,
+        manualEmail: true,
       },
       message: `${newContact.first_name} ${newContact.last_name} added to your CRM!`,
     }, { headers: corsHeaders });
   } catch (error: any) {
-    console.error('[Add from LinkedIn] Error:', error);
+    console.error('[Add from LinkedIn with Email] Error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to add person to CRM' },
       { status: 500, headers: corsHeaders }

@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     // Check current token
     try {
       const tokenInfo = await oauth2Client.getTokenInfo(session.access_token);
-      result.currentTokenScopes = tokenInfo.scope ? tokenInfo.scope.split(' ') : [];
+      result.currentTokenScopes = (tokenInfo as any).scope ? (tokenInfo as any).scope.split(' ') : [];
       result.currentTokenExpiresAt = tokenInfo.expiry_date ? new Date(tokenInfo.expiry_date).toISOString() : null;
     } catch (error: any) {
       result.currentTokenError = error.message;
@@ -83,10 +83,10 @@ export async function GET(request: NextRequest) {
         if (!credentials.scope && credentials.access_token) {
           try {
             const refreshedTokenInfo = await oauth2Client.getTokenInfo(credentials.access_token);
-            result.refreshedTokenInfoScopes = refreshedTokenInfo.scope ? refreshedTokenInfo.scope.split(' ') : [];
+            result.refreshedTokenInfoScopes = (refreshedTokenInfo as any).scope ? (refreshedTokenInfo as any).scope.split(' ') : [];
             
-            if (refreshedTokenInfo.scope) {
-              result.refreshedTokenScopes = refreshedTokenInfo.scope.split(' ');
+            if ((refreshedTokenInfo as any).scope) {
+              result.refreshedTokenScopes = (refreshedTokenInfo as any).scope.split(' ');
               result.refreshedTokenHasScope = true;
             }
           } catch (tokenInfoError: any) {

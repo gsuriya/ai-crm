@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Send, Loader2 } from "lucide-react";
+import { Send, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface AddToCadenceModalProps {
@@ -53,41 +53,56 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
   const loadEmailPreview = () => {
     const cadence = cadences.find((c) => c.id === selectedCadenceId);
     if (!cadence || !cadence.nodes) {
+      console.log("No cadence or nodes found");
       setSubject("");
       setBody("");
       return;
     }
 
-    // Find start node
-    const startNode = cadence.nodes.find((n: any) => n.type === "start");
+    console.log("Loading preview for cadence:", cadence.name);
+    console.log("Nodes:", cadence.nodes);
+
+    // Find start/trigger node
+    const startNode = cadence.nodes.find((n: any) => n.type === "start" || n.type === "trigger");
     if (!startNode) {
+      console.log("No start/trigger node found");
+      setSubject("");
+      setBody("");
+      return;
+    }
+    console.log("Found start node:", startNode.id, startNode.connections);
+
+    // Get the first connection from the start node (it's an array of IDs)
+    const firstConnectionId = startNode.connections && startNode.connections.length > 0 
+      ? startNode.connections[0] 
+      : null;
+
+    if (!firstConnectionId) {
+      console.log("No connections from start node");
       setSubject("");
       setBody("");
       return;
     }
 
-    // Find first connection from start
-    const connections = cadence.nodes.flatMap((n: any) => n.connections || []);
-    const firstConnection = connections.find((c: any) => c.source === startNode.id);
+    console.log("First connection ID:", firstConnectionId);
 
-    if (!firstConnection) {
-      setSubject("");
-      setBody("");
-      return;
-    }
-
-    // Find the first email node
+    // Find the node with this ID
     const firstEmailNode = cadence.nodes.find(
-      (n: any) => n.id === firstConnection.target && n.type === "email"
+      (n: any) => n.id === firstConnectionId && n.type === "email"
     );
+    console.log("First email node:", firstEmailNode);
 
     if (firstEmailNode && firstEmailNode.config) {
       const rawSubject = firstEmailNode.config.subject || "";
       const rawBody = firstEmailNode.config.body || "";
       
+      console.log("Setting subject:", rawSubject);
+      console.log("Setting body:", rawBody);
+      
       setSubject(replaceVariables(rawSubject));
       setBody(replaceVariables(rawBody));
     } else {
+      console.log("No email node found or no config");
       setSubject("");
       setBody("");
     }
@@ -109,6 +124,11 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
       return;
     }
 
+    if (!subject || !body) {
+      alert("Please wait for the email template to load");
+      return;
+    }
+
     setSending(true);
     try {
       const response = await fetch("/api/people/add-to-cadence", {
@@ -120,6 +140,8 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
           lastName,
           company,
           cadenceId: selectedCadenceId,
+          emailSubject: subject,
+          emailBody: body,
         }),
       });
 
@@ -128,7 +150,8 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
         throw new Error(error.error || "Failed to add to cadence");
       }
 
-      alert(`✅ Success! ${firstName} ${lastName} has been added to the cadence!`);
+      const result = await response.json();
+      alert(`✅ Success! Email sent to ${firstName} ${lastName} and added to cadence!`);
       
       setEmail("");
       setFirstName("");
@@ -151,15 +174,33 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200"
       style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         background: 'rgba(0, 0, 0, 0.5)',
         backdropFilter: 'blur(4px)'
       }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-2xl w-[700px] max-w-[90vw] max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-4 duration-300"
+        style={{
+          background: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          width: '700px',
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: 'Google Sans, Roboto, Arial, sans-serif'
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -209,6 +250,7 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
                 fontSize: '14px',
                 fontFamily: 'Google Sans, Roboto, Arial, sans-serif',
                 background: 'white',
+                color: '#202124',
                 cursor: 'pointer'
               }}
             >
@@ -224,7 +266,7 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
             </select>
           </div>
 
-          {/* Contact Fields - Side by side */}
+          {/* Contact Fields */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: '#5f6368', marginBottom: '6px', fontWeight: 500 }}>
@@ -241,7 +283,9 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
                   border: '1px solid #dadce0',
                   borderRadius: '4px',
                   fontSize: '14px',
-                  fontFamily: 'Google Sans, Roboto, Arial, sans-serif'
+                  fontFamily: 'Google Sans, Roboto, Arial, sans-serif',
+                  background: 'white',
+                  color: '#202124'
                 }}
               />
             </div>
@@ -260,7 +304,9 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
                   border: '1px solid #dadce0',
                   borderRadius: '4px',
                   fontSize: '14px',
-                  fontFamily: 'Google Sans, Roboto, Arial, sans-serif'
+                  fontFamily: 'Google Sans, Roboto, Arial, sans-serif',
+                  background: 'white',
+                  color: '#202124'
                 }}
               />
             </div>
@@ -282,7 +328,9 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
                 border: '1px solid #dadce0',
                 borderRadius: '4px',
                 fontSize: '14px',
-                fontFamily: 'Google Sans, Roboto, Arial, sans-serif'
+                fontFamily: 'Google Sans, Roboto, Arial, sans-serif',
+                background: 'white',
+                color: '#202124'
               }}
             />
           </div>
@@ -301,12 +349,13 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
                 outline: 'none',
                 fontSize: '14px',
                 fontFamily: 'Google Sans, Roboto, Arial, sans-serif',
-                color: '#202124'
+                color: '#202124',
+                background: 'transparent'
               }}
             />
           </div>
 
-          {/* Subject Field */}
+          {/* Subject */}
           <div style={{ borderBottom: '1px solid #e8eaed', padding: '8px 0', display: 'flex', alignItems: 'center' }}>
             <span style={{ color: '#5f6368', fontSize: '14px', minWidth: '60px' }}>Subject</span>
             <input
@@ -320,12 +369,13 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
                 outline: 'none',
                 fontSize: '14px',
                 fontFamily: 'Google Sans, Roboto, Arial, sans-serif',
-                color: '#202124'
+                color: '#202124',
+                background: 'transparent'
               }}
             />
           </div>
 
-          {/* Email Body - Editable */}
+          {/* Email Body */}
           <div style={{ padding: '16px 0' }}>
             <textarea
               value={body}
@@ -340,7 +390,8 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
                 fontFamily: 'Arial, sans-serif',
                 border: 'none',
                 outline: 'none',
-                resize: 'vertical'
+                resize: 'vertical',
+                background: 'white'
               }}
             />
           </div>
@@ -359,7 +410,7 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
               padding: '8px 24px',
               fontSize: '14px',
               fontWeight: 500,
-              cursor: 'pointer',
+              cursor: sending || !email || !firstName || !lastName || !company || !selectedCadenceId ? 'not-allowed' : 'pointer',
               fontFamily: 'Google Sans, Roboto, Arial, sans-serif',
               boxShadow: '0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15)',
               opacity: (sending || !email || !firstName || !lastName || !company || !selectedCadenceId) ? 0.5 : 1,
@@ -380,18 +431,18 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
           >
             {sending ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Sending...
+                <Loader2 style={{ width: '16px', height: '16px' }} className="animate-spin" />
+                <span>Sending...</span>
               </>
             ) : (
               <>
-                <Send className="h-4 w-4" />
-                Send & Add to Cadence
+                <Send style={{ width: '16px', height: '16px' }} />
+                <span>Send & Add to Cadence</span>
               </>
             )}
           </button>
           <span style={{ fontSize: '12px', color: '#5f6368' }}>
-            This will add the contact to your CRM and start the cadence
+            This will send the email above, add the contact to your CRM, and continue the cadence from step 2
           </span>
         </div>
       </div>

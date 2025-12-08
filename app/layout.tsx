@@ -9,7 +9,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Cheddar CRM - Private Markets",
+  title: "Cheddar - Private Markets",
   description: "AI-powered CRM for private markets investors",
 };
 

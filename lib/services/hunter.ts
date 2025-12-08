@@ -91,8 +91,8 @@ export interface HunterEmailVerifierResult {
 
 /**
  * Find email address using first name, last name, and company name
- * Hunter.io will automatically determine the correct domain from the company name
- * NO domain guessing - let Hunter.io handle everything
+ * Let Hunter.io do its job - it's smart and knows real company domains
+ * Only use domain override for known problematic companies (like Meta)
  */
 export async function findEmail(params: {
   firstName: string;
@@ -106,17 +106,37 @@ export async function findEmail(params: {
       throw new Error('Hunter.io API key not configured');
     }
 
-    const url = new URL(`${HUNTER_API_BASE}/email-finder`);
-    url.searchParams.append('first_name', params.firstName);
-    url.searchParams.append('last_name', params.lastName);
-    url.searchParams.append('company', params.company);
-    url.searchParams.append('api_key', HUNTER_API_KEY);
+    // Only these specific companies need domain override (Hunter.io rejects them as "webmail")
+    const PROBLEM_COMPANIES: Record<string, string> = {
+      'meta': 'meta.com',
+      'facebook': 'fb.com',
+    };
+    
+    const companyLower = params.company.toLowerCase().trim();
+    const needsDomainOverride = PROBLEM_COMPANIES[companyLower];
 
     console.log('[Hunter] Finding email for:', {
       firstName: params.firstName,
       lastName: params.lastName,
       company: params.company,
+      usingDomainOverride: needsDomainOverride || false,
     });
+
+    const url = new URL(`${HUNTER_API_BASE}/email-finder`);
+    url.searchParams.append('first_name', params.firstName);
+    url.searchParams.append('last_name', params.lastName);
+    
+    // Use domain override ONLY for known problematic companies
+    // Otherwise let Hunter.io figure out the domain from company name
+    if (needsDomainOverride) {
+      url.searchParams.append('domain', needsDomainOverride);
+      console.log('[Hunter] Using domain override:', needsDomainOverride);
+    } else {
+      url.searchParams.append('company', params.company);
+      console.log('[Hunter] Using company name (letting Hunter.io find domain):', params.company);
+    }
+    
+    url.searchParams.append('api_key', HUNTER_API_KEY);
 
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -125,13 +145,18 @@ export async function findEmail(params: {
       },
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[Hunter] API error:', error);
-      throw new Error(`Hunter API error: ${response.status} - ${error}`);
+    const data = await response.json();
+    
+    // Check for errors
+    if (data.errors) {
+      console.error('[Hunter] API returned errors:', data.errors);
+      return null;
     }
 
-    const data = await response.json();
+    if (!response.ok) {
+      console.error('[Hunter] API error status:', response.status);
+      return null;
+    }
     
     console.log('[Hunter] Result:', {
       email: data.data?.email,

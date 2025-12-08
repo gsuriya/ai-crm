@@ -1,0 +1,74 @@
+Checking for new versions...
+
+A newer version of the Stripe CLI is available, please update to: v1.33.0
+Getting ready...
+Ready! You are using Stripe API Version [2025-09-30.clover]. Your webhook signing secret is whsec_9c2089330f1dbaf11d2c9ab6a09b51ba60df54dc1707e5ff3f11af041dc344f2 (^C to quit)
+2025-12-07 20:30:12   --> customer.created [evt_1SbtHE1mTYfgYAlhK09i7aYF]
+2025-12-07 20:30:12  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtHE1mTYfgYAlhK09i7aYF]
+2025-12-07 20:33:45   --> customer.created [evt_1SbtKe1mTYfgYAlhwTF82k4S]
+2025-12-07 20:33:45  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtKe1mTYfgYAlhwTF82k4S]
+2025-12-07 20:35:42   --> coupon.created [evt_1SbtMY1mTYfgYAlhiOan89E6]
+2025-12-07 20:35:43  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtMY1mTYfgYAlhiOan89E6]
+2025-12-07 20:36:32   --> customer.created [evt_1SbtNM1mTYfgYAlhPXHVKLw7]
+2025-12-07 20:36:32  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtNM1mTYfgYAlhPXHVKLw7]
+2025-12-07 20:37:51   --> customer.created [evt_1SbtOd1mTYfgYAlh4xTbtP91]
+2025-12-07 20:37:51  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtOd1mTYfgYAlh4xTbtP91]
+2025-12-07 20:38:46   --> customer.created [evt_1SbtPW1mTYfgYAlhBozsApvu]
+2025-12-07 20:38:46  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtPW1mTYfgYAlhBozsApvu]
+2025-12-07 20:38:51   --> promotion_code.created [evt_1SbtPb1mTYfgYAlhfwGi9knl]
+2025-12-07 20:38:51  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtPb1mTYfgYAlhfwGi9knl]
+2025-12-07 20:39:56   --> setup_intent.requires_action [evt_1SbtQe1mTYfgYAlhl8qZ0DlJ]
+2025-12-07 20:39:56   --> setup_intent.created [evt_1SbtQe1mTYfgYAlhTbSXX5dQ]
+2025-12-07 20:39:56  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtQe1mTYfgYAlhl8qZ0DlJ]
+2025-12-07 20:39:56  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtQe1mTYfgYAlhTbSXX5dQ]
+2025-12-07 20:41:00   --> customer.created [evt_1SbtRg1mTYfgYAlhBAuFuGRR]
+2025-12-07 20:41:00  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRg1mTYfgYAlhBAuFuGRR]
+2025-12-07 20:41:14   --> promotion_code.updated [evt_1SbtRu1mTYfgYAlhg9pSt0x7]
+2025-12-07 20:41:14   --> checkout.session.completed [evt_1SbtRu1mTYfgYAlhXeH6JDT9]
+2025-12-07 20:41:14   --> customer.updated [evt_1SbtRu1mTYfgYAlhpBE8oOg3]
+2025-12-07 20:41:14   --> customer.discount.created [evt_1SbtRu1mTYfgYAlhKabwYpin]
+2025-12-07 20:41:14   --> customer.subscription.created [evt_1SbtRu1mTYfgYAlhgCsNOSMC]
+2025-12-07 20:41:14   --> invoice.created [evt_1SbtRu1mTYfgYAlhjFquARzL]
+2025-12-07 20:41:14   --> invoice.finalized [evt_1SbtRu1mTYfgYAlhYK1B98HN]
+2025-12-07 20:41:14   --> invoice.paid [evt_1SbtRu1mTYfgYAlhRDnhGIVa]
+2025-12-07 20:41:15   --> invoice.payment_succeeded [evt_1SbtRu1mTYfgYAlh75NDSbmS]
+2025-12-07 20:41:15  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlhpBE8oOg3]
+2025-12-07 20:41:15  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlhKabwYpin]
+2025-12-07 20:41:15  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlhgCsNOSMC]
+2025-12-07 20:41:15  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlhYK1B98HN]
+2025-12-07 20:41:15  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlhjFquARzL]
+2025-12-07 20:41:15  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlh75NDSbmS]
+2025-12-07 20:41:15  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlhg9pSt0x7]
+2025-12-07 20:41:15  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlhRDnhGIVa]
+2025-12-07 20:41:16  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtRu1mTYfgYAlhXeH6JDT9]
+2025-12-07 20:42:30   --> promotion_code.updated [evt_1SbtT71mTYfgYAlhVjUm022h]
+2025-12-07 20:42:30   --> customer.discount.created [evt_1SbtT71mTYfgYAlhOun2eU13]
+2025-12-07 20:42:30  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtT71mTYfgYAlhVjUm022h]
+2025-12-07 20:42:30   --> customer.subscription.created [evt_1SbtT81mTYfgYAlhQDHtkKAu]
+2025-12-07 20:42:30   --> checkout.session.completed [evt_1SbtT81mTYfgYAlh6qtQlecU]
+2025-12-07 20:42:30  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtT71mTYfgYAlhOun2eU13]
+2025-12-07 20:42:30  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtT81mTYfgYAlhQDHtkKAu]
+2025-12-07 20:42:30   --> invoice.created [evt_1SbtT81mTYfgYAlh5BUXMvhX]
+2025-12-07 20:42:30  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtT81mTYfgYAlh5BUXMvhX]
+2025-12-07 20:42:30   --> invoice.finalized [evt_1SbtT81mTYfgYAlhkxm4F7Cu]
+2025-12-07 20:42:30  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtT81mTYfgYAlhkxm4F7Cu]
+2025-12-07 20:42:30   --> invoice.paid [evt_1SbtT81mTYfgYAlh0sY3PCs3]
+2025-12-07 20:42:30  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtT81mTYfgYAlh0sY3PCs3]
+2025-12-07 20:42:30  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtT81mTYfgYAlh6qtQlecU]
+2025-12-07 20:42:30   --> invoice.payment_succeeded [evt_1SbtT81mTYfgYAlhnUYef1hw]
+2025-12-07 20:42:30  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbtT81mTYfgYAlhnUYef1hw]
+time="Sun, 07 Dec 2025 21:01:06 EST" level=error msg="Error when writing ping message: websocket: close sent" prefix=websocket.Client.writePump
+2025-12-07 21:04:09   --> customer.subscription.updated [evt_1Sbto51mTYfgYAlhKS3ULF3Y]
+2025-12-07 21:04:09  <--  [500] POST http://localhost:3000/api/stripe/webhook [evt_1Sbto51mTYfgYAlhKS3ULF3Y]
+2025-12-07 21:39:59   --> mandate.updated [evt_1SbuMl1mTYfgYAlhNnNMGthK]
+2025-12-07 21:39:59   --> setup_intent.setup_failed [evt_1SbuMl1mTYfgYAlhjcvFhfJX]
+2025-12-07 21:40:00  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbuMl1mTYfgYAlhjcvFhfJX]
+2025-12-07 21:40:00  <--  [200] POST http://localhost:3000/api/stripe/webhook [evt_1SbuMl1mTYfgYAlhNnNMGthK]
+Session expired, reconnecting...
+Ready! You are using Stripe API Version [2025-09-30.clover]. Your webhook signing secret is whsec_9c2089330f1dbaf11d2c9ab6a09b51ba60df54dc1707e5ff3f11af041dc344f2 (^C to quit)
+Session expired, reconnecting...
+Ready! You are using Stripe API Version [2025-09-30.clover]. Your webhook signing secret is whsec_9c2089330f1dbaf11d2c9ab6a09b51ba60df54dc1707e5ff3f11af041dc344f2 (^C to quit)
+Session expired, reconnecting...
+Ready! You are using Stripe API Version [2025-09-30.clover]. Your webhook signing secret is whsec_9c2089330f1dbaf11d2c9ab6a09b51ba60df54dc1707e5ff3f11af041dc344f2 (^C to quit)
+Session expired, reconnecting...
+Ready! You are using Stripe API Version [2025-09-30.clover]. Your webhook signing secret is whsec_9c2089330f1dbaf11d2c9ab6a09b51ba60df54dc1707e5ff3f11af041dc344f2 (^C to quit)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendEmail } from '@/lib/services/gmail-simple';
 import { getExecution, executeNextBlock } from '@/lib/services/cadence-execution';
+import { checkPlanLimits, incrementPeopleAdded } from '@/lib/services/plan-limits';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,13 +86,38 @@ export async function POST(request: NextRequest) {
 
       const email = emailResult.data.email;
       
-      // Create the contact
+      // Find or create company first
+      let tempCompanyId: string | null = null;
+      if (profileData.company) {
+        const { data: existingCompany } = await supabase
+          .from('companies')
+          .select('id')
+          .eq('name', profileData.company)
+          .single();
+        
+        if (existingCompany) {
+          tempCompanyId = existingCompany.id;
+        } else {
+          const { data: newCompany } = await supabase
+            .from('companies')
+            .insert({ name: profileData.company })
+            .select()
+            .single();
+          
+          if (newCompany) {
+            tempCompanyId = newCompany.id;
+          }
+        }
+      }
+      
+      // Create the contact with company_id
       const { data: newContact, error: createError } = await supabase
         .from('contacts')
         .insert({
           first_name: profileData.firstName,
           last_name: profileData.lastName,
           email: email,
+          company_id: tempCompanyId,
           linkedin_url: linkedinUrl,
           job_title: profileData.title || '',
           current_company: profileData.company,
@@ -216,6 +242,18 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(`[Add to Cadence] Found ${sessions.length} user session(s), trying to send email...`);
+
+        // Check plan limits for the first session's user
+        const primaryUserId = sessions[0].user_id;
+        const planStatus = await checkPlanLimits(supabase, primaryUserId);
+        if (!planStatus.canAddMore) {
+          return NextResponse.json({ 
+            error: `You've reached the free plan limit of ${planStatus.limit} people. Please upgrade to add more.`,
+            limitReached: true,
+            peopleAdded: planStatus.peopleAdded,
+            limit: planStatus.limit
+          }, { status: 403, headers: corsHeaders });
+        }
 
         // Try each session until one works
         let emailSent = false;
@@ -376,6 +414,11 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Add to Cadence] Success!');
+
+    // Increment people_added_count for billing
+    if (userIdForExecution) {
+      await incrementPeopleAdded(supabase, userIdForExecution);
+    }
 
     return NextResponse.json({
       success: true,

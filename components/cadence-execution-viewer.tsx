@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Mail, Phone, Clock, Play, MessageSquare, CheckCircle, Circle, Loader2, MessageCircle } from "lucide-react";
+import { X, Mail, Phone, Clock, Play, MessageSquare, CheckCircle, Circle, Loader2, MessageCircle, FastForward, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface FlowBlock {
@@ -42,6 +42,7 @@ interface Props {
   contactEmail?: string;
   responded: boolean;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
 const blockIcons: Record<string, any> = {
@@ -71,8 +72,19 @@ function formatDuration(ms: number): string {
   return s + "s";
 }
 
-function WaitTimer({ scheduledFor, config }: { scheduledFor?: string; config?: FlowBlock["config"] }) {
+function WaitTimer({ 
+  scheduledFor, 
+  config,
+  executionId,
+  onRefresh
+}: { 
+  scheduledFor?: string; 
+  config?: FlowBlock["config"];
+  executionId?: string;
+  onRefresh?: () => void;
+}) {
   const [now, setNow] = useState(Date.now());
+  const [adjusting, setAdjusting] = useState(false);
   
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 1000);
@@ -90,13 +102,58 @@ function WaitTimer({ scheduledFor, config }: { scheduledFor?: string; config?: F
     ((config?.delaySeconds || 0) * 1000);
   const elapsed = totalMs - remaining;
   const progress = totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0;
+
+  const handleSkipWait = async () => {
+    if (!executionId) return;
+    setAdjusting(true);
+    try {
+      const res = await fetch("/api/cadence/skip-wait", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ executionId }),
+      });
+      if (res.ok) {
+        onRefresh?.();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to skip wait");
+      }
+    } catch (err) {
+      console.error("Error skipping wait:", err);
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
+  const handleAdjustTime = async (adjustMs: number) => {
+    if (!executionId) return;
+    setAdjusting(true);
+    try {
+      const newScheduledFor = new Date(scheduledTime + adjustMs).toISOString();
+      const res = await fetch("/api/cadence/adjust-wait", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ executionId, newScheduledFor }),
+      });
+      if (res.ok) {
+        onRefresh?.();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to adjust wait time");
+      }
+    } catch (err) {
+      console.error("Error adjusting wait:", err);
+    } finally {
+      setAdjusting(false);
+    }
+  };
   
   if (remaining <= 0) {
     return <div className="text-xs text-green-600 font-medium">Ready to continue</div>;
   }
   
   return (
-    <div className="mt-2 space-y-1">
+    <div className="mt-2 space-y-2">
       <div className="flex items-center justify-between text-xs text-gray-500">
         <span>Elapsed: {formatDuration(elapsed > 0 ? elapsed : 0)}</span>
         <span>Remaining: {formatDuration(remaining)}</span>
@@ -108,6 +165,39 @@ function WaitTimer({ scheduledFor, config }: { scheduledFor?: string; config?: F
           animate={{ width: progress + "%" }}
           transition={{ duration: 0.5 }}
         />
+      </div>
+      
+      {/* Wait adjustment controls */}
+      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-200">
+        <button
+          onClick={handleSkipWait}
+          disabled={adjusting}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors disabled:opacity-50"
+        >
+          <FastForward className="h-3.5 w-3.5" />
+          Skip Wait
+        </button>
+        
+        <div className="flex items-center gap-1 ml-auto">
+          <span className="text-xs text-gray-500 mr-1">Adjust:</span>
+          <button
+            onClick={() => handleAdjustTime(-3600000)}
+            disabled={adjusting}
+            className="p-1.5 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors disabled:opacity-50"
+            title="Reduce by 1 hour"
+          >
+            <Minus className="h-3 w-3" />
+          </button>
+          <span className="text-xs text-gray-500">1h</span>
+          <button
+            onClick={() => handleAdjustTime(3600000)}
+            disabled={adjusting}
+            className="p-1.5 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors disabled:opacity-50"
+            title="Add 1 hour"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -121,6 +211,7 @@ export function CadenceExecutionViewer({
   contactEmail,
   responded,
   onClose,
+  onRefresh,
 }: Props) {
   const executedBlockIds = execution?.metadata?.executedBlockIds || [];
   const currentBlockId = execution?.current_block_id;
@@ -152,8 +243,30 @@ export function CadenceExecutionViewer({
 
   const orderedBlocks = getOrderedBlocks();
 
+  // Check if we're currently waiting (scheduled_for is in the future)
+  const isCurrentlyWaiting = execution?.scheduled_for && new Date(execution.scheduled_for).getTime() > Date.now();
+  
+  // Find the delay block that precedes the current block
+  const precedingDelayBlockId = isCurrentlyWaiting
+    ? blocks.find((b) => b.type === "delay" && b.connections?.includes(currentBlockId || ""))?.id
+    : null;
+
   const getBlockStatus = (block: FlowBlock): "completed" | "current" | "waiting" | "skipped" | "pending" => {
-    if (executedBlockIds.includes(block.id)) return "completed";
+    // If we're in a wait period and this is the delay block before the current block, show it as "waiting"
+    if (precedingDelayBlockId && block.id === precedingDelayBlockId) {
+      return "waiting";
+    }
+    
+    // If we're in a wait period and this is the "current" block (next action), show it as pending
+    if (isCurrentlyWaiting && block.id === currentBlockId) {
+      return "pending";
+    }
+    
+    // Normal completed check - but exclude the preceding delay if we're still waiting
+    if (executedBlockIds.includes(block.id) && block.id !== precedingDelayBlockId) {
+      return "completed";
+    }
+    
     if (block.id === currentBlockId) {
       if (block.type === "delay" && execution?.scheduled_for) return "waiting";
       return "current";
@@ -200,8 +313,8 @@ export function CadenceExecutionViewer({
               </div>
             )}
             {!isPaused && !isCompleted && execution?.status === "active" && (
-              <div className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                Active
+              <div className="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                {isCurrentlyWaiting ? "Waiting" : "Active"}
               </div>
             )}
             <Button variant="ghost" size="sm" onClick={onClose}>
@@ -257,7 +370,7 @@ export function CadenceExecutionViewer({
                       (status === "completed"
                         ? "bg-green-50 border border-green-200"
                         : status === "current" || status === "waiting"
-                        ? "bg-blue-50 border border-blue-200"
+                        ? "bg-yellow-50 border border-yellow-200"
                         : status === "skipped"
                         ? "bg-gray-50 border border-gray-200 opacity-50"
                         : "bg-gray-50 border border-gray-200")
@@ -269,7 +382,7 @@ export function CadenceExecutionViewer({
                         (status === "completed"
                           ? "bg-green-500"
                           : status === "current" || status === "waiting"
-                          ? blockColors[block.type] || "bg-gray-500"
+                          ? "bg-yellow-500"
                           : "bg-gray-300")
                       }
                     >
@@ -336,7 +449,12 @@ export function CadenceExecutionViewer({
                               .join(" ") || "0s"}
                           </p>
                           {isWaiting && (
-                            <WaitTimer scheduledFor={execution?.scheduled_for} config={block.config} />
+                            <WaitTimer 
+                              scheduledFor={execution?.scheduled_for} 
+                              config={block.config}
+                              executionId={execution?.id}
+                              onRefresh={onRefresh}
+                            />
                           )}
                         </div>
                       )}

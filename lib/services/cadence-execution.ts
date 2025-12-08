@@ -1050,6 +1050,24 @@ export async function executeNextBlock(
           console.log(`[Workflow]   ✅ Creating NEW thread`);
         }
         
+        // CRITICAL FIX: If replying to a thread and subject is empty, use first email's subject
+        // Gmail REQUIRES matching subjects to properly thread emails together
+        if (threadId && (!finalSubject || finalSubject.trim() === '')) {
+          // Find the first email block's subject from this execution
+          const firstEmailInExecution = blocks
+            .filter(b => b.type === 'email' && executedBlockIds.includes(b.id))
+            .sort((a, b) => executedBlockIds.indexOf(a.id) - executedBlockIds.indexOf(b.id))[0];
+          
+          if (firstEmailInExecution?.config?.subject) {
+            const originalSubject = firstEmailInExecution.config.subject;
+            // Don't add "Re:" if it already starts with it
+            finalSubject = originalSubject.toLowerCase().startsWith('re:') 
+              ? originalSubject 
+              : `Re: ${originalSubject}`;
+            console.log(`[Workflow] 📧 ⚠️ Empty subject detected - using first email's subject for threading: "${finalSubject}"`);
+          }
+        }
+        
         console.log(`[Workflow] 📧 CALLING sendEmail NOW...`);
         console.log(`[Workflow] 📧 User ID: ${user.id}`);
         console.log(`[Workflow] 📧 To: ${contactEmail}`);

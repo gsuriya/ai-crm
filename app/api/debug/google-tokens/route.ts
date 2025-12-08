@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
         error: 'Could not get token info',
       },
       refreshedToken: refreshedTokenInfo ? {
-        scopes: refreshedTokenInfo.scope ? refreshedTokenInfo.scope.split(' ').filter(s => s.length > 0) : [],
+        scopes: refreshedTokenInfo.scope ? refreshedTokenInfo.scope.split(' ').filter((s: string) => s.length > 0) : [],
         scopeString: refreshedTokenInfo.scope || 'NONE',
         expiresIn: refreshedTokenInfo.expiry_date,
         hasGmailSend: refreshedTokenInfo.scope?.includes('gmail.send') || false,
