@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Mail, Clock, CheckCircle, MessageCircle, Pause, Play, X as XIcon, RefreshCw, Plus, FastForward, Eye, MoreHorizontal, Timer, AlertCircle, RotateCcw } from "lucide-react";
+import { Mail, Clock, CheckCircle, MessageCircle, Pause, Play, X as XIcon, RefreshCw, Plus, FastForward, Eye, MoreHorizontal, Timer, AlertCircle, RotateCcw, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CadenceExecutionViewer } from "@/components/cadence-execution-viewer";
 import { AddToCadenceModal } from "@/components/add-to-cadence-modal";
@@ -54,6 +55,7 @@ interface OutreachItem {
 type FilterType = 'all' | 'active' | 'completed' | 'responded' | 'paused';
 
 export default function OutreachPage() {
+  const router = useRouter();
   const [outreach, setOutreach] = useState<OutreachItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
@@ -374,11 +376,17 @@ export default function OutreachPage() {
     }
   };
 
+  // Check if cadence is paused due to plan expiration
+  const isPausedDueToPlan = (item: OutreachItem) => {
+    return item.status === 'paused' && item.execution?.metadata?.paused_reason === 'plan_expired';
+  };
+
   const getStatusStyles = (item: OutreachItem) => {
     if (item.responded) return { bg: 'bg-green-50', text: 'text-green-700', icon: <MessageCircle className="h-4 w-4" /> };
     if (item.status === 'error') return { bg: 'bg-red-50', text: 'text-red-700', icon: <AlertCircle className="h-4 w-4" /> };
     if (item.status === 'active') return { bg: 'bg-blue-50', text: 'text-blue-700', icon: <Clock className="h-4 w-4" /> };
     if (item.status === 'completed') return { bg: 'bg-gray-100', text: 'text-gray-600', icon: <CheckCircle className="h-4 w-4" /> };
+    if (isPausedDueToPlan(item)) return { bg: 'bg-orange-50', text: 'text-orange-700', icon: <Zap className="h-4 w-4" /> };
     if (item.status === 'paused') return { bg: 'bg-yellow-50', text: 'text-yellow-700', icon: <Pause className="h-4 w-4" /> };
     return { bg: 'bg-gray-50', text: 'text-gray-600', icon: <Mail className="h-4 w-4" /> };
   };
@@ -544,7 +552,7 @@ export default function OutreachPage() {
                 <div className="flex items-center gap-3">
                   <div 
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 ${styles.bg} ${styles.text}`}
-                    title={item.status === 'error' && item.execution?.metadata?.error ? item.execution.metadata.error : ''}
+                    title={item.status === 'error' && item.execution?.metadata?.error ? item.execution.metadata.error : isPausedDueToPlan(item) ? 'Paused due to subscription ending. Upgrade to resume.' : ''}
                   >
                     {styles.icon}
                     <span>
@@ -552,6 +560,7 @@ export default function OutreachPage() {
                        item.status === 'error' ? 'Error' :
                        item.status === 'active' ? 'Active' :
                        item.status === 'completed' ? 'Done' :
+                       isPausedDueToPlan(item) ? 'Upgrade to Resume' :
                        item.status === 'paused' ? 'Paused' : item.status}
                     </span>
                   </div>
@@ -624,14 +633,24 @@ export default function OutreachPage() {
                                 </>
                               )}
                               {item.status === 'paused' && (
-                                <button
-                                  onClick={() => handleResumeCadence(item)}
-                                  disabled={actionLoading === item.id}
-                                  className="w-full px-3 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
-                                >
-                                  <Play className="h-4 w-4" />
-                                  Resume
-                                </button>
+                                isPausedDueToPlan(item) ? (
+                                  <button
+                                    onClick={() => router.push('/upgrade')}
+                                    className="w-full px-3 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 flex items-center gap-2"
+                                  >
+                                    <Zap className="h-4 w-4" />
+                                    Upgrade to Resume
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleResumeCadence(item)}
+                                    disabled={actionLoading === item.id}
+                                    className="w-full px-3 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
+                                  >
+                                    <Play className="h-4 w-4" />
+                                    Resume
+                                  </button>
+                                )
                               )}
                             </div>
                           </>

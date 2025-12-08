@@ -9,277 +9,111 @@ const THEME_COLOR = '#6366f1'; // indigo-600
 const THEME_COLOR_HOVER = '#4f46e5'; // indigo-700
 const THEME_COLOR_LIGHT = '#eef2ff'; // indigo-50
 
-function extractLinkedInProfile() {
+// Use LLM to extract profile data - much more reliable than CSS selectors
+async function extractLinkedInProfileWithLLM() {
   try {
-    // Extract name - try multiple selectors
-    let name = '';
-    let nameElement = document.querySelector('h1.text-heading-xlarge');
-    if (!nameElement) {
-      nameElement = document.querySelector('h1[class*="text-heading"]');
-    }
-    if (!nameElement) {
-      nameElement = document.querySelector('.pv-text-details__left-panel h1');
-    }
-    if (!nameElement) {
-      // Try to get from page title
-      const titleMatch = document.title.match(/^(.+?)\s*[-|]/);
-      if (titleMatch) {
-        name = titleMatch[1].trim();
-      }
-    } else {
-      name = nameElement.textContent?.trim() || '';
-    }
+    console.log('Extracting profile with LLM...');
     
-    // Clean up name - remove notification counts like "(24)"
-    name = name.replace(/^\(\d+\)\s*/, '').trim();
+    // Get the visible text from the page (focus on the main profile area)
+    const mainContent = document.querySelector('main') || document.body;
+    const pageText = mainContent.innerText.substring(0, 5000); // First 5000 chars should have all profile info
     
-    console.log('Extracted name:', name);
-    
-    // Split name into first and last
-    const nameParts = name.split(' ').filter(part => part.length > 0);
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || nameParts[0] || '';
-    
-    console.log('Split name:', { firstName, lastName });
-    
-    // Extract headline/title
-    let headline = '';
-    let headlineElement = document.querySelector('.text-body-medium.break-words');
-    if (!headlineElement) {
-      headlineElement = document.querySelector('.pv-text-details__left-panel .text-body-medium');
-    }
-    if (!headlineElement) {
-      headlineElement = document.querySelector('[class*="headline"]');
-    }
-    headline = headlineElement?.textContent?.trim() || '';
-    
-    console.log('Extracted headline:', headline);
-    
-    // Extract current company - TRY MULTIPLE METHODS
-    let currentCompany = '';
-    let currentPosition = '';
-    
-    console.log('Starting company extraction...');
-    
-    // DEBUG: Log what elements we can find
-    console.log('DEBUG - Right panel exists:', !!document.querySelector('.pv-text-details__right-panel'));
-    console.log('DEBUG - Company links found:', document.querySelectorAll('a[href*="/company/"]').length);
-    console.log('DEBUG - Experience section exists:', !!document.querySelector('#experience'));
-    
-    // METHOD 0: Look for the FIRST company link in the top profile card area
-    // This is the most reliable - LinkedIn always links to the company page
-    const topCard = document.querySelector('.pv-top-card') || document.querySelector('main section:first-child');
-    if (topCard) {
-      const companyLinks = topCard.querySelectorAll('a[href*="/company/"]');
-      console.log('DEBUG - Company links in top card:', companyLinks.length);
-      
-      for (const link of companyLinks) {
-        // Get text from the link - prefer aria-hidden span to avoid screen reader text
-        let text = '';
-        const hiddenSpan = link.querySelector('span[aria-hidden="true"]');
-        if (hiddenSpan) {
-          text = hiddenSpan.textContent?.trim() || '';
-        } else {
-          text = link.textContent?.trim() || '';
-        }
-        
-        // Also check aria-label
-        if (!text) {
-          text = link.getAttribute('aria-label')?.trim() || '';
-        }
-        
-        if (text && text.length > 1 && text.length < 100) {
-          currentCompany = text;
-          console.log('METHOD 0 - Found company from top card company link:', currentCompany);
-          break;
-        }
-      }
-    }
-    
-    // METHOD 1: Get company from the RIGHT PANEL where it shows company with logo
-    // This is where LinkedIn shows "Meta" or "Google" etc with the company logo
-    // Look for the first company link in the top card area
-    if (!currentCompany) {
-      // The company is usually in a button or link with the company name in the right panel
-      const topCardRight = document.querySelector('.pv-text-details__right-panel');
-      if (topCardRight) {
-        // Find the first list item which is usually current company
-        const firstItem = topCardRight.querySelector('li button span[aria-hidden="true"]');
-        if (firstItem) {
-          currentCompany = firstItem.textContent?.trim() || '';
-          console.log('METHOD 1a - Found company from right panel button:', currentCompany);
-        }
-        
-        // Also try anchor links in the right panel
-        if (!currentCompany) {
-          const companyLink = topCardRight.querySelector('a[href*="/company/"] span[aria-hidden="true"]');
-          if (companyLink) {
-            currentCompany = companyLink.textContent?.trim() || '';
-            console.log('METHOD 1b - Found company from right panel link:', currentCompany);
-          }
-        }
-      }
-    }
-    
-    // METHOD 2: Try any link to a company page and get its text
-    if (!currentCompany) {
-      const allCompanyLinks = document.querySelectorAll('a[href*="/company/"]');
-      for (const link of allCompanyLinks) {
-        // Skip if it's in the sidebar recommendations
-        if (link.closest('.scaffold-finite-scroll')) continue;
-        if (link.closest('[data-view-name="profile-component-entity"]')) continue;
-        
-        const text = link.textContent?.trim();
-        // Get the innermost text (not all nested text)
-        const span = link.querySelector('span[aria-hidden="true"]');
-        const companyName = span?.textContent?.trim() || text;
-        
-        if (companyName && companyName.length > 1 && companyName.length < 100) {
-          currentCompany = companyName;
-          console.log('METHOD 2 - Found company from company link:', currentCompany);
-          break;
-        }
-      }
-    }
-    
-    // METHOD 3: Try the experience list items in the top card
-    if (!currentCompany) {
-      const experienceItems = document.querySelectorAll('ul.pv-text-details__right-panel-item-list li');
-      for (const item of experienceItems) {
-        const button = item.querySelector('button');
-        if (button) {
-          const span = button.querySelector('span[aria-hidden="true"]');
-          const text = span?.textContent?.trim() || button.textContent?.trim();
-          if (text && text.length > 1 && text.length < 100) {
-            // Skip if it looks like a school
-            if (!text.toLowerCase().includes('university') && 
-                !text.toLowerCase().includes('college') &&
-                !text.toLowerCase().includes('school')) {
-              currentCompany = text;
-              console.log('METHOD 3 - Found company from experience list:', currentCompany);
-              break;
-            }
-          }
-        }
-      }
-    }
-    
-    // METHOD 4: Try headline parsing (original method)
-    if (!currentCompany && headline) {
-      // Try to match "at Company" or "@ Company"
-      const atMatch = headline.match(/(?:at|@)\s+(.+?)(?:\s*[-|]|$)/i);
-      if (atMatch) {
-        currentCompany = atMatch[1].trim();
-        console.log('METHOD 4 - Found company from headline:', currentCompany);
-      }
-    }
-    
-    // Extract position from headline
-    if (headline) {
-      const positionMatch = headline.match(/^(.+?)\s+(?:at|@)\s+/i);
-      if (positionMatch) {
-        currentPosition = positionMatch[1].trim();
-      } else {
-        // If no "at" or "@", use the whole headline as position
-        currentPosition = headline;
-      }
-    }
-    
-    console.log('After headline parsing - Company:', currentCompany, 'Position:', currentPosition);
-    
-    // METHOD 5: Try experience section (scroll down area)
-    if (!currentCompany) {
-      const experienceSection = document.querySelector('#experience');
-      if (experienceSection) {
-        const expContainer = experienceSection.closest('section');
-        if (expContainer) {
-          // Find the first job entry
-          const firstJob = expContainer.querySelector('li.artdeco-list__item');
-          if (firstJob) {
-            // Try to find company name - it's usually in a span with specific classes
-            const companySpan = firstJob.querySelector('.t-14.t-normal span[aria-hidden="true"]');
-            if (companySpan) {
-              currentCompany = companySpan.textContent?.trim() || '';
-              console.log('METHOD 5a - Found company from experience section:', currentCompany);
-            }
-            
-            // Also try the secondary title
-            if (!currentCompany) {
-              const secondaryTitle = firstJob.querySelector('.pvs-entity__secondary-title');
-              if (secondaryTitle) {
-                currentCompany = secondaryTitle.textContent?.trim() || '';
-                console.log('METHOD 5b - Found company from secondary title:', currentCompany);
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    // METHOD 6: Last resort - look for any image with company name in alt text
-    if (!currentCompany) {
-      // Look for company logos in the profile card area only
-      const profileCard = document.querySelector('.pv-top-card') || document.querySelector('main');
-      if (profileCard) {
-        const images = profileCard.querySelectorAll('img[alt]');
-        for (const img of images) {
-          const alt = img.getAttribute('alt') || '';
-          // Skip profile pictures
-          if (alt.toLowerCase().includes('profile') || alt.toLowerCase().includes('photo')) continue;
-          // Skip LinkedIn logo
-          if (alt.toLowerCase() === 'linkedin') continue;
-          
-          // Remove "logo" from the alt text
-          const possibleCompany = alt.replace(/\s*logo\s*/gi, '').trim();
-          if (possibleCompany && possibleCompany.length > 2 && possibleCompany.length < 50) {
-            currentCompany = possibleCompany;
-            console.log('METHOD 6 - Found company from image alt:', currentCompany);
-            break;
-          }
-        }
-      }
-    }
-    
-    // CLEANUP: Remove employment type suffixes like "· Full-time", "· Part-time", etc.
-    if (currentCompany) {
-      currentCompany = currentCompany
-        .replace(/\s*·\s*(Full-time|Part-time|Contract|Freelance|Internship|Seasonal|Self-employed|Temporary).*$/i, '')
-        .replace(/\s*-\s*(Full-time|Part-time|Contract|Freelance|Internship|Seasonal|Self-employed|Temporary).*$/i, '')
-        .replace(/\s*\((Full-time|Part-time|Contract|Freelance|Internship|Seasonal|Self-employed|Temporary)\).*$/i, '')
-        .trim();
-    }
-    
-    console.log('FINAL - Company:', currentCompany, 'Position:', currentPosition);
-    
-    // Extract location
-    const locationElement = document.querySelector('.text-body-small.inline.t-black--light.break-words');
-    const location = locationElement?.textContent?.trim() || '';
-    
-    // Get profile URL
     const profileUrl = window.location.href.split('?')[0];
     
-    // Extract profile picture
+    console.log('Sending to LLM for extraction...');
+    
+    const response = await fetch(`${CRM_API_URL}/extract-linkedin-profile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pageText: pageText,
+        profileUrl: profileUrl,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to extract profile with LLM');
+    }
+    
+    const result = await response.json();
+    console.log('LLM extraction result:', result);
+    
+    if (!result.success || !result.profile) {
+      throw new Error('LLM extraction failed');
+    }
+    
+    // Get profile picture separately (LLM can't see images)
     const profilePicElement = document.querySelector('img.pv-top-card-profile-picture__image');
-    const profilePicUrl = profilePicElement?.src || '';
+    const photoUrl = profilePicElement?.src || '';
     
     const profileData = {
-      firstName,
-      lastName,
-      name,
-      title: currentPosition || headline,
-      company: currentCompany,
-      location,
-      profileUrl,
-      photoUrl: profilePicUrl,
+      firstName: result.profile.firstName,
+      lastName: result.profile.lastName,
+      name: `${result.profile.firstName} ${result.profile.lastName}`,
+      title: result.profile.title,
+      company: result.profile.company,
+      location: result.profile.location,
+      profileUrl: profileUrl,
+      photoUrl: photoUrl,
       extractedAt: new Date().toISOString()
     };
     
-    console.log('Final extracted LinkedIn profile:', profileData);
+    console.log('Final extracted LinkedIn profile (via LLM):', profileData);
     return profileData;
   } catch (error) {
-    console.error('Error extracting LinkedIn profile:', error);
+    console.error('Error extracting LinkedIn profile with LLM:', error);
+    // Fall back to basic extraction if LLM fails
+    return extractLinkedInProfileBasic();
+  }
+}
+
+// Basic fallback extraction (simplified version)
+function extractLinkedInProfileBasic() {
+  try {
+    console.log('Falling back to basic extraction...');
+    
+    // Get name from page title or h1
+    let name = '';
+    const titleMatch = document.title.match(/^\(?(\d+\))?\s*(.+?)\s*[-|]/);
+    if (titleMatch) {
+      name = titleMatch[2].trim();
+    } else {
+      const h1 = document.querySelector('h1');
+      name = h1?.textContent?.trim() || '';
+    }
+    
+    // Clean up name
+    name = name.replace(/^\(\d+\)\s*/, '').trim();
+    
+    const nameParts = name.split(' ').filter(part => part.length > 0);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
+    const profileUrl = window.location.href.split('?')[0];
+    
+    return {
+      firstName,
+      lastName,
+      name,
+      title: '',
+      company: '', // Will prompt user
+      location: '',
+      profileUrl,
+      photoUrl: '',
+      extractedAt: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error in basic extraction:', error);
     return null;
   }
+}
+
+// Main extraction function - tries LLM first, falls back to basic
+async function extractLinkedInProfile() {
+  return await extractLinkedInProfileWithLLM();
 }
 
 // Create sidebar
@@ -483,36 +317,17 @@ async function handleSaveForLater() {
       document.head.appendChild(style);
     }
     
-    // Extract profile data
-    const profileData = extractLinkedInProfile();
+    // Extract profile data using LLM
+    const profileData = await extractLinkedInProfile();
     if (!profileData || !profileData.profileUrl) {
-      throw new Error('Could not extract profile data');
+      throw new Error('Could not extract profile data from this LinkedIn page');
     }
     
-    // If company is missing, try to get it from visible text on page as last resort
+    // If still no company after LLM extraction, prompt user to enter it
     if (!profileData.company) {
-      console.log('Company not found via selectors, trying text search...');
-      
-      // Look for common patterns in the page text
-      const bodyText = document.body.innerText;
-      
-      // Try to find "Current: CompanyName" or "Works at CompanyName" patterns
-      const currentMatch = bodyText.match(/(?:Current|Works at|Working at)[:\s]+([A-Z][A-Za-z0-9\s&.,-]+?)(?:\n|·|•|\||$)/);
-      if (currentMatch) {
-        profileData.company = currentMatch[1].trim();
-        console.log('Found company from page text:', profileData.company);
-      }
-    }
-    
-    // If still no company, prompt user to enter it
-    if (!profileData.company) {
-      // Try to give user a hint by showing what we can see
-      const pageText = document.body.innerText.substring(0, 1000);
-      console.log('Could not find company. Page preview:', pageText);
-      
       const userCompany = prompt(
         `⚠️ Could not auto-detect company for ${profileData.firstName} ${profileData.lastName}\n\n` +
-        `Tip: Look at their profile - what company is shown near the top?\n\n` +
+        `Look at their profile - what company is shown near the top?\n\n` +
         `Please enter their company name:`,
         ''
       );
@@ -546,9 +361,10 @@ async function handleSaveForLater() {
       // Check if it's an email not found error
       if (error.error && error.error.includes('Could not find email')) {
         const manualEmail = prompt(
-          `⚠️ Hunter.io couldn't find an email for ${profileData.firstName} ${profileData.lastName} at ${profileData.company}.\n\n` +
-          `If you know their email, enter it below to continue:\n\n` +
-          `(Tip: Try formats like firstname.lastname@company.com)`,
+          `⚠️ Could not find email for ${profileData.firstName} ${profileData.lastName} at ${profileData.company}\n\n` +
+          `Hunter.io doesn't have this person's email in their database.\n\n` +
+          `If you KNOW their email address, enter it below.\n` +
+          `Otherwise, click Cancel to skip this person.`,
           ''
         );
         
@@ -575,7 +391,7 @@ async function handleSaveForLater() {
             throw new Error(retryError.error || 'Failed to add to CRM');
           }
         } else {
-          throw new Error('Email is required to add contact to CRM');
+          throw new Error('Email not found. Hunter.io does not have this person\'s email in their database.');
         }
       } else {
         throw new Error(error.error || 'Failed to add to CRM');
@@ -646,32 +462,17 @@ async function handleSendToCadence() {
       Loading...
     `;
     
-    // Extract profile data
-    const profileData = extractLinkedInProfile();
+    // Extract profile data using LLM
+    const profileData = await extractLinkedInProfile();
     if (!profileData || !profileData.profileUrl) {
-      throw new Error('Could not extract profile data');
+      throw new Error('Could not extract profile data from this LinkedIn page');
     }
     
-    // If company is missing, try to get it from visible text on page as last resort
-    if (!profileData.company) {
-      console.log('Company not found via selectors, trying text search...');
-      
-      // Look for common patterns in the page text
-      const bodyText = document.body.innerText;
-      
-      // Try to find "Current: CompanyName" or "Works at CompanyName" patterns
-      const currentMatch = bodyText.match(/(?:Current|Works at|Working at)[:\s]+([A-Z][A-Za-z0-9\s&.,-]+?)(?:\n|·|•|\||$)/);
-      if (currentMatch) {
-        profileData.company = currentMatch[1].trim();
-        console.log('Found company from page text:', profileData.company);
-      }
-    }
-    
-    // If still no company, prompt user to enter it
+    // If still no company after LLM extraction, prompt user to enter it
     if (!profileData.company) {
       const userCompany = prompt(
         `⚠️ Could not auto-detect company for ${profileData.firstName} ${profileData.lastName}\n\n` +
-        `Tip: Look at their profile - what company is shown near the top?\n\n` +
+        `Look at their profile - what company is shown near the top?\n\n` +
         `Please enter their company name:`,
         ''
       );
@@ -728,6 +529,7 @@ async function handleSendToCadence() {
     `;
     
     // Use the find-email endpoint (doesn't add to CRM)
+    let emailFound = false;
     try {
       const response = await fetch(`${CRM_API_URL}/people/find-email`, {
         method: 'POST',
@@ -746,14 +548,37 @@ async function handleSendToCadence() {
         if (result.email) {
           profileData.email = result.email;
           profileData.emailScore = result.score;
+          emailFound = true;
           console.log('Found email:', result.email, 'Score:', result.score);
         }
       } else {
-        console.warn('Could not find email');
+        console.warn('Could not find email via Hunter.io');
       }
     } catch (error) {
       console.error('Error finding email:', error);
-      // Continue anyway - we'll show "Finding email..." in the overlay
+    }
+    
+    // If email not found, ask user if they want to manually enter one
+    if (!emailFound) {
+      button.disabled = false;
+      button.innerHTML = originalHTML;
+      
+      const manualEmail = prompt(
+        `⚠️ Could not find email for ${profileData.firstName} ${profileData.lastName} at ${profileData.company}\n\n` +
+        `Hunter.io doesn't have this person's email in their database.\n\n` +
+        `If you KNOW their email address, enter it below.\n` +
+        `Otherwise, click Cancel to skip this person.`,
+        ''
+      );
+      
+      if (!manualEmail || !manualEmail.includes('@')) {
+        throw new Error('Email not found. Hunter.io does not have this person\'s email in their database.');
+      }
+      
+      profileData.email = manualEmail.trim();
+      profileData.emailScore = null; // No confidence score for manual entry
+      profileData.manuallyEntered = true;
+      console.log('User manually entered email:', profileData.email);
     }
     
     // Reset button
@@ -893,22 +718,27 @@ async function showGmailOverlay(profileData, cadences) {
         </select>
       </div>
       
-      <!-- To Field - Editable -->
+      <!-- To Field - Shows email source -->
       <div style="
         border-bottom: 1px solid #e8eaed;
         padding: 8px 0;
-        display: flex;
-        align-items: center;
       ">
-        <span style="color: #5f6368; font-size: 14px; min-width: 60px;">To</span>
-        <input id="crm-email-to" type="email" value="${profileData.email || ''}" placeholder="Enter email address" style="
-          flex: 1;
-          border: none;
-          outline: none;
-          font-size: 14px;
-          color: #202124;
-          font-family: 'Google Sans', Roboto, Arial, sans-serif;
-        ">
+        <div style="display: flex; align-items: center;">
+          <span style="color: #5f6368; font-size: 14px; min-width: 60px;">To</span>
+          <input id="crm-email-to" type="email" value="${profileData.email || ''}" placeholder="Enter email address" style="
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            color: #202124;
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+          " readonly>
+        </div>
+        ${profileData.manuallyEntered 
+          ? `<div style="margin-left: 60px; margin-top: 4px; font-size: 11px; color: #f59e0b;">⚠️ Manually entered - not verified by Hunter.io</div>`
+          : profileData.emailScore 
+            ? `<div style="margin-left: 60px; margin-top: 4px; font-size: 11px; color: #10b981;">✓ Found by Hunter.io (${profileData.emailScore}% confidence)</div>`
+            : ''}
       </div>
       
       <!-- Subject Field -->

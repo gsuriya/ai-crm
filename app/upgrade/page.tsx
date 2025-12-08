@@ -101,15 +101,15 @@ export default function UpgradePage() {
             <ul className="space-y-3 mb-8">
               <li className="flex items-start gap-2.5">
                 <Check className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-gray-700">5 people max per month</span>
+                <span className="text-sm text-gray-700">5 cadence adds total</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <Check className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-gray-700">Email format database</span>
+                <span className="text-sm text-gray-700">Basic email sequences</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <Check className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-gray-700">Basic cadences</span>
+                <span className="text-sm text-gray-700">Email finder (Hunter.io)</span>
               </li>
             </ul>
 
@@ -128,26 +128,30 @@ export default function UpgradePage() {
             </div>
 
             <div className="mb-6">
-              <h3 className="text-xl font-bold text-white mb-1">Unlimited</h3>
+              <h3 className="text-xl font-bold text-white mb-1">Pro</h3>
               <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-4xl font-bold text-white">$20</span>
+                <span className="text-4xl font-bold text-white">$30</span>
                 <span className="text-gray-400">/month</span>
               </div>
-              <p className="text-sm text-gray-400">Everything you need</p>
+              <p className="text-sm text-gray-400">Everything you need to scale</p>
             </div>
 
             <ul className="space-y-3 mb-8">
               <li className="flex items-start gap-2.5">
                 <Check className="h-4 w-4 text-white flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-white font-medium">Unlimited people</span>
+                <span className="text-sm text-white font-medium">Unlimited cadence adds</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <Check className="h-4 w-4 text-white flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-white font-medium">Unlimited emails</span>
+                <span className="text-sm text-white font-medium">Unlimited email sequences</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <Check className="h-4 w-4 text-white flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-gray-300">Smart email caching</span>
+                <span className="text-sm text-gray-300">Priority email delivery</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <Check className="h-4 w-4 text-white flex-shrink-0 mt-0.5" />
+                <span className="text-sm text-gray-300">Advanced analytics</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <Check className="h-4 w-4 text-white flex-shrink-0 mt-0.5" />
@@ -195,10 +199,19 @@ export default function UpgradePage() {
 
             <div className="border border-gray-200 rounded-lg p-5">
               <h3 className="font-semibold text-black text-sm mb-2">
+                What happens to my cadences if I cancel?
+              </h3>
+              <p className="text-sm text-gray-600">
+                Your active cadences will be paused (not deleted) when your subscription ends. When you upgrade again, you can resume them right from where they left off.
+              </p>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-5">
+              <h3 className="font-semibold text-black text-sm mb-2">
                 Is there really no limit?
               </h3>
               <p className="text-sm text-gray-600">
-                Correct. Send as many emails as you want. We have a fair use policy of 10,000/month to prevent abuse.
+                Correct. Add as many people to cadences as you want with no limits.
               </p>
             </div>
           </div>

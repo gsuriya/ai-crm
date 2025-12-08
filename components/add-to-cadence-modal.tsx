@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, Zap, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 interface AddToCadenceModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface AddToCadenceModalProps {
 }
 
 export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceModalProps) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -20,6 +22,8 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<{ peopleAdded: number; limit: number } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -147,6 +151,17 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
 
       if (!response.ok) {
         const error = await response.json();
+        
+        // Check if it's a limit reached error
+        if (error.limitReached) {
+          setLimitReached(true);
+          setLimitInfo({
+            peopleAdded: error.peopleAdded || 5,
+            limit: error.limit || 5,
+          });
+          return;
+        }
+        
         throw new Error(error.error || "Failed to add to cadence");
       }
 
@@ -159,6 +174,8 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
       setCompany("");
       setSubject("");
       setBody("");
+      setLimitReached(false);
+      setLimitInfo(null);
       
       onSuccess?.();
       onClose();
@@ -169,8 +186,126 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
       setSending(false);
     }
   };
+  
+  const handleUpgrade = () => {
+    onClose();
+    router.push('/upgrade');
+  };
 
   if (!isOpen) return null;
+
+  // Show upgrade prompt if limit reached
+  if (limitReached) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(4px)'
+        }}
+        onClick={onClose}
+      >
+        <div
+          style={{
+            background: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+            width: '440px',
+            maxWidth: '90vw',
+            padding: '32px',
+            textAlign: 'center',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{
+            width: '64px',
+            height: '64px',
+            background: '#FEF3C7',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px',
+          }}>
+            <AlertCircle style={{ width: '32px', height: '32px', color: '#F59E0B' }} />
+          </div>
+          
+          <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#111', marginBottom: '8px' }}>
+            Free Plan Limit Reached
+          </h2>
+          
+          <p style={{ color: '#666', fontSize: '14px', marginBottom: '24px', lineHeight: '1.6' }}>
+            You've used all {limitInfo?.limit || 5} cadence adds on the free plan.
+            Upgrade to Pro for unlimited cadence adds and keep growing your outreach.
+          </p>
+          
+          <div style={{
+            background: '#F3F4F6',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '24px',
+          }}>
+            <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
+              Pro Plan includes:
+            </div>
+            <ul style={{ textAlign: 'left', fontSize: '13px', color: '#333', margin: 0, paddingLeft: '20px' }}>
+              <li style={{ marginBottom: '4px' }}>✓ Unlimited cadence adds</li>
+              <li style={{ marginBottom: '4px' }}>✓ Priority email delivery</li>
+              <li style={{ marginBottom: '4px' }}>✓ Advanced analytics</li>
+              <li>✓ Priority support</li>
+            </ul>
+          </div>
+          
+          <button
+            onClick={handleUpgrade}
+            style={{
+              width: '100%',
+              padding: '14px 24px',
+              background: '#4F46E5',
+              color: 'white',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: '15px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              marginBottom: '12px',
+            }}
+          >
+            <Zap style={{ width: '18px', height: '18px' }} />
+            Upgrade to Pro - $30/month
+          </button>
+          
+          <button
+            onClick={() => { setLimitReached(false); onClose(); }}
+            style={{
+              width: '100%',
+              padding: '12px 24px',
+              background: 'transparent',
+              color: '#666',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: '14px',
+              cursor: 'pointer',
+            }}
+          >
+            Maybe later
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
