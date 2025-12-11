@@ -3,7 +3,27 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Mail, Clock, CheckCircle, MessageCircle, Pause, Play, X as XIcon, RefreshCw, Plus, FastForward, Eye, MoreHorizontal, Timer, AlertCircle, RotateCcw, Zap } from "lucide-react";
+import { 
+  Mail, 
+  Clock, 
+  CheckCircle, 
+  MessageCircle, 
+  Pause, 
+  Play, 
+  X as XIcon, 
+  RefreshCw, 
+  Plus, 
+  FastForward, 
+  Eye, 
+  MoreHorizontal, 
+  Timer, 
+  AlertCircle, 
+  RotateCcw, 
+  Zap,
+  Send,
+  ArrowUpRight,
+  Sparkles
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CadenceExecutionViewer } from "@/components/cadence-execution-viewer";
 import { AddToCadenceModal } from "@/components/add-to-cadence-modal";
@@ -67,7 +87,6 @@ export default function OutreachPage() {
   const [expandedActions, setExpandedActions] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
-  // Update time every second for live timers
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
@@ -75,7 +94,6 @@ export default function OutreachPage() {
 
   useEffect(() => { fetchOutreach(); }, []);
 
-  // Stats
   const stats = {
     total: outreach.length,
     active: outreach.filter(o => o.status === 'active').length,
@@ -84,7 +102,6 @@ export default function OutreachPage() {
     responded: outreach.filter(o => o.responded).length,
   };
 
-  // Filtered outreach
   const filteredOutreach = outreach.filter(item => {
     if (filter === 'all') return true;
     if (filter === 'active') return item.status === 'active';
@@ -103,7 +120,7 @@ export default function OutreachPage() {
 
     if (days > 0) return `${days}d ${hours % 24}h`;
     if (hours > 0) return `${hours}h ${minutes % 60}m`;
-    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    if (minutes > 0) return `${minutes}m`;
     return `${seconds}s`;
   };
 
@@ -173,14 +190,7 @@ export default function OutreachPage() {
       const response = await fetch('/api/cadence/refresh-all', { method: 'POST' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to refresh');
-      
-      // Always refresh the outreach list to show latest state
       await fetchOutreach();
-      
-      // Show a toast or message if something happened
-      if (data.message && data.message !== 'Everything is up to date') {
-        console.log('✅ Refresh complete:', data.message);
-      }
     } catch (error: any) {
       console.error('Error refreshing:', error);
       alert('Error refreshing: ' + error.message);
@@ -211,7 +221,6 @@ export default function OutreachPage() {
     }
   };
 
-  // Fetch fresh execution data before showing viewer
   const handleViewExecution = async (item: OutreachItem) => {
     if (!item.execution?.id) {
       setSelectedOutreach(item);
@@ -219,7 +228,6 @@ export default function OutreachPage() {
     }
     
     try {
-      // Fetch fresh execution data
       const { data: freshExecution, error } = await supabase
         .from('cadence_executions')
         .select('*')
@@ -227,30 +235,24 @@ export default function OutreachPage() {
         .single();
       
       if (error || !freshExecution) {
-        console.error('Error fetching fresh execution:', error);
-        setSelectedOutreach(item); // Fall back to stale data
+        setSelectedOutreach(item);
         return;
       }
       
-      // Update the item with fresh execution data
-      const updatedItem = {
+      setSelectedOutreach({
         ...item,
         execution: freshExecution as ExecutionData,
-      };
-      
-      setSelectedOutreach(updatedItem);
+      });
     } catch (err) {
-      console.error('Error in handleViewExecution:', err);
       setSelectedOutreach(item);
     }
   };
 
   const handleRetry = async (item: OutreachItem) => {
     if (!item.execution?.id) return;
-    if (!confirm('Retry this cadence? Make sure you have fixed the email content in the cadence editor first.')) return;
+    if (!confirm('Retry this cadence?')) return;
     setActionLoading(item.id);
     try {
-      // Reset the execution to active and let it retry
       const response = await fetch('/api/cadence/resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -259,7 +261,6 @@ export default function OutreachPage() {
       if (!response.ok) throw new Error('Failed to retry');
       await fetchOutreach();
     } catch (error: any) {
-      console.error('Error retrying:', error);
       alert('Error: ' + error.message);
     } finally {
       setActionLoading(null);
@@ -292,7 +293,6 @@ export default function OutreachPage() {
     const pausedAt = item.execution?.metadata?.paused_at;
 
     if (isPaused && pausedAt) {
-      // Timer is paused - calculate how much time was remaining when paused
       const pausedTime = new Date(pausedAt).getTime();
       const remainingMs = scheduledFor ? Math.max(0, scheduledFor - pausedTime) : 0;
       const elapsedMs = totalMs - remainingMs;
@@ -376,258 +376,320 @@ export default function OutreachPage() {
     }
   };
 
-  // Check if cadence is paused due to plan expiration
   const isPausedDueToPlan = (item: OutreachItem) => {
     return item.status === 'paused' && item.execution?.metadata?.paused_reason === 'plan_expired';
   };
 
-  const getStatusStyles = (item: OutreachItem) => {
-    if (item.responded) return { bg: 'bg-green-50', text: 'text-green-700', icon: <MessageCircle className="h-4 w-4" /> };
-    if (item.status === 'error') return { bg: 'bg-red-50', text: 'text-red-700', icon: <AlertCircle className="h-4 w-4" /> };
-    if (item.status === 'active') return { bg: 'bg-blue-50', text: 'text-blue-700', icon: <Clock className="h-4 w-4" /> };
-    if (item.status === 'completed') return { bg: 'bg-gray-100', text: 'text-gray-600', icon: <CheckCircle className="h-4 w-4" /> };
-    if (isPausedDueToPlan(item)) return { bg: 'bg-orange-50', text: 'text-orange-700', icon: <Zap className="h-4 w-4" /> };
-    if (item.status === 'paused') return { bg: 'bg-yellow-50', text: 'text-yellow-700', icon: <Pause className="h-4 w-4" /> };
-    return { bg: 'bg-gray-50', text: 'text-gray-600', icon: <Mail className="h-4 w-4" /> };
+  const getStatusConfig = (item: OutreachItem) => {
+    if (item.responded) return { 
+      bg: 'bg-emerald-50', 
+      text: 'text-emerald-700', 
+      border: 'border-emerald-200',
+      icon: <MessageCircle className="w-3.5 h-3.5" />,
+      label: 'Replied'
+    };
+    if (item.status === 'error') return { 
+      bg: 'bg-red-50', 
+      text: 'text-red-600', 
+      border: 'border-red-200',
+      icon: <AlertCircle className="w-3.5 h-3.5" />,
+      label: 'Error'
+    };
+    if (item.status === 'active') return { 
+      bg: 'bg-sky-50', 
+      text: 'text-sky-700', 
+      border: 'border-sky-200',
+      icon: <Send className="w-3.5 h-3.5" />,
+      label: 'Active'
+    };
+    if (item.status === 'completed') return { 
+      bg: 'bg-slate-100', 
+      text: 'text-slate-600', 
+      border: 'border-slate-200',
+      icon: <CheckCircle className="w-3.5 h-3.5" />,
+      label: 'Done'
+    };
+    if (isPausedDueToPlan(item)) return { 
+      bg: 'bg-amber-50', 
+      text: 'text-amber-700', 
+      border: 'border-amber-200',
+      icon: <Zap className="w-3.5 h-3.5" />,
+      label: 'Upgrade'
+    };
+    if (item.status === 'paused') return { 
+      bg: 'bg-amber-50', 
+      text: 'text-amber-700', 
+      border: 'border-amber-200',
+      icon: <Pause className="w-3.5 h-3.5" />,
+      label: 'Paused'
+    };
+    return { 
+      bg: 'bg-slate-50', 
+      text: 'text-slate-600', 
+      border: 'border-slate-200',
+      icon: <Mail className="w-3.5 h-3.5" />,
+      label: 'Pending'
+    };
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      'bg-violet-500',
+      'bg-sky-500',
+      'bg-emerald-500',
+      'bg-amber-500',
+      'bg-rose-500',
+      'bg-indigo-500',
+    ];
+    const index = (name?.charCodeAt(0) || 0) % colors.length;
+    return colors[index];
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 to-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-2 border-violet-200 border-t-violet-600 animate-spin" />
+          <p className="text-slate-500 text-sm">Loading outreach...</p>
+        </div>
     </div>
   );
+  }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/30">
+      <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start justify-between mb-8"
+        >
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Outreach</h1>
-          <p className="text-gray-500 text-sm mt-1">Track and manage your email sequences</p>
+            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Outreach</h1>
+            <p className="text-slate-500 text-sm mt-1">Track and manage your email sequences</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={handleCheckReplies} 
             disabled={checkingReplies}
-            className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-            title="Refresh everything: check replies, send scheduled emails, update all stats"
+              className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-all shadow-soft"
+              title="Refresh"
           >
-            <RefreshCw className={`h-5 w-5 ${checkingReplies ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${checkingReplies ? 'animate-spin' : ''}`} />
           </button>
           <button 
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800 flex items-center gap-2 transition-colors text-sm font-medium"
+              className="px-4 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-2 transition-all text-sm font-medium shadow-soft"
           >
-            <Plus className="h-4 w-4" />
+              <Plus className="w-4 h-4" />
             Add Person
           </button>
         </div>
-      </div>
+        </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-5 gap-3 mb-6">
-        {[
-          { label: 'Total', value: stats.total, filter: 'all' as FilterType },
-          { label: 'Active', value: stats.active, filter: 'active' as FilterType },
-          { label: 'Paused', value: stats.paused, filter: 'paused' as FilterType },
-          { label: 'Completed', value: stats.completed, filter: 'completed' as FilterType },
-          { label: 'Responded', value: stats.responded, filter: 'responded' as FilterType },
+        {/* Stats Pills */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-wrap gap-2 mb-6"
+        >
+          {[
+            { label: 'All', value: stats.total, filter: 'all' as FilterType, color: 'slate' },
+            { label: 'Active', value: stats.active, filter: 'active' as FilterType, color: 'sky' },
+            { label: 'Paused', value: stats.paused, filter: 'paused' as FilterType, color: 'amber' },
+            { label: 'Completed', value: stats.completed, filter: 'completed' as FilterType, color: 'slate' },
+            { label: 'Replied', value: stats.responded, filter: 'responded' as FilterType, color: 'emerald' },
         ].map((stat) => (
           <button
             key={stat.label}
             onClick={() => setFilter(stat.filter)}
-            className={`p-4 rounded-xl border transition-all text-left ${
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
               filter === stat.filter 
-                ? 'border-black bg-gray-50' 
-                : 'border-gray-200 hover:border-gray-300 bg-white'
-            }`}
-          >
-            <div className="text-2xl font-semibold text-gray-900">{stat.value}</div>
-            <div className="text-sm text-gray-500">{stat.label}</div>
+                  ? 'bg-slate-900 text-white shadow-soft' 
+                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+              }`}
+            >
+              {stat.label}
+              <span className={`ml-2 ${filter === stat.filter ? 'text-slate-300' : 'text-slate-400'}`}>
+                {stat.value}
+              </span>
           </button>
         ))}
-      </div>
+        </motion.div>
 
-      {/* List */}
+        {/* Outreach List */}
       {filteredOutreach.length === 0 ? (
-        <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-          <Mail className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-gray-900 font-medium mb-1">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-soft"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+              <Mail className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
             {filter === 'all' ? 'No outreach yet' : `No ${filter} outreach`}
           </h3>
-          <p className="text-gray-500 text-sm mb-4">
-            {filter === 'all' ? 'Add someone to a cadence to get started' : 'Check back later'}
+            <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">
+              {filter === 'all' ? 'Add someone to a cadence to start your outreach' : 'Check back later'}
           </p>
           {filter === 'all' && (
             <button 
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800 text-sm font-medium inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 text-sm font-medium inline-flex items-center gap-2"
             >
-              <Plus className="h-4 w-4" />
+                <Plus className="w-4 h-4" />
               Add Person
             </button>
           )}
-        </div>
+          </motion.div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="space-y-3">
           {filteredOutreach.map((item, idx) => {
-            const styles = getStatusStyles(item);
+              const statusConfig = getStatusConfig(item);
             const waiting = isCurrentlyWaiting(item);
             const waitInfo = getWaitInfo(item);
+              const progress = item.total_steps > 0 ? (item.current_step / item.total_steps) * 100 : 0;
             
             return (
-              <div 
+                <motion.div
                 key={item.id} 
-                className={`px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${
-                  idx !== filteredOutreach.length - 1 ? 'border-b border-gray-100' : ''
-                }`}
-              >
-                {/* Left: Contact Info */}
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${styles.bg} ${styles.text}`}>
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.03 }}
+                  className="bg-white rounded-2xl border border-slate-100 shadow-soft hover:shadow-soft-lg hover:border-slate-200 transition-all overflow-hidden"
+                >
+                  <div className="p-5">
+                    <div className="flex items-center gap-4">
+                      {/* Avatar */}
+                      <div className={`w-11 h-11 rounded-full ${getAvatarColor(item.contact?.first_name || '')} flex items-center justify-center text-white font-medium text-sm flex-shrink-0`}>
                     {item.contact?.first_name?.charAt(0) || '?'}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900 truncate">
+                      
+                      {/* Contact Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-semibold text-slate-900 truncate">
                         {item.contact ? `${item.contact.first_name} ${item.contact.last_name}` : 'Unknown'}
                       </span>
                       {item.responded && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium flex-shrink-0">
-                          Replied
+                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium flex-shrink-0">
+                              Replied ✓
                         </span>
                       )}
                     </div>
-                    <div className="text-sm text-gray-500 truncate">
-                      {item.company?.name || 'Unknown Company'} • {item.cadence?.name || 'Unknown Cadence'}
+                        <p className="text-sm text-slate-500 truncate">
+                          {item.company?.name || 'Unknown Company'}
+                          <span className="mx-1.5 text-slate-300">•</span>
+                          {item.cadence?.name || 'Unknown Cadence'}
+                        </p>
+                      </div>
+
+                      {/* Progress */}
+                      <div className="hidden sm:flex items-center gap-4 px-4">
+                        <div className="text-center">
+                          <p className="text-lg font-semibold text-slate-900">
+                            {item.current_step}/{item.total_steps}
+                          </p>
+                          <p className="text-xs text-slate-400">Emails</p>
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="w-24">
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${progress}%` }}
+                              transition={{ duration: 0.5, ease: "easeOut" }}
+                              className={`h-full rounded-full ${
+                                item.responded ? 'bg-emerald-500' : 
+                                item.status === 'completed' ? 'bg-slate-400' : 
+                                item.status === 'paused' ? 'bg-amber-500' : 'bg-violet-500'
+                              }`}
+                            />
                     </div>
                   </div>
-                </div>
-
-                {/* Center: Progress & Wait Timer */}
-                <div className="flex items-center gap-6 px-4">
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-gray-900">
-                      {item.current_step}/{item.total_steps}
-                    </div>
-                    <div className="text-xs text-gray-500">Emails</div>
                   </div>
                   
                   {/* Wait Timer */}
                   {waiting && waitInfo && (
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${waitInfo.isPaused ? 'bg-yellow-50' : 'bg-blue-50'}`}>
-                      <Timer className={`h-4 w-4 ${waitInfo.isPaused ? 'text-yellow-600' : 'text-blue-600'}`} />
-                      <div className="text-xs">
-                        {waitInfo.isPaused ? (
-                          <span className="text-yellow-700 font-medium">
-                            Paused • {formatDuration(waitInfo.remainingMs)} left
+                        <div className={`hidden md:flex items-center gap-2 px-3 py-2 rounded-xl ${waitInfo.isPaused ? 'bg-amber-50' : 'bg-sky-50'}`}>
+                          <Timer className={`w-4 h-4 ${waitInfo.isPaused ? 'text-amber-500' : 'text-sky-500'}`} />
+                          <span className={`text-sm font-medium ${waitInfo.isPaused ? 'text-amber-700' : 'text-sky-700'}`}>
+                            {formatDuration(waitInfo.remainingMs)}
                           </span>
-                        ) : (
-                          <span className="text-blue-700">
-                            <span className="font-medium">{formatDuration(waitInfo.remainingMs)}</span>
-                            <span className="text-blue-500 ml-1">remaining</span>
-                          </span>
-                        )}
-                      </div>
                     </div>
                   )}
                   
-                  {!waiting && (
-                    <div className="w-24">
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all ${
-                            item.responded ? 'bg-green-500' : 
-                            item.status === 'completed' ? 'bg-gray-400' : 
-                            item.status === 'paused' ? 'bg-yellow-500' : 'bg-blue-500'
-                          }`}
-                          style={{ width: `${item.total_steps > 0 ? (item.current_step / item.total_steps) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                      {/* Status Badge */}
+                      <div className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 ${statusConfig.bg} ${statusConfig.text} border ${statusConfig.border}`}>
+                        {statusConfig.icon}
+                        <span>{statusConfig.label}</span>
                 </div>
 
-                {/* Right: Status & Actions */}
-                <div className="flex items-center gap-3">
-                  <div 
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 ${styles.bg} ${styles.text}`}
-                    title={item.status === 'error' && item.execution?.metadata?.error ? item.execution.metadata.error : isPausedDueToPlan(item) ? 'Paused due to subscription ending. Upgrade to resume.' : ''}
-                  >
-                    {styles.icon}
-                    <span>
-                      {item.responded ? 'Responded' : 
-                       item.status === 'error' ? 'Error' :
-                       item.status === 'active' ? 'Active' :
-                       item.status === 'completed' ? 'Done' :
-                       isPausedDueToPlan(item) ? 'Upgrade to Resume' :
-                       item.status === 'paused' ? 'Paused' : item.status}
-                    </span>
-                  </div>
-                  
-                  {/* Action buttons */}
+                      {/* Actions */}
                   <div className="flex items-center gap-1">
                     {waiting && item.status === 'active' && (
                       <button 
                         onClick={() => handleSkipWait(item)} 
                         disabled={skipWaitLoading === item.id}
-                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
                         title="Send now"
                       >
-                        <FastForward className="h-4 w-4" />
+                            <FastForward className="w-4 h-4" />
                       </button>
                     )}
                     
                     <button 
                       onClick={() => handleViewExecution(item)} 
-                      className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                          className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                       title="View details"
                     >
-                      <Eye className="h-4 w-4" />
+                          <Eye className="w-4 h-4" />
                     </button>
 
-                    {/* Retry button for errors */}
                     {item.status === 'error' && (
                       <button 
                         onClick={() => handleRetry(item)} 
                         disabled={actionLoading === item.id}
-                        className="p-2 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                        title={`Retry - ${item.execution?.metadata?.error || 'Unknown error'}`}
+                            className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Retry"
                       >
-                        <RotateCcw className="h-4 w-4" />
+                            <RotateCcw className="w-4 h-4" />
                       </button>
                     )}
 
-                    {/* More actions dropdown */}
                     {(item.status === 'active' || item.status === 'paused') && !item.responded && (
                       <div className="relative">
                         <button 
                           onClick={() => setExpandedActions(expandedActions === item.id ? null : item.id)}
-                          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                         >
-                          <MoreHorizontal className="h-4 w-4" />
+                              <MoreHorizontal className="w-4 h-4" />
                         </button>
                         
                         {expandedActions === item.id && (
                           <>
                             <div className="fixed inset-0 z-10" onClick={() => setExpandedActions(null)} />
-                            <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                                <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-20">
                               {item.status === 'active' && (
                                 <>
                                   <button
                                     onClick={() => handlePauseCadence(item)}
                                     disabled={actionLoading === item.id}
-                                    className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                                   >
-                                    <Pause className="h-4 w-4" />
+                                        <Pause className="w-4 h-4" />
                                     Pause
                                   </button>
                                   <button
                                     onClick={() => handleCancelCadence(item)}
                                     disabled={actionLoading === item.id}
-                                    className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                                   >
-                                    <XIcon className="h-4 w-4" />
+                                        <XIcon className="w-4 h-4" />
                                     Cancel
                                   </button>
                                 </>
@@ -636,18 +698,18 @@ export default function OutreachPage() {
                                 isPausedDueToPlan(item) ? (
                                   <button
                                     onClick={() => router.push('/upgrade')}
-                                    className="w-full px-3 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm text-violet-600 hover:bg-violet-50 flex items-center gap-2"
                                   >
-                                    <Zap className="h-4 w-4" />
+                                        <Zap className="w-4 h-4" />
                                     Upgrade to Resume
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => handleResumeCadence(item)}
                                     disabled={actionLoading === item.id}
-                                    className="w-full px-3 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2"
                                   >
-                                    <Play className="h-4 w-4" />
+                                        <Play className="w-4 h-4" />
                                     Resume
                                   </button>
                                 )
@@ -660,12 +722,13 @@ export default function OutreachPage() {
                   </div>
                 </div>
               </div>
+                </motion.div>
             );
           })}
         </div>
       )}
 
-      {/* Execution Viewer Modal */}
+        {/* Modals */}
       <AnimatePresence>
         {selectedOutreach && (
           <CadenceExecutionViewer
@@ -674,6 +737,7 @@ export default function OutreachPage() {
             cadenceName={selectedOutreach.cadence?.name || 'Unknown Cadence'}
             contactName={selectedOutreach.contact ? selectedOutreach.contact.first_name + ' ' + selectedOutreach.contact.last_name : undefined}
             contactEmail={selectedOutreach.contact?.email}
+            companyName={selectedOutreach.company?.name}
             responded={selectedOutreach.responded}
             onClose={() => setSelectedOutreach(null)}
             onRefresh={() => { fetchOutreach(); setSelectedOutreach(null); }}
@@ -681,12 +745,12 @@ export default function OutreachPage() {
         )}
       </AnimatePresence>
 
-      {/* Add to Cadence Modal */}
       <AddToCadenceModal 
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSuccess={() => fetchOutreach()}
       />
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, X, Mail, Phone, Clock, Play, Square, Settings, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
+import { Plus, Check, X, Mail, Phone, Clock, Play, Square, Settings, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, MessageSquare, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
@@ -142,6 +142,9 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [generatingAI, setGeneratingAI] = useState<string | null>(null); // block ID that's generating
+  const [aiPrompt, setAiPrompt] = useState(''); // user's context for AI generation
+  const [showAiPrompt, setShowAiPrompt] = useState<string | null>(null); // block ID showing prompt input
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
@@ -1383,6 +1386,59 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, [zoom]);
 
+  // Generate email content with AI
+  const generateEmailWithAI = async (blockId: string, userPrompt: string) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block || block.type !== 'email') return;
+    if (!userPrompt.trim()) {
+      alert('Please describe what the email should be about');
+      return;
+    }
+
+    setGeneratingAI(blockId);
+    setShowAiPrompt(null);
+    
+    try {
+      // Count email blocks and determine position
+      const emailBlocks = blocks.filter(b => b.type === 'email');
+      const emailIndex = emailBlocks.findIndex(b => b.id === blockId);
+      const emailNumber = emailIndex + 1;
+      const totalEmails = emailBlocks.length;
+
+      // Get previous email bodies for context
+      const previousEmails = emailBlocks
+        .slice(0, emailIndex)
+        .map(b => ({ body: b.config?.body || '' }));
+
+      const response = await fetch('/api/ai/generate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cadenceName: name,
+          emailNumber,
+          totalEmails,
+          subject: block.config?.subject || '',
+          previousEmails,
+          userPrompt: userPrompt.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.body) {
+        updateBlockConfig(blockId, { body: data.body });
+        setAiPrompt(''); // Clear prompt after success
+      } else {
+        alert(data.error || 'Failed to generate email');
+      }
+    } catch (error: any) {
+      console.error('Error generating email:', error);
+      alert('Failed to generate email: ' + error.message);
+    } finally {
+      setGeneratingAI(null);
+    }
+  };
+
   const updateBlockConfig = (blockId: string, config: Partial<FlowBlock['config']>) => {
     setBlocks(prev => {
       // Check if we're updating the first email block's subject
@@ -1763,7 +1819,76 @@ export function CadenceFlowBuilder({ initialBlocks = [], cadenceId, cadenceName 
                     })()}
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-1 block">Body</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-sm font-medium block">Body</label>
+                      {showAiPrompt !== block.id && (
+                        <button
+                          onClick={() => {
+                            setShowAiPrompt(block.id);
+                            setAiPrompt('');
+                          }}
+                          disabled={generatingAI === block.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-100 hover:bg-violet-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {generatingAI === block.id ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5" />
+                              Generate with AI
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* AI Prompt Input */}
+                    {showAiPrompt === block.id && (
+                      <div className="mb-3 p-3 bg-violet-50 border border-violet-200 rounded-lg">
+                        <label className="text-xs font-medium text-violet-800 block mb-1.5">
+                          What should this email be about?
+                        </label>
+                        <textarea
+                          value={aiPrompt}
+                          onChange={(e) => setAiPrompt(e.target.value)}
+                          placeholder="e.g., Recruiting for a software engineering role at our startup, mentioning we saw their work on open source projects..."
+                          className="w-full p-2 text-sm border border-violet-200 rounded-md bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 min-h-[60px]"
+                          autoFocus
+                        />
+                        <div className="flex items-center gap-2 mt-2">
+                          <button
+                            onClick={() => generateEmailWithAI(block.id, aiPrompt)}
+                            disabled={generatingAI === block.id || !aiPrompt.trim()}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {generatingAI === block.id ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Generate
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowAiPrompt(null);
+                              setAiPrompt('');
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
                     <p className="text-xs text-gray-500 mb-2">
                       💡 Use variables: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{first_name}}'}</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{last_name}}'}</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{name}}'}</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{company}}'}</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">{'{{position}}'}</code>
                     </p>
