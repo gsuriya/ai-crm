@@ -234,7 +234,7 @@ export default function SettingsPage() {
                 </div>
                 {creditsRemaining <= 0 ? (
                   <p className="text-sm text-red-600 font-medium">
-                    You've reached your limit. Upgrade to add more people to cadences.
+                    You&apos;ve reached your limit. Upgrade to add more people to cadences.
                   </p>
                 ) : creditsRemaining === 1 ? (
                   <p className="text-sm text-orange-600">
@@ -371,7 +371,7 @@ export default function SettingsPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">Need Help?</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Have questions about billing or your subscription? We're here to help.
+            Have questions about billing or your subscription? We&apos;re here to help.
           </p>
           <a
             href="mailto:support@getcheddar.com"

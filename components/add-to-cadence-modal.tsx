@@ -243,7 +243,7 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
           </h2>
           
           <p style={{ color: '#666', fontSize: '14px', marginBottom: '24px', lineHeight: '1.6' }}>
-            You've used all {limitInfo?.limit || 5} cadence adds on the free plan.
+            You&apos;ve used all {limitInfo?.limit || 5} cadence adds on the free plan.
             Upgrade to Pro for unlimited cadence adds and keep growing your outreach.
           </p>
           

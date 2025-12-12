@@ -104,7 +104,13 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
     // Try calling a migration function if it exists
-    const { error: rpcError } = await supabase.rpc('add_position_column_to_contacts').catch(() => ({ error: { message: 'Function does not exist' } }));
+    let rpcError: any = null;
+    try {
+      const result = await supabase.rpc('add_position_column_to_contacts');
+      rpcError = result.error;
+    } catch {
+      rpcError = { message: 'Function does not exist' };
+    }
     
     if (!rpcError) {
       return NextResponse.json({ 

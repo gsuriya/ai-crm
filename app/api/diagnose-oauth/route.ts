@@ -57,9 +57,9 @@ export async function GET(request: NextRequest) {
           const tokenInfo = await oauth2Client.getTokenInfo(credentials.access_token);
           refreshResult = {
             success: true,
-            scopes: tokenInfo.scope ? tokenInfo.scope.split(' ').filter(s => s.length > 0) : [],
-            hasGmailSend: tokenInfo.scope?.includes('gmail.send') || false,
-            rawScope: tokenInfo.scope || 'NONE',
+            scopes: tokenInfo.scopes || [],
+            hasGmailSend: tokenInfo.scopes?.some((s: string) => s.includes('gmail.send')) || false,
+            rawScope: tokenInfo.scopes?.join(' ') || 'NONE',
           };
         }
       } catch (error: any) {
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check stored scope
-    const storedScopes = session.scope ? session.scope.split(' ').filter(s => s.length > 0) : [];
+    const storedScopes = session.scope ? session.scope.split(' ').filter((s: string) => s.length > 0) : [];
     const storedHasGmailSend = session.scope?.includes('gmail.send') || false;
 
     // Determine the problem

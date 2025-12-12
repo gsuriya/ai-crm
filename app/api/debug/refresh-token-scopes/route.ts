@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         // Check if gmail.send is present
         const allRefreshedScopes = result.refreshedTokenScopes || [];
         result.hasGmailSendAfterRefresh = allRefreshedScopes.includes('https://www.googleapis.com/auth/gmail.send') || 
-                                          allRefreshedScopes.some(s => s.includes('gmail.send'));
+                                          allRefreshedScopes.some((s: string) => s.includes('gmail.send'));
         
         result.verdict = result.hasGmailSendAfterRefresh 
           ? '✅ Refresh token HAS scopes - should work!'

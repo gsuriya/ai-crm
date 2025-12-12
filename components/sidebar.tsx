@@ -360,7 +360,7 @@ export function Sidebar() {
                         </>
                       ) : subscription.cancelAtPeriodEnd ? (
                         <div className="text-[11px] text-muted-foreground">
-                          Your subscription will end on <span className="font-medium text-foreground">{formatDate(subscription.currentPeriodEnd)}</span>. You'll keep all Pro features until then.
+                          Your subscription will end on <span className="font-medium text-foreground">{formatDate(subscription.currentPeriodEnd)}</span>. You&apos;ll keep all Pro features until then.
                         </div>
                       ) : (
                         <>

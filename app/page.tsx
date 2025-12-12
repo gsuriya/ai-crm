@@ -153,7 +153,7 @@ export default function HomePage() {
             Welcome back{userFirstName ? `, ${userFirstName}` : ''}
           </h1>
           <p className="text-slate-500 mt-1">
-            Here's what's happening with your outreach
+            Here&apos;s what&apos;s happening with your outreach
           </p>
         </motion.div>
 
@@ -244,7 +244,7 @@ export default function HomePage() {
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Recent Contacts</h2>
-                <p className="text-sm text-slate-500">People you've added recently</p>
+                <p className="text-sm text-slate-500">People you&apos;ve added recently</p>
               </div>
               <Link 
                 href="/people" 
