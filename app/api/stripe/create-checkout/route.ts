@@ -63,10 +63,10 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: 'Cheddar - Unlimited Plan',
-              description: 'Unlimited email outreach, lookups, and cadences',
+              name: 'Cheddar Pro',
+              description: 'Unlimited cadence adds, email sequences, and priority support',
             },
-            unit_amount: 2000,
+            unit_amount: 2000, // $20.00
             recurring: {
               interval: 'month',
             },

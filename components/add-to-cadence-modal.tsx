@@ -284,7 +284,7 @@ export function AddToCadenceModal({ isOpen, onClose, onSuccess }: AddToCadenceMo
             }}
           >
             <Zap style={{ width: '18px', height: '18px' }} />
-            Upgrade to Pro - $30/month
+            Upgrade to Pro - $20/month
           </button>
           
           <button

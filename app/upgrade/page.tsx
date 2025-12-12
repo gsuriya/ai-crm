@@ -130,7 +130,7 @@ export default function UpgradePage() {
             <div className="mb-6">
               <h3 className="text-xl font-bold text-white mb-1">Pro</h3>
               <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-4xl font-bold text-white">$30</span>
+                <span className="text-4xl font-bold text-white">$20</span>
                 <span className="text-gray-400">/month</span>
               </div>
               <p className="text-sm text-gray-400">Everything you need to scale</p>
