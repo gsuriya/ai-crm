@@ -1,149 +1,82 @@
-# LinkedIn Extension - Quick Start 🚀
+# LinkedIn CRM Extension - Quick Start 🚀
 
-## Installation (2 minutes)
+## For New Users - Setup Instructions
 
-### 1. Load Extension
+### Step 1: Get the Extension Files
+1. Download or copy the `chrome-extension` folder to your computer
+
+### Step 2: Configure the Extension
+
+**Open `background.js` and update these values:**
+
+```javascript
+// Line ~10 - Add your Hunter.io API key (get one at https://hunter.io/api - free tier available)
+const HUNTER_API_KEY = 'your_hunter_api_key_here';
+
+// Line ~14 - Update to your CRM URL (ask your admin for this)
+const CRM_API_URL = 'https://your-crm-app.vercel.app/api';
 ```
-1. Open Chrome → chrome://extensions/
-2. Enable "Developer mode" (top right)
-3. Click "Load unpacked"
-4. Select the chrome-extension folder
+
+### Step 3: Load the Extension in Chrome
+1. Open Chrome → go to `chrome://extensions/`
+2. Enable **"Developer mode"** (toggle in top right)
+3. Click **"Load unpacked"**
+4. Select the `chrome-extension` folder
 5. Done! ✅
-```
 
-### 2. Start Your CRM
-```bash
-npm run dev
-```
+### Step 4: Log Into Your CRM
+**IMPORTANT:** You must be logged into the CRM website first!
+1. Go to your CRM URL (e.g., `https://your-crm-app.vercel.app`)
+2. Sign in with Google
+3. Keep this tab open or make sure you're logged in
 
-## Usage (10 seconds per person)
+---
 
-### Step 1: Go to LinkedIn Profile
-Visit any LinkedIn profile:
-- https://www.linkedin.com/in/neelshar/
-- https://www.linkedin.com/in/anyone/
+## Usage
 
-### Step 2: Click the Button
-Look for the **purple "Add to Cadence"** button in the bottom-right corner.
+### On Any LinkedIn Profile:
+1. Visit a LinkedIn profile (e.g., `https://www.linkedin.com/in/someone/`)
+2. Click the extension icon in your Chrome toolbar
+3. Click **"Find Email"** to find their email via Hunter.io
+4. Click **"Add to CRM"** to save them to your CRM
+5. Click **"Send Email"** to send them an email directly
 
-### Step 3: Select Cadence
-Pick which cadence to add them to.
+### What the Extension Does:
+- 📧 Finds professional emails using Hunter.io
+- 👤 Extracts profile info from LinkedIn (name, company, title, etc.)
+- 💾 Saves contacts directly to your CRM
+- ✉️ Sends emails through your connected Gmail
 
-### Step 4: Done!
-✅ Email found via Apollo.io
-✅ Contact created in CRM
-✅ Cadence started automatically
-✅ First email sent!
-
-## What You'll See
-
-### On LinkedIn:
-```
-┌─────────────────────────────────────┐
-│  LinkedIn Profile Page              │
-│                                     │
-│  [Profile Info]                     │
-│  [Experience]                       │
-│  [Education]                        │
-│                                     │
-│                    ┌──────────────┐ │
-│                    │ 👤+ Add to   │ │  ← This button!
-│                    │   Cadence    │ │
-│                    └──────────────┘ │
-└─────────────────────────────────────┘
-```
-
-### Modal Popup:
-```
-┌─────────────────────────────────────┐
-│  Select Cadence                     │
-│  Choose which cadence to add this   │
-│  person to                          │
-│                                     │
-│  ┌───────────────────────────────┐ │
-│  │ Cold Outreach Sequence        │ │ ← Click one
-│  │ 3-email sequence for leads    │ │
-│  └───────────────────────────────┘ │
-│                                     │
-│  ┌───────────────────────────────┐ │
-│  │ Warm Introduction             │ │
-│  │ Follow-up sequence            │ │
-│  └───────────────────────────────┘ │
-│                                     │
-│  [Cancel]                           │
-└─────────────────────────────────────┘
-```
-
-### Success Message:
-```
-✅ Success!
-
-Neel Sharma has been added to the cadence 
-and outreach has started!
-
-Email: neel@berkeley.edu
-```
-
-## Button States
-
-1. **Default** → Purple button with "Add to Cadence"
-2. **Loading** → Spinning icon with "Loading..."
-3. **Adding** → Spinning icon with "Adding..."
-4. **Success** → Green button with "Added! ✓"
-5. **Error** → Red button with "Error"
+---
 
 ## Troubleshooting
 
-### Button not showing?
-- Wait 2-3 seconds after page loads
-- Reload the page
-- Check you're on a `/in/` profile URL
+### "Hunter.io API key not configured"
+→ You need to add your Hunter.io API key to `background.js`
 
-### "No email found"?
-- Person not in Apollo's database
-- Try a different profile
-- Some people have private settings
+### "Failed to add to CRM" or "Unauthorized"
+→ Make sure you're logged into the CRM website first
 
-### API errors?
-- Make sure `npm run dev` is running
-- Check console: F12 → Console tab
-- Verify Apollo API key in `.env.local`
+### Extension icon not showing?
+→ Click the puzzle piece icon in Chrome toolbar and pin the extension
 
-## What Happens Behind the Scenes
+### Button not working on LinkedIn?
+→ Refresh the LinkedIn page and try again
 
-```
-1. Extract LinkedIn Data
-   ↓
-2. Send to Apollo.io
-   ↓
-3. Get Email Address
-   ↓
-4. Create Contact in CRM
-   ↓
-5. Add to Cadence
-   ↓
-6. Start Execution
-   ↓
-7. Send First Email
-   ↓
-8. ✅ Done!
-```
+---
 
-## Pro Tips
+## Hunter.io API Key
 
-- ✅ Test on your own profile first
-- ✅ Create cadences before adding people
-- ✅ Monitor your Apollo.io credits
-- ✅ Check "Ongoing Outreach" to see status
-- ✅ Watch for email replies in your CRM
+1. Go to https://hunter.io
+2. Sign up for free (25 searches/month free)
+3. Go to API section: https://hunter.io/api
+4. Copy your API key
+5. Paste it in `background.js`
+
+---
 
 ## Need Help?
 
-Check the full guide: `LINKEDIN_EXTENSION_SETUP.md`
-
-Or check:
-- Browser console (F12)
-- Server logs (terminal running `npm run dev`)
-- Apollo.io dashboard for credit usage
-
-
+- Check browser console: F12 → Console tab
+- Make sure CRM is running and you're logged in
+- Verify your Hunter.io has remaining credits

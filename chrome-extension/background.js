@@ -1,11 +1,19 @@
 // Background service worker - Handles API calls
 console.log('LinkedIn CRM Extension: Background script loaded');
 
-// Hunter.io API configuration
-const HUNTER_API_KEY = 'YOUR_HUNTER_API_KEY_HERE'; // User needs to add their key
+// =====================================================
+// CONFIGURATION - Users need to update these values!
+// =====================================================
 
-// Your CRM API endpoint
-const CRM_API_URL = 'http://localhost:3000/api'; // Update with your actual CRM URL
+// Hunter.io API key - Get yours at https://hunter.io/api
+// Each user needs their own key (free tier: 25 searches/month)
+const HUNTER_API_KEY = 'YOUR_HUNTER_API_KEY_HERE';
+
+// Your CRM URL - Update this to your deployed Vercel URL
+// Example: 'https://your-app.vercel.app/api'
+const CRM_API_URL = 'https://ai-crm-gsuriya.vercel.app/api';
+
+// =====================================================
 
 // Find email using Hunter.io
 // NO domain guessing - pass company name directly to Hunter.io
@@ -78,17 +86,37 @@ async function searchCompanyEmails(companyDomain) {
 // Add contact to your CRM
 async function addToCRM(contactData) {
   try {
-    const response = await fetch(`${CRM_API_URL}/contacts/add`, {
+    const response = await fetch(`${CRM_API_URL}/people/add-from-linkedin-with-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(contactData),
+      credentials: 'include', // Send cookies for authentication
+      body: JSON.stringify({
+        linkedinUrl: contactData.linkedinUrl,
+        email: contactData.email,
+        profileData: {
+          firstName: contactData.firstName,
+          lastName: contactData.lastName,
+          title: contactData.position,
+          company: contactData.company,
+          location: contactData.location,
+          photoUrl: contactData.photoUrl,
+        }
+      }),
     });
     
     const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to add to CRM'
+      };
+    }
+    
     return {
-      success: response.ok,
+      success: true,
       data
     };
   } catch (error) {
@@ -108,12 +136,25 @@ async function sendEmail(emailData) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(emailData),
+      credentials: 'include', // Send cookies for authentication
+      body: JSON.stringify({
+        to: emailData.to,
+        subject: emailData.subject,
+        body: emailData.body,
+      }),
     });
     
     const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to send email. Make sure you are logged into the CRM.'
+      };
+    }
+    
     return {
-      success: response.ok,
+      success: true,
       data
     };
   } catch (error) {
