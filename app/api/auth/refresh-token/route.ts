@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Force re-authentication with Google to get correct scopes
  * This redirects to the client-side OAuth flow
