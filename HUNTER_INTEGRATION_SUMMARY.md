@@ -242,3 +242,5 @@ const { email, score } = await result.json();
 - ✅ Way better than Apollo!
 
 Let me know and I'll finish the integration! 🚀
+
+

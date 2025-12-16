@@ -53,3 +53,5 @@ async function deleteAllCompanies() {
 }
 
 deleteAllCompanies().catch(console.error);
+
+

@@ -53,3 +53,5 @@ async function deleteAllContacts() {
 }
 
 deleteAllContacts().catch(console.error);
+
+
