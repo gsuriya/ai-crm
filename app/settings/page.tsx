@@ -166,7 +166,7 @@ export default function SettingsPage() {
   const creditsRemaining = FREE_LIMIT - creditsUsed;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -182,7 +182,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Account Section */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">Account</h2>
           <div className="space-y-4">
             <div>
@@ -193,14 +193,14 @@ export default function SettingsPage() {
         </div>
 
         {/* Subscription Section */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-foreground">Subscription</h2>
             {subscription?.planType === 'paid' && (
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 subscription.cancelAtPeriodEnd 
-                  ? 'bg-orange-100 text-orange-700'
-                  : 'bg-green-100 text-green-700'
+                  ? 'bg-orange-500/20 text-orange-400'
+                  : 'bg-emerald-500/20 text-emerald-400'
               }`}>
                 {subscription.cancelAtPeriodEnd ? 'Cancelling' : 'Active'}
               </span>
@@ -211,7 +211,7 @@ export default function SettingsPage() {
             /* Free Plan */
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-gray-100 rounded-lg">
+                <div className="p-2 bg-white/10 rounded-lg">
                   <CreditCard className="h-5 w-5 text-gray-600" />
                 </div>
                 <div>
@@ -221,7 +221,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Usage */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <div className="bg-white/5 rounded-lg p-4 mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-foreground">Usage</span>
                   <span className="text-sm text-muted-foreground">{creditsUsed}/{FREE_LIMIT} used</span>
@@ -288,7 +288,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Billing Info */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-3">
+              <div className="bg-white/5 rounded-lg p-4 mb-6 space-y-3">
                 {subscription?.cancelAtPeriodEnd ? (
                   <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
                     <XCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
@@ -368,7 +368,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Help Section */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">Need Help?</h2>
           <p className="text-sm text-muted-foreground mb-4">
             Have questions about billing or your subscription? We&apos;re here to help.
@@ -385,5 +385,10 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+
+
+
+
 
 

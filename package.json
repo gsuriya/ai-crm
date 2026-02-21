@@ -47,8 +47,10 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^11.0.0",
     "googleapis": "^164.1.0",
+    "gsap": "^3.14.2",
     "lucide-react": "^0.344.0",
     "next": "^14.2.0",
+    "ogl": "^1.0.11",
     "openai": "^6.7.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
@@ -58,7 +60,8 @@
     "react-dom": "^18.3.0",
     "recharts": "^3.3.0",
     "stripe": "^20.0.0",
-    "tailwind-merge": "^2.2.0"
+    "tailwind-merge": "^2.2.0",
+    "three": "^0.167.1"
   },
   "devDependencies": {
     "@types/node": "^20",

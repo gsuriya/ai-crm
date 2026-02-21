@@ -276,17 +276,17 @@ export default function CompaniesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 to-white">
+      <div className="flex items-center justify-center h-screen ">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-2 border-violet-200 border-t-violet-600 animate-spin" />
-          <p className="text-slate-500 text-sm">Loading companies...</p>
+          <div className="w-12 h-12 rounded-full border-2 border-violet-500/30 border-t-violet-400 animate-spin" />
+          <p className="text-white/50 text-sm">Loading companies...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/30">
+    <div className="min-h-screen ">
       <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Header */}
         <motion.div 
@@ -296,8 +296,8 @@ export default function CompaniesPage() {
         >
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Companies</h1>
-              <p className="text-slate-500 text-sm mt-1">
+              <h1 className="text-2xl font-semibold text-white tracking-tight">Companies</h1>
+              <p className="text-white/50 text-sm mt-1">
                 {companies.length} {companies.length === 1 ? 'company' : 'companies'} in your CRM
               </p>
             </div>
@@ -305,13 +305,13 @@ export default function CompaniesPage() {
 
           {/* Search */}
           <div className="relative max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
                   type="text"
                   placeholder="Search companies..."
                   value={searchInput}
               onChange={handleSearch}
-              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all shadow-soft"
+              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
             />
           </div>
         </motion.div>
@@ -324,12 +324,12 @@ export default function CompaniesPage() {
             className="text-center py-16"
           >
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-              <Building2 className="w-8 h-8 text-slate-400" />
+              <Building2 className="w-8 h-8 text-white/30" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">
+            <h3 className="text-lg font-medium text-white mb-2">
               {searchQuery ? "No companies found" : "No companies yet"}
             </h3>
-            <p className="text-slate-500 text-sm max-w-sm mx-auto">
+            <p className="text-white/50 text-sm max-w-sm mx-auto">
               {searchQuery 
                 ? "Try adjusting your search terms" 
                 : "Companies will appear here when you add contacts from LinkedIn"}
@@ -346,7 +346,7 @@ export default function CompaniesPage() {
                   transition={{ delay: index * 0.03 }}
                 >
                   <Link href={`/companies/${company.id}`}>
-                    <div className="group bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-soft-lg hover:border-slate-200 transition-all duration-300 cursor-pointer">
+                    <div className="group bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5 hover:border-white/20 transition-all duration-300 cursor-pointer">
                       <div className="flex items-start gap-4">
                         {/* Company Logo */}
                         <CompanyLogo company={company} size={48} />
@@ -354,7 +354,7 @@ export default function CompaniesPage() {
                         <div className="flex-1 min-w-0">
                           {/* Company Name */}
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-slate-900 truncate group-hover:text-violet-600 transition-colors">
+                            <h3 className="font-semibold text-white truncate group-hover:text-violet-400 transition-colors">
                                 {company.name}
                             </h3>
                             <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-violet-500 transition-colors flex-shrink-0" />
@@ -362,11 +362,11 @@ export default function CompaniesPage() {
                           
                           {/* Industry/Description */}
                           {company.industry ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-medium">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/10 text-white/60 text-xs font-medium">
                               {company.industry}
                             </span>
                           ) : company.description ? (
-                            <p className="text-sm text-slate-500 truncate">
+                            <p className="text-sm text-white/50 truncate">
                               {company.description}
                             </p>
                           ) : null}
@@ -375,13 +375,13 @@ export default function CompaniesPage() {
                       
                       {/* Footer */}
                       <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <div className="flex items-center gap-1.5 text-xs text-white/30">
                           <Calendar className="w-3.5 h-3.5" />
                           <span>{formatDate(company.created_at)}</span>
                         </div>
                         
                         {company.website && (
-                          <span className="text-xs text-slate-400 truncate max-w-[120px]">
+                          <span className="text-xs text-white/40 truncate max-w-[120px]">
                             {company.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
                           </span>
                         )}
@@ -397,5 +397,10 @@ export default function CompaniesPage() {
     </div>
   );
 }
+
+
+
+
+
 
 

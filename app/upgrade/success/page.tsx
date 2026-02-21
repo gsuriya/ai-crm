@@ -24,7 +24,7 @@ export default function SuccessPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center">
         <div className="mb-8">
           <div className="mx-auto w-20 h-20 bg-black rounded-full flex items-center justify-center mb-6">

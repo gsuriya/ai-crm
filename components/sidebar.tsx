@@ -199,8 +199,8 @@ export function Sidebar() {
   return (
     <div 
       data-sidebar 
-      className="flex flex-shrink-0 flex-col border-r border-gray-100 bg-background h-screen" 
-      style={{ zIndex: 10 }}
+      className="flex flex-shrink-0 flex-col border-r border-[#392e4e] h-screen"
+      style={{ zIndex: 10, backgroundColor: 'rgba(6, 0, 16, 0.55)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
     >
       {/* Logo at top */}
       <div className="flex h-16 items-center justify-center flex-shrink-0">
@@ -225,17 +225,17 @@ export function Sidebar() {
               className={cn(
                 "group flex flex-col items-center justify-center rounded-lg py-2 px-1 transition-all duration-200",
                 isActive
-                  ? "bg-indigo-50 text-indigo-600"
-                  : "text-black hover:bg-muted/50"
+                  ? "text-[#8400ff] bg-[rgba(132,0,255,0.1)]"
+                  : "text-white/50 hover:text-white/80 hover:bg-[rgba(132,0,255,0.05)]"
               )}
             >
               <item.icon className={cn(
                 "h-5 w-5 mb-1 transition-colors",
-                isActive ? "text-indigo-600" : "text-black"
+                isActive ? "text-[#8400ff]" : "text-white/50"
               )} />
               <span className={cn(
                 "text-[10px] font-medium text-center leading-tight",
-                isActive ? "text-indigo-600" : "text-black"
+                isActive ? "text-[#8400ff]" : "text-white/50"
               )}>
                 {item.name}
               </span>
@@ -260,7 +260,7 @@ export function Sidebar() {
             </div>
             <div className="w-full bg-muted rounded-full h-1.5 mb-1.5">
               <div 
-                className="bg-indigo-600 h-1.5 rounded-full transition-all"
+                className="bg-[#8400ff] h-1.5 rounded-full transition-all"
                 style={{ width: `${((totalCredits - creditsRemaining) / totalCredits) * 100}%` }}
               />
             </div>
@@ -282,7 +282,7 @@ export function Sidebar() {
               onClick={() => router.push('/people')}
               className="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-muted/50 transition-colors"
             >
-              <Bell className="h-5 w-5 text-black hover:text-black/80" />
+              <Bell className="h-5 w-5 text-white/50 hover:text-[#8400ff]" />
               {notificationCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-semibold">
                   {notificationCount > 99 ? '99+' : notificationCount}
@@ -305,8 +305,8 @@ export function Sidebar() {
                     onError={() => setUserImage(null)}
                   />
                 ) : (
-                  <div className="h-full w-full rounded-lg bg-indigo-100 flex items-center justify-center">
-                    <span className="text-sm font-medium text-indigo-600">
+                  <div className="h-full w-full rounded-lg bg-[rgba(132,0,255,0.15)] flex items-center justify-center">
+                    <span className="text-sm font-medium text-[#8400ff]">
                       {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
                     </span>
                   </div>
@@ -352,7 +352,7 @@ export function Sidebar() {
                               setShowDropdown(false);
                               router.push('/upgrade');
                             }}
-                            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-medium rounded-md"
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs bg-[#8400ff] text-white hover:bg-[#7000dd] transition-colors font-medium rounded-md"
                           >
                             <Zap className="h-3.5 w-3.5" />
                             Upgrade to Pro
@@ -417,10 +417,10 @@ export function Sidebar() {
         ) : (
           <Link
             href="/auth/signin"
-            className="group flex flex-col items-center justify-center rounded-lg py-2 px-1 transition-all duration-200 text-black hover:bg-muted/50 w-full"
+            className="group flex flex-col items-center justify-center rounded-lg py-2 px-1 transition-all duration-200 text-white/50 hover:text-white/80 hover:bg-[rgba(132,0,255,0.05)] w-full"
           >
-            <LogIn className="h-5 w-5 mb-1 transition-colors text-black" />
-            <span className="text-[10px] font-medium text-center leading-tight text-black">
+            <LogIn className="h-5 w-5 mb-1 transition-colors text-white/50" />
+            <span className="text-[10px] font-medium text-center leading-tight text-white/50">
               Sign In
             </span>
           </Link>

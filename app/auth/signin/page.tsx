@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { signInWithGoogle, signInWithGoogleDirect, getSession } from "@/lib/auth";
 import { Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import LightPillar from "@/components/LightPillar";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -62,7 +63,22 @@ export default function SignInPage() {
     const error = params.get('error');
     const message = params.get('message');
     
-    if (error === 'scopes_not_granted') {
+    if (error === 'oauth_failed' || error === 'session_storage_failed') {
+      alert(
+        `❌ Authentication Error\n\n` +
+        `Unable to connect to the authentication service.\n\n` +
+        `This might be because:\n` +
+        `1. Your Supabase project is paused or unavailable\n` +
+        `2. There's a network connectivity issue\n` +
+        `3. The Supabase URL in your environment variables is incorrect\n\n` +
+        `Please check:\n` +
+        `• Your internet connection\n` +
+        `• Your Supabase project status at https://supabase.com/dashboard\n` +
+        `• The NEXT_PUBLIC_SUPABASE_URL in your .env.local file\n\n` +
+        `Current Supabase URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL || 'Not set'}`
+      );
+      window.history.replaceState({}, '', '/auth/signin');
+    } else if (error === 'scopes_not_granted') {
       const missing = params.get('missing')?.split(',') || [];
       const actual = params.get('actual')?.split(',') || [];
       const customMessage = params.get('message');
@@ -90,7 +106,7 @@ export default function SignInPage() {
 
   if (checking) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="flex h-screen items-center justify-center" style={{ backgroundColor: '#060010' }}>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -103,12 +119,29 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4">
+    <div className="relative flex h-screen items-center justify-center p-4" style={{ backgroundColor: '#060010' }}>
+      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+        <LightPillar
+          topColor="#5227FF"
+          bottomColor="#FF9FFC"
+          intensity={1}
+          rotationSpeed={0.3}
+          glowAmount={0.002}
+          pillarWidth={3}
+          pillarHeight={0.4}
+          noiseIntensity={0.5}
+          pillarRotation={25}
+          interactive={false}
+          mixBlendMode="screen"
+          quality="high"
+        />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
         className="w-full max-w-md"
+        style={{ position: 'relative', zIndex: 1 }}
       >
         {/* Logo & Title Card */}
         <motion.div
@@ -133,7 +166,8 @@ export default function SignInPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.4 }}
-            className="text-3xl font-bold text-foreground mb-2"
+            className="text-3xl font-bold mb-2"
+            style={{ color: 'rgba(255, 255, 255, 1)' }}
           >
             Cheddar
           </motion.h1>
@@ -141,7 +175,8 @@ export default function SignInPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.4 }}
-            className="text-muted-foreground text-lg"
+            className="text-lg"
+            style={{ color: 'rgba(255, 255, 254, 1)' }}
           >
             Sign in to access your CRM
           </motion.p>

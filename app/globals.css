@@ -5,24 +5,25 @@
 @tailwind utilities;
 
 :root {
-  /* Refined dark slate palette */
-  --background: 0 0% 99%;
-  --foreground: 222 47% 11%;
+  /* Dark palette matching MagicBento #060010 */
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --background-dark: #060010;
   
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card: 260 100% 3%;
+  --card-foreground: 0 0% 100%;
   
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover: 260 100% 3%;
+  --popover-foreground: 0 0% 100%;
   
   --primary: 252 100% 67%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 220 14% 96%;
-  --secondary-foreground: 222 47% 11%;
+  --secondary: 260 30% 10%;
+  --secondary-foreground: 0 0% 100%;
   
-  --muted: 220 14% 96%;
-  --muted-foreground: 220 9% 46%;
+  --muted: 260 30% 10%;
+  --muted-foreground: 260 10% 60%;
   
   --accent: 252 100% 67%;
   --accent-foreground: 0 0% 100%;
@@ -30,8 +31,8 @@
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
   
-  --border: 220 13% 91%;
-  --input: 220 13% 91%;
+  --border: 260 30% 15%;
+  --input: 260 30% 15%;
   --ring: 252 100% 67%;
   
   --radius: 0.75rem;
@@ -55,7 +56,8 @@
   }
   
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: #060010;
     font-feature-settings: "ss01", "ss02", "cv01";
   }
   
@@ -254,3 +256,5 @@
   background: hsl(var(--primary) / 0.2);
   color: hsl(var(--foreground));
 }
+
+

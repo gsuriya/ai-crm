@@ -382,51 +382,51 @@ export default function OutreachPage() {
 
   const getStatusConfig = (item: OutreachItem) => {
     if (item.responded) return { 
-      bg: 'bg-emerald-50', 
-      text: 'text-emerald-700', 
-      border: 'border-emerald-200',
+      bg: 'bg-emerald-500/10', 
+      text: 'text-emerald-400', 
+      border: 'border-emerald-500/30',
       icon: <MessageCircle className="w-3.5 h-3.5" />,
       label: 'Replied'
     };
     if (item.status === 'error') return { 
-      bg: 'bg-red-50', 
-      text: 'text-red-600', 
-      border: 'border-red-200',
+      bg: 'bg-red-500/10', 
+      text: 'text-red-400', 
+      border: 'border-red-500/30',
       icon: <AlertCircle className="w-3.5 h-3.5" />,
       label: 'Error'
     };
     if (item.status === 'active') return { 
-      bg: 'bg-sky-50', 
-      text: 'text-sky-700', 
-      border: 'border-sky-200',
+      bg: 'bg-sky-500/10', 
+      text: 'text-sky-400', 
+      border: 'border-sky-500/30',
       icon: <Send className="w-3.5 h-3.5" />,
       label: 'Active'
     };
     if (item.status === 'completed') return { 
-      bg: 'bg-slate-100', 
-      text: 'text-slate-600', 
-      border: 'border-slate-200',
+      bg: 'bg-white/5', 
+      text: 'text-white/50', 
+      border: 'border-white/10',
       icon: <CheckCircle className="w-3.5 h-3.5" />,
       label: 'Done'
     };
     if (isPausedDueToPlan(item)) return { 
-      bg: 'bg-amber-50', 
-      text: 'text-amber-700', 
-      border: 'border-amber-200',
+      bg: 'bg-amber-500/10', 
+      text: 'text-amber-400', 
+      border: 'border-amber-500/30',
       icon: <Zap className="w-3.5 h-3.5" />,
       label: 'Upgrade'
     };
     if (item.status === 'paused') return { 
-      bg: 'bg-amber-50', 
-      text: 'text-amber-700', 
-      border: 'border-amber-200',
+      bg: 'bg-amber-500/10', 
+      text: 'text-amber-400', 
+      border: 'border-amber-500/30',
       icon: <Pause className="w-3.5 h-3.5" />,
       label: 'Paused'
     };
     return { 
-      bg: 'bg-slate-50', 
-      text: 'text-slate-600', 
-      border: 'border-slate-200',
+      bg: 'bg-white/5', 
+      text: 'text-white/40', 
+      border: 'border-white/10',
       icon: <Mail className="w-3.5 h-3.5" />,
       label: 'Pending'
     };
@@ -447,17 +447,17 @@ export default function OutreachPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 to-white">
+      <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-2 border-violet-200 border-t-violet-600 animate-spin" />
-          <p className="text-slate-500 text-sm">Loading outreach...</p>
+          <div className="w-12 h-12 rounded-full border-2 border-violet-500/30 border-t-violet-400 animate-spin" />
+          <p className="text-white/50 text-sm">Loading outreach...</p>
         </div>
-    </div>
-  );
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/30">
+    <div className="min-h-screen">
       <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Header */}
         <motion.div 
@@ -466,21 +466,21 @@ export default function OutreachPage() {
           className="flex items-start justify-between mb-8"
         >
         <div>
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Outreach</h1>
-            <p className="text-slate-500 text-sm mt-1">Track and manage your email sequences</p>
+            <h1 className="text-2xl font-semibold text-white tracking-tight">Outreach</h1>
+            <p className="text-white/50 text-sm mt-1">Track and manage your email sequences</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={handleCheckReplies} 
             disabled={checkingReplies}
-              className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-all shadow-soft"
+              className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:border-white/20 transition-all"
               title="Refresh"
           >
               <RefreshCw className={`w-4 h-4 ${checkingReplies ? 'animate-spin' : ''}`} />
           </button>
           <button 
             onClick={() => setShowAddModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-2 transition-all text-sm font-medium shadow-soft"
+              className="px-4 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-500 flex items-center gap-2 transition-all text-sm font-medium"
           >
               <Plus className="w-4 h-4" />
             Add Person
@@ -496,23 +496,23 @@ export default function OutreachPage() {
           className="flex flex-wrap gap-2 mb-6"
         >
           {[
-            { label: 'All', value: stats.total, filter: 'all' as FilterType, color: 'slate' },
-            { label: 'Active', value: stats.active, filter: 'active' as FilterType, color: 'sky' },
-            { label: 'Paused', value: stats.paused, filter: 'paused' as FilterType, color: 'amber' },
-            { label: 'Completed', value: stats.completed, filter: 'completed' as FilterType, color: 'slate' },
-            { label: 'Replied', value: stats.responded, filter: 'responded' as FilterType, color: 'emerald' },
+            { label: 'All', value: stats.total, filter: 'all' as FilterType },
+            { label: 'Active', value: stats.active, filter: 'active' as FilterType },
+            { label: 'Paused', value: stats.paused, filter: 'paused' as FilterType },
+            { label: 'Completed', value: stats.completed, filter: 'completed' as FilterType },
+            { label: 'Replied', value: stats.responded, filter: 'responded' as FilterType },
         ].map((stat) => (
           <button
             key={stat.label}
             onClick={() => setFilter(stat.filter)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
               filter === stat.filter 
-                  ? 'bg-slate-900 text-white shadow-soft' 
-                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                  ? 'bg-violet-600 text-white' 
+                  : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:border-white/20'
               }`}
             >
               {stat.label}
-              <span className={`ml-2 ${filter === stat.filter ? 'text-slate-300' : 'text-slate-400'}`}>
+              <span className={`ml-2 ${filter === stat.filter ? 'text-white/70' : 'text-white/30'}`}>
                 {stat.value}
               </span>
           </button>
@@ -524,21 +524,21 @@ export default function OutreachPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-soft"
+            className="text-center py-16 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10"
           >
-            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-slate-400" />
+            <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-4">
+              <Mail className="w-8 h-8 text-white/40" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">
+            <h3 className="text-lg font-medium text-white mb-2">
             {filter === 'all' ? 'No outreach yet' : `No ${filter} outreach`}
           </h3>
-            <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">
+            <p className="text-white/50 text-sm mb-6 max-w-sm mx-auto">
               {filter === 'all' ? 'Add someone to a cadence to start your outreach' : 'Check back later'}
           </p>
           {filter === 'all' && (
             <button 
               onClick={() => setShowAddModal(true)}
-                className="px-5 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 text-sm font-medium inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-500 text-sm font-medium inline-flex items-center gap-2"
             >
                 <Plus className="w-4 h-4" />
               Add Person
@@ -559,7 +559,7 @@ export default function OutreachPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.03 }}
-                  className="bg-white rounded-2xl border border-slate-100 shadow-soft hover:shadow-soft-lg hover:border-slate-200 transition-all overflow-hidden"
+                  className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:border-white/20 hover:bg-white/8 transition-all overflow-hidden"
                 >
                   <div className="p-5">
                     <div className="flex items-center gap-4">
@@ -571,18 +571,18 @@ export default function OutreachPage() {
                       {/* Contact Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-semibold text-slate-900 truncate">
+                          <span className="font-semibold text-white truncate">
                         {item.contact ? `${item.contact.first_name} ${item.contact.last_name}` : 'Unknown'}
                       </span>
                       {item.responded && (
-                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium flex-shrink-0">
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full font-medium flex-shrink-0 border border-emerald-500/30">
                               Replied ✓
                         </span>
                       )}
                     </div>
-                        <p className="text-sm text-slate-500 truncate">
+                        <p className="text-sm text-white/50 truncate">
                           {item.company?.name || 'Unknown Company'}
-                          <span className="mx-1.5 text-slate-300">•</span>
+                          <span className="mx-1.5 text-white/20">•</span>
                           {item.cadence?.name || 'Unknown Cadence'}
                         </p>
                       </div>
@@ -590,15 +590,15 @@ export default function OutreachPage() {
                       {/* Progress */}
                       <div className="hidden sm:flex items-center gap-4 px-4">
                         <div className="text-center">
-                          <p className="text-lg font-semibold text-slate-900">
+                          <p className="text-lg font-semibold text-white">
                             {item.current_step}/{item.total_steps}
                           </p>
-                          <p className="text-xs text-slate-400">Emails</p>
+                          <p className="text-xs text-white/40">Emails</p>
                         </div>
                         
                         {/* Progress Bar */}
                         <div className="w-24">
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                             <motion.div 
                               initial={{ width: 0 }}
                               animate={{ width: `${progress}%` }}
@@ -615,9 +615,9 @@ export default function OutreachPage() {
                   
                   {/* Wait Timer */}
                   {waiting && waitInfo && (
-                        <div className={`hidden md:flex items-center gap-2 px-3 py-2 rounded-xl ${waitInfo.isPaused ? 'bg-amber-50' : 'bg-sky-50'}`}>
-                          <Timer className={`w-4 h-4 ${waitInfo.isPaused ? 'text-amber-500' : 'text-sky-500'}`} />
-                          <span className={`text-sm font-medium ${waitInfo.isPaused ? 'text-amber-700' : 'text-sky-700'}`}>
+                        <div className={`hidden md:flex items-center gap-2 px-3 py-2 rounded-xl ${waitInfo.isPaused ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-sky-500/10 border border-sky-500/20'}`}>
+                          <Timer className={`w-4 h-4 ${waitInfo.isPaused ? 'text-amber-400' : 'text-sky-400'}`} />
+                          <span className={`text-sm font-medium ${waitInfo.isPaused ? 'text-amber-300' : 'text-sky-300'}`}>
                             {formatDuration(waitInfo.remainingMs)}
                           </span>
                     </div>
@@ -635,7 +635,7 @@ export default function OutreachPage() {
                       <button 
                         onClick={() => handleSkipWait(item)} 
                         disabled={skipWaitLoading === item.id}
-                            className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                            className="p-2 text-white/40 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
                         title="Send now"
                       >
                             <FastForward className="w-4 h-4" />
@@ -644,7 +644,7 @@ export default function OutreachPage() {
                     
                     <button 
                       onClick={() => handleViewExecution(item)} 
-                          className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                          className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                       title="View details"
                     >
                           <Eye className="w-4 h-4" />
@@ -654,7 +654,7 @@ export default function OutreachPage() {
                       <button 
                         onClick={() => handleRetry(item)} 
                         disabled={actionLoading === item.id}
-                            className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            className="p-2 text-white/40 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
                             title="Retry"
                       >
                             <RotateCcw className="w-4 h-4" />
@@ -665,7 +665,7 @@ export default function OutreachPage() {
                       <div className="relative">
                         <button 
                           onClick={() => setExpandedActions(expandedActions === item.id ? null : item.id)}
-                              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                              className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                         >
                               <MoreHorizontal className="w-4 h-4" />
                         </button>
@@ -673,13 +673,13 @@ export default function OutreachPage() {
                         {expandedActions === item.id && (
                           <>
                             <div className="fixed inset-0 z-10" onClick={() => setExpandedActions(null)} />
-                                <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-20">
+                                <div className="absolute right-0 top-full mt-2 w-44 bg-[#0d0020] backdrop-blur-sm rounded-xl shadow-lg border border-white/10 py-2 z-20">
                               {item.status === 'active' && (
                                 <>
                                   <button
                                     onClick={() => handlePauseCadence(item)}
                                     disabled={actionLoading === item.id}
-                                        className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white flex items-center gap-2"
                                   >
                                         <Pause className="w-4 h-4" />
                                     Pause
@@ -687,7 +687,7 @@ export default function OutreachPage() {
                                   <button
                                     onClick={() => handleCancelCadence(item)}
                                     disabled={actionLoading === item.id}
-                                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"
                                   >
                                         <XIcon className="w-4 h-4" />
                                     Cancel
@@ -698,7 +698,7 @@ export default function OutreachPage() {
                                 isPausedDueToPlan(item) ? (
                                   <button
                                     onClick={() => router.push('/upgrade')}
-                                        className="w-full px-4 py-2 text-left text-sm text-violet-600 hover:bg-violet-50 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm text-violet-400 hover:bg-violet-500/10 flex items-center gap-2"
                                   >
                                         <Zap className="w-4 h-4" />
                                     Upgrade to Resume
@@ -707,7 +707,7 @@ export default function OutreachPage() {
                                   <button
                                     onClick={() => handleResumeCadence(item)}
                                     disabled={actionLoading === item.id}
-                                        className="w-full px-4 py-2 text-left text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-2"
                                   >
                                         <Play className="w-4 h-4" />
                                     Resume

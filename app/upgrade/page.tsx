@@ -42,7 +42,7 @@ export default function UpgradePage() {
 
   if (showCheckout && clientSecret) {
     return (
-      <div className="min-h-screen bg-white py-12 px-4">
+      <div className="min-h-screen py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <button
             onClick={() => {
@@ -67,7 +67,7 @@ export default function UpgradePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white py-12 px-4">
+    <div className="min-h-screen py-12 px-4">
       <div className="max-w-5xl mx-auto">
         <button
           onClick={() => router.push('/')}

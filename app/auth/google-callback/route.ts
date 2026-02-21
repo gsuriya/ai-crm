@@ -183,27 +183,66 @@ export async function GET(request: NextRequest) {
 
     // Try to sign in with Supabase using ID token
     if (tokens.id_token) {
-      const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: tokens.id_token,
-      });
+      try {
+        const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: tokens.id_token,
+        });
 
-      if (authError) {
-        console.error('❌ Error signing in with Supabase signInWithIdToken:', authError);
-        console.log('Will try alternative sign-in method...');
-      } else if (authData?.user) {
-        console.log('✅ Signed in to Supabase with ID token, user:', authData.user.email);
-        
-        // Store Google tokens in user_sessions table
+        if (authError) {
+          console.error('❌ Error signing in with Supabase signInWithIdToken:', authError);
+          console.log('Will try alternative sign-in method...');
+          throw authError; // Force fallback to alternative method
+        } else if (authData?.user) {
+          console.log('✅ Signed in to Supabase with ID token, user:', authData.user.email);
+          
+          // Store Google tokens in user_sessions table
+          const { error: sessionError } = await supabase
+            .from('user_sessions')
+            .upsert({
+              user_id: authData.user.id,
+              email: userInfo.data.email || authData.user.email || '',
+              access_token: tokens.access_token,
+              refresh_token: tokens.refresh_token || null,
+              token_expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
+              scope: scopeString, // Store the SCOPE STRING, not the token!
+            }, {
+              onConflict: 'user_id',
+            });
+
+          if (sessionError) {
+            console.error('❌ Error storing user session:', sessionError);
+            return NextResponse.redirect(`${requestUrl.origin}/auth/signin?error=session_storage_failed`);
+          } else {
+            console.log('✅ Stored Google OAuth tokens with correct scopes for user:', authData.user.email);
+            console.log('✅ Scope string stored:', scopeString);
+            return response;
+          }
+        }
+      } catch (supabaseError: any) {
+        console.error('❌ Supabase connection error:', supabaseError.message);
+        console.log('⚠️ Falling back to cookie-based authentication...');
+        // Continue to fallback method below
+      }
+    }
+
+    // Fallback: signInWithIdToken failed, so we need to handle this differently
+    // Check if user is already signed in (might have existing session)
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (currentUser) {
+        // User is already signed in, just store the tokens
+        console.log('✅ User already signed in, storing tokens directly');
         const { error: sessionError } = await supabase
           .from('user_sessions')
           .upsert({
-            user_id: authData.user.id,
-            email: userInfo.data.email || authData.user.email || '',
+            user_id: currentUser.id,
+            email: userInfo.data.email || currentUser.email || '',
             access_token: tokens.access_token,
             refresh_token: tokens.refresh_token || null,
             token_expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
-            scope: scopeString, // Store the SCOPE STRING, not the token!
+            scope: scopeString,
           }, {
             onConflict: 'user_id',
           });
@@ -212,40 +251,13 @@ export async function GET(request: NextRequest) {
           console.error('❌ Error storing user session:', sessionError);
           return NextResponse.redirect(`${requestUrl.origin}/auth/signin?error=session_storage_failed`);
         } else {
-          console.log('✅ Stored Google OAuth tokens with correct scopes for user:', authData.user.email);
-          console.log('✅ Scope string stored:', scopeString);
+          console.log('✅ Stored Google OAuth tokens with correct scopes for existing user:', currentUser.email);
           return response;
         }
       }
-    }
-
-    // Fallback: signInWithIdToken failed, so we need to handle this differently
-    // Check if user is already signed in (might have existing session)
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    
-    if (currentUser) {
-      // User is already signed in, just store the tokens
-      console.log('✅ User already signed in, storing tokens directly');
-      const { error: sessionError } = await supabase
-        .from('user_sessions')
-        .upsert({
-          user_id: currentUser.id,
-          email: userInfo.data.email || currentUser.email || '',
-          access_token: tokens.access_token,
-          refresh_token: tokens.refresh_token || null,
-          token_expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
-          scope: scopeString,
-        }, {
-          onConflict: 'user_id',
-        });
-
-      if (sessionError) {
-        console.error('❌ Error storing user session:', sessionError);
-        return NextResponse.redirect(`${requestUrl.origin}/auth/signin?error=session_storage_failed`);
-      } else {
-        console.log('✅ Stored Google OAuth tokens with correct scopes for existing user:', currentUser.email);
-        return response;
-      }
+    } catch (getUserError: any) {
+      console.error('❌ Error checking current user:', getUserError.message);
+      console.log('⚠️ Supabase appears to be unavailable. Using cookie-based fallback...');
     }
 
     // No existing session, store tokens temporarily in cookie to complete sign-in on client side

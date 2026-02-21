@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { AuthGuard } from "@/components/auth-guard";
 import { CommandBar } from "@/components/command-bar";
+import LightPillar from "@/components/LightPillar";
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -103,9 +104,26 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       {isAuthPage ? (
         <>{children}</>
       ) : (
-        <div className="flex h-screen overflow-hidden">
+        <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#060010', position: 'relative' }}>
+          {/* Global LightPillar background */}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+            <LightPillar
+              topColor="#5227FF"
+              bottomColor="#FF9FFC"
+              intensity={1}
+              rotationSpeed={0.3}
+              glowAmount={0.002}
+              pillarWidth={3}
+              pillarHeight={0.4}
+              noiseIntensity={0.5}
+              pillarRotation={25}
+              interactive={false}
+              mixBlendMode="screen"
+              quality="high"
+            />
+          </div>
           <Sidebar />
-          <main className="flex-1 overflow-y-auto bg-background min-w-0 pl-8">
+          <main className="flex-1 overflow-y-auto min-w-0 pl-8" style={{ position: 'relative', zIndex: 1, backgroundColor: 'transparent' }}>
             {children}
           </main>
           <CommandBar open={commandBarOpen} onOpenChange={setCommandBarOpen} />

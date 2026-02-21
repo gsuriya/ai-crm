@@ -393,17 +393,17 @@ export default function CadencesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 to-white">
+      <div className="flex items-center justify-center h-screen ">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-2 border-violet-200 border-t-violet-600 animate-spin" />
-          <p className="text-slate-500 text-sm">Loading cadences...</p>
+          <div className="w-12 h-12 rounded-full border-2 border-violet-500/30 border-t-violet-400 animate-spin" />
+          <p className="text-white/50 text-sm">Loading cadences...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/30">
+    <div className="min-h-screen ">
       <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Header */}
         <motion.div 
@@ -412,14 +412,14 @@ export default function CadencesPage() {
           className="flex items-start justify-between mb-8"
         >
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Cadences</h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <h1 className="text-2xl font-semibold text-white tracking-tight">Cadences</h1>
+            <p className="text-white/50 text-sm mt-1">
               {cadences.length} {cadences.length === 1 ? 'sequence' : 'sequences'} created
             </p>
           </div>
           <button
             onClick={handleCreateCadence}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-2 transition-all text-sm font-medium shadow-soft"
+            className="px-4 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-500 flex items-center gap-2 transition-all text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             Create Cadence
@@ -431,18 +431,18 @@ export default function CadencesPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-soft"
+            className="text-center py-16 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10"
           >
-            <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-violet-500/20 flex items-center justify-center mx-auto mb-4">
               <Zap className="w-8 h-8 text-violet-600" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">No cadences yet</h3>
-            <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">
+            <h3 className="text-lg font-medium text-white mb-2">No cadences yet</h3>
+            <p className="text-white/50 text-sm mb-6 max-w-sm mx-auto">
               Create your first email sequence to automate your outreach
             </p>
             <button
               onClick={handleCreateCadence}
-              className="px-5 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 text-sm font-medium inline-flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-500 text-sm font-medium inline-flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Create Cadence
@@ -461,7 +461,7 @@ export default function CadencesPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-soft-lg hover:border-slate-200 transition-all"
+                  className="group bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all"
                 >
                   {/* Card Header with gradient accent */}
                   <div className={`h-1.5 bg-gradient-to-r ${colors.gradient}`} />
@@ -470,11 +470,11 @@ export default function CadencesPage() {
                     {/* Title */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 truncate mb-1 group-hover:text-violet-600 transition-colors">
+                        <h3 className="font-semibold text-white truncate mb-1 group-hover:text-violet-400 transition-colors">
                           {cadence.name}
                         </h3>
                         {cadence.description && (
-                          <p className="text-sm text-slate-500 line-clamp-2">
+                          <p className="text-sm text-white/50 line-clamp-2">
                             {cadence.description}
                           </p>
                         )}
